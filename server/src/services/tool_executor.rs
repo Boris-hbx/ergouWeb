@@ -618,7 +618,7 @@ pub fn tool_definitions() -> Vec<Value> {
                 "type": "object",
                 "properties": {
                     "content": {"type": "string", "description": "要记住的内容，简明扼要，不超过200字"},
-                    "category": {"type": "string", "enum": ["user_fact", "preference", "behavioral_pattern", "conversation_highlight"], "description": "记忆类别：user_fact=个人信息，preference=偏好，behavioral_pattern=行为模式，conversation_highlight=对话亮点"}
+                    "category": {"type": "string", "enum": ["habit", "fact", "personality", "intent"], "description": "记忆类别：habit=操作习惯/默认值，fact=个人事实，personality=沟通偏好，intent=提过但没做的事"}
                 },
                 "required": ["content", "category"]
             }
@@ -2546,8 +2546,8 @@ fn tool_save_memory(db: &Connection, user_id: &str, input: &Value) -> Value {
     }
 
     // Category validation
-    let category = input["category"].as_str().unwrap_or("user_fact");
-    let valid_categories = ["user_fact", "preference", "behavioral_pattern", "conversation_highlight"];
+    let category = input["category"].as_str().unwrap_or("fact");
+    let valid_categories = ["habit", "fact", "personality", "intent"];
     if !valid_categories.contains(&category) {
         return json!({"error": "无效的记忆类别"});
     }

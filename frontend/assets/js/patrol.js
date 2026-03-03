@@ -1,5 +1,5 @@
 /**
- * patrol.js — 二狗巡游系统主控模块
+ * patrol.js — 二狗巡山系统主控模块
  * SPEC-057 Phase 1+2: 核心循环 + 地形感知
  *
  * 依赖: patrol-utils.js (ObjectPool, DeviceProfile, CSSAnimator, IdleDetector, PatrolStateMachine, PawPool)

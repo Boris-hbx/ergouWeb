@@ -1,5 +1,5 @@
 /**
- * patrol-debug.js — 二狗巡游调试面板
+ * patrol-debug.js — 二狗巡山调试面板
  * SPEC-057 Phase 0d
  *
  * 仅 admin 用户可用。

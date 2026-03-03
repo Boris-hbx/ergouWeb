@@ -625,15 +625,25 @@ var Trip = (function() {
             }
 
             if (data.success) {
-                // Upload photos if any
                 var itemId = _editingItemId || (data.item && data.item.id);
                 var pendingFiles = _itemPhotoManager ? _itemPhotoManager.getFiles() : [];
-                if (itemId && pendingFiles.length > 0) {
-                    await API.uploadTripItemPhotos(itemId, pendingFiles);
-                }
+                var tripId = _currentTrip.id;
+
+                // 立即关弹窗 + 提示，不等照片上传
                 closeItemModal();
                 showToast(_editingItemId ? '条目已更新' : '条目已添加');
-                showDetail(_currentTrip.id);
+
+                // 照片上传 + 刷新在后台进行
+                if (itemId && pendingFiles.length > 0) {
+                    API.uploadTripItemPhotos(itemId, pendingFiles)
+                        .then(function() { showDetail(tripId); })
+                        .catch(function() {
+                            showToast('照片上传失败', 'error');
+                            showDetail(tripId);
+                        });
+                } else {
+                    showDetail(tripId);
+                }
             } else {
                 showToast(data.message || '操作失败', 'error');
             }

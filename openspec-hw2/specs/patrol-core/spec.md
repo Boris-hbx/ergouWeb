@@ -160,7 +160,7 @@ Phase 1 使用简化路径（非地形感知）：
 
 ### Requirement: 设置页巡游开关
 
-settings.js 应添加"二狗巡游"开关：
+settings.js 应添加"二狗巡山"开关：
 
 - 存储 key: `patrol-enabled`
 - 默认值: `'1'`（开启）

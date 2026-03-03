@@ -55,6 +55,17 @@
 - **WHEN** 用户打开→关闭→打开 abao 面板 3 次
 - **THEN** 只有 1 个 `keydown` 监听器处于活跃状态，不会触发 3 次回调
 
+### Requirement: SW error capture
+Service Worker catch blocks SHALL log errors with `console.error('[SW]', error)` instead of silently swallowing them. The SW SHALL also listen for `error` and `unhandledrejection` events.
+
+#### Scenario: SW fetch handler error
+- **WHEN** the SW fetch handler encounters an error
+- **THEN** the catch block logs `console.error('[SW]', error)` before falling back
+
+#### Scenario: SW global error
+- **WHEN** an uncaught error occurs in the SW scope
+- **THEN** the `error` event listener logs it with `console.error('[SW] uncaught:', event.error)`
+
 ### Requirement: 好友缓存设置过期策略
 share-modal 的好友列表缓存 SHALL 设置 5 分钟 TTL。超过 TTL 后重新请求服务端数据。好友增删操作 SHALL 立即使缓存失效。
 

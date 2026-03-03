@@ -95,10 +95,10 @@ fn build_memory_context(db: &Connection, user_id: &str) -> String {
 
     for (id, category, content) in &rows {
         let label = match category.as_str() {
-            "user_fact" => "个人信息",
-            "preference" => "偏好",
-            "behavioral_pattern" => "行为模式",
-            "conversation_highlight" => "对话亮点",
+            "habit" => "习惯",
+            "fact" => "事实",
+            "personality" => "性格",
+            "intent" => "意图",
             _ => category,
         };
         ctx.push_str(&format!(
@@ -239,13 +239,14 @@ pub fn build_system_prompt_with_page(
 - 不确定日期时 → 先调 get_current_datetime
 
 ### 记忆
-- 用户自然提到个人信息（名字、职业、城市、习惯）→ save_memory(user_fact)
-- 发现行为模式（总是深夜工作、喜欢先做小事）→ save_memory(behavioral_pattern)
-- 用户表达明确偏好（喜欢简短回复、偏好某种记账方式）→ save_memory(preference)
+- 用户的操作习惯和默认值（记账默认加币、任务喜欢放周五） → save_memory(habit)
+- 用户的个人事实（城市、职业、养了只猫） → save_memory(fact)
+- 用户的沟通偏好（喜欢被怼、讨厌鸡汤、欣赏冷幽默） → save_memory(personality)
+- 用户提过但没做的事（"我该学英语了"、"想记账但一直没开始"） → save_memory(intent)
 - 用户说"忘掉/别记了" → delete_memory
 - 不主动套话。用户没说的不记。
 - 绝不记录密码、银行卡、证件号等敏感信息。
-- 记忆要简明："用户在多伦多做后端开发"（好） vs "用户说他在加拿大安大略省..."（啰嗦）
+- 记忆要简明："用户在温哥华做后端开发"（好） vs "用户说他在加拿大BC省..."（啰嗦）
 
 ## 页面感知
 用户当前正在哪个页面、看的哪条数据会在下方标注。用户说"这里/这个/当前"时，优先理解为当前页面的内容。

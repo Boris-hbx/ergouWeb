@@ -1,5 +1,5 @@
 /**
- * patrol-interfaces.js — 二狗巡游系统接口契约
+ * patrol-interfaces.js — 二狗巡山系统接口契约
  * SPEC-057 Phase 0
  *
  * 本文件定义所有模块间的接口，不包含实现。

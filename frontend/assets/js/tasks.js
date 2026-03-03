@@ -262,6 +262,7 @@ function renderFlatList() {
     document.getElementById('completed-list').innerHTML = completedHtml || '<div class="empty-hint">暂无已完成任务</div>';
     document.getElementById('deleted-list').innerHTML = deletedHtml || '<div class="empty-hint">暂无已删除任务</div>';
 
+    updateButtonAnimations();
     renderAssigneeFilter();
     renderPendingItems();
 }

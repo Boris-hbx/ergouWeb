@@ -163,7 +163,7 @@ async function selectAiModel(model) {
     }
 }
 
-// ========== 二狗巡游开关 ==========
+// ========== 二狗巡山开关 ==========
 
 function initPatrolToggle() {
     var toggle = document.getElementById('patrol-toggle');
@@ -568,10 +568,10 @@ function renderMemories(memories) {
     }
 
     var categoryLabels = {
-        'user_fact': '个人信息',
-        'preference': '偏好',
-        'behavioral_pattern': '行为模式',
-        'conversation_highlight': '对话亮点'
+        'habit': '习惯',
+        'fact': '事实',
+        'personality': '性格',
+        'intent': '意图'
     };
 
     var html = memories.map(function(m) {

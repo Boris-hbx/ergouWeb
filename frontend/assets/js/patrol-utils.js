@@ -1,5 +1,5 @@
 /**
- * patrol-utils.js — 二狗巡游系统通用工具模块
+ * patrol-utils.js — 二狗巡山系统通用工具模块
  * SPEC-057 Phase 0b
  *
  * 包含: ObjectPool, DeviceProfile, CSSAnimator, IdleDetector
