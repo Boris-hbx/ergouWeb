@@ -1,5 +1,5 @@
 /**
- * patrol-utils.js — 二狗巡山系统通用工具模块
+ * patrol-utils.js — 二狗值班系统通用工具模块
  * SPEC-057 Phase 0b
  *
  * 包含: ObjectPool, DeviceProfile, CSSAnimator, IdleDetector
@@ -308,43 +308,43 @@ var IdleDetector = {
 var PatrolStateMachine = {
     create: function(opts) {
         var onStateChange = opts.onStateChange || function() {};
-        var _state = 'home';
+        var _state = 'off_duty';
 
         // Transition table: [currentState][event] → nextState
         var transitions = {
-            home: {
-                idle: 'peek'
+            off_duty: {
+                idle: 'on_duty'
             },
-            peek: {
-                peekDone: 'walk',
-                click: 'home',
-                scroll: 'home',
-                modal: 'home'
+            on_duty: {
+                peekDone: 'patrol',
+                click: 'off_duty',
+                scroll: 'off_duty',
+                modal: 'off_duty'
             },
-            walk: {
-                click: 'home',
-                scroll: 'home',
-                modal: 'home',
+            patrol: {
+                click: 'off_duty',
+                scroll: 'off_duty',
+                modal: 'off_duty',
                 abaoTab: 'converge',
-                walkEnd: 'pause'
+                walkEnd: 'standby'
             },
-            pause: {
-                click: 'home',
-                scroll: 'home',
-                modal: 'home',
+            standby: {
+                click: 'off_duty',
+                scroll: 'off_duty',
+                modal: 'off_duty',
                 abaoTab: 'converge',
-                pauseTimeout: 'walk',
+                pauseTimeout: 'patrol',
                 restTimeout: 'rest'
             },
             rest: {
-                click: 'home',
-                scroll: 'home',
-                modal: 'home',
+                click: 'off_duty',
+                scroll: 'off_duty',
+                modal: 'off_duty',
                 abaoTab: 'converge',
-                idle: 'walk'
+                idle: 'patrol'
             },
             converge: {
-                convergeDone: 'home'
+                convergeDone: 'off_duty'
             }
         };
 
@@ -354,7 +354,7 @@ var PatrolStateMachine = {
             },
 
             get canPatrol() {
-                return _state !== 'home' && _state !== 'converge';
+                return _state !== 'off_duty' && _state !== 'converge';
             },
 
             transition: function(event) {
@@ -377,9 +377,9 @@ var PatrolStateMachine = {
 
             reset: function() {
                 var from = _state;
-                _state = 'home';
-                if (from !== 'home') {
-                    onStateChange(from, 'home', 'reset');
+                _state = 'off_duty';
+                if (from !== 'off_duty') {
+                    onStateChange(from, 'off_duty', 'reset');
                 }
             }
         };

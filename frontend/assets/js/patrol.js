@@ -1,5 +1,5 @@
 /**
- * patrol.js — 二狗巡山系统主控模块
+ * patrol.js — 二狗值班系统主控模块
  * SPEC-057 Phase 1+2: 核心循环 + 地形感知
  *
  * 依赖: patrol-utils.js (ObjectPool, DeviceProfile, CSSAnimator, IdleDetector, PatrolStateMachine, PawPool)
@@ -39,6 +39,95 @@ var Patrol = (function() {
     // Scroll debounce
     var _scrollTimer = null;
 
+    // ─── Abao button breathing (intermittent, scroll-aware) ───
+    var _breatheState = {
+        timer: null,
+        count: 0,         // breaths done in current burst
+        iconEl: null,
+        scrollTimer: null,
+        paused: false,     // true while user is scrolling
+        destroyed: false
+    };
+
+    function breatheInit() {
+        var el = document.querySelector('.mobile-nav-abao .mobile-nav-icon');
+        if (!el) return;
+        _breatheState.iconEl = el;
+        _breatheState.destroyed = false;
+
+        // Listen for scroll → pause breathing
+        var onScroll = function() {
+            _breatheState.paused = true;
+            // Remove animation immediately
+            if (_breatheState.iconEl) _breatheState.iconEl.classList.remove('abao-inhale');
+            clearTimeout(_breatheState.scrollTimer);
+            clearTimeout(_breatheState.timer);
+            // Resume after 6s idle
+            _breatheState.scrollTimer = setTimeout(function() {
+                _breatheState.paused = false;
+                breatheSchedule();
+            }, 6000);
+        };
+        window.addEventListener('scroll', onScroll, true);
+        _breatheState._onScroll = onScroll;
+
+        // Start first cycle after a short delay
+        _breatheState.timer = setTimeout(function() { breatheSchedule(); }, 3000);
+    }
+
+    function breatheSchedule() {
+        if (_breatheState.destroyed || _breatheState.paused) return;
+        _breatheState.count = 0;
+        breatheOnce();
+    }
+
+    function breatheOnce() {
+        if (_breatheState.destroyed || _breatheState.paused) return;
+        var el = _breatheState.iconEl;
+        if (!el) return;
+
+        // Don't breathe if chat panel is open
+        if (el.closest('.active')) return;
+
+        // Trigger one breath
+        el.classList.remove('abao-inhale');
+        // Force reflow to restart animation
+        void el.offsetWidth;
+        el.classList.add('abao-inhale');
+
+        _breatheState.count++;
+
+        // Listen for this breath to finish
+        el.addEventListener('animationend', function handler() {
+            el.removeEventListener('animationend', handler);
+            el.classList.remove('abao-inhale');
+
+            if (_breatheState.destroyed || _breatheState.paused) return;
+
+            if (_breatheState.count < 2) {
+                // Second breath after a short gap
+                _breatheState.timer = setTimeout(breatheOnce, 800);
+            } else {
+                // Done breathing — rest 8-12 seconds
+                var rest = 8000 + Math.random() * 4000;
+                _breatheState.timer = setTimeout(breatheSchedule, rest);
+            }
+        });
+    }
+
+    function breatheDestroy() {
+        _breatheState.destroyed = true;
+        clearTimeout(_breatheState.timer);
+        clearTimeout(_breatheState.scrollTimer);
+        if (_breatheState._onScroll) {
+            window.removeEventListener('scroll', _breatheState._onScroll, true);
+        }
+        if (_breatheState.iconEl) {
+            _breatheState.iconEl.classList.remove('abao-inhale');
+        }
+        _breatheState.iconEl = null;
+    }
+
     // Debug params (overridable via patrol:debugParam)
     var _params = {
         opacity: 0.5,
@@ -59,9 +148,14 @@ var Patrol = (function() {
         return localStorage.getItem('patrol-enabled') !== '0';
     }
 
+    // Organic gait rhythm — not a metronome, more like a real dog
+    // Pattern: normal, normal, linger, normal, normal, quick, normal, normal...
+    var _gaitRhythm = [1.0, 1.0, 1.09, 1.0, 1.0, 0.88, 1.0, 1.0];
+
     function getStepInterval() {
-        // Time between steps based on stride and speed
-        return (_params.stride / _params.speed) * 1000;
+        var base = (_params.stride / _params.speed) * 1000;
+        var rhythm = _gaitRhythm[_walkIndex % _gaitRhythm.length];
+        return base * rhythm;
     }
 
     // Get color from element under point (environment tinting)
@@ -204,6 +298,13 @@ var Patrol = (function() {
         var color = getEnvColor(x, y);
         stampPaw(x, y, color, 'stamped', 2000);
 
+        // "踩凹" — brief inset shadow on the card
+        var card = detail.cardEl;
+        if (card) {
+            card.classList.add('patrol-dent');
+            setTimeout(function() { card.classList.remove('patrol-dent'); }, 400);
+        }
+
         // Check if last in quadrant → checkmark pattern
         if (detail.isLastInQuadrant) {
             var qEl = document.getElementById('quadrant-' + detail.quadrant);
@@ -291,11 +392,11 @@ var Patrol = (function() {
         // Clear all patrol classes
         _tabIcon.classList.remove('patrol-out', 'patrol-returning', 'patrol-pulse');
 
-        if (toState === 'peek' || toState === 'walk' || toState === 'pause' || toState === 'rest') {
+        if (toState === 'on_duty' || toState === 'patrol' || toState === 'standby' || toState === 'rest') {
             _tabIcon.classList.add('patrol-out');
         } else if (toState === 'converge') {
             _tabIcon.classList.add('patrol-returning');
-        } else if (toState === 'home' && fromState !== 'home') {
+        } else if (toState === 'off_duty' && fromState !== 'off_duty') {
             // Coming home — pulse
             _tabIcon.classList.add('patrol-pulse');
             _tabIcon.addEventListener('animationend', function handler() {
@@ -318,19 +419,19 @@ var Patrol = (function() {
 
         // Handle state transitions
         switch (to) {
-            case 'peek':
+            case 'on_duty':
                 handlePeek();
                 break;
-            case 'walk':
+            case 'patrol':
                 handleWalk(from);
                 break;
-            case 'pause':
+            case 'standby':
                 handlePause();
                 break;
             case 'rest':
                 handleRest();
                 break;
-            case 'home':
+            case 'off_duty':
                 handleHome(from, event);
                 break;
             case 'converge':
@@ -359,7 +460,7 @@ var Patrol = (function() {
 
         // After 300ms, transition to walk
         setTimeout(function() {
-            if (_sm && _sm.state === 'peek') {
+            if (_sm && _sm.state === 'on_duty') {
                 _sm.transition('peekDone');
             }
         }, 300);
@@ -369,7 +470,7 @@ var Patrol = (function() {
         clearWalkTimers();
 
         var startX, startY;
-        if (fromState === 'peek' || fromState === 'home') {
+        if (fromState === 'on_duty' || fromState === 'off_duty') {
             // Start from tab icon area
             if (_tabIcon) {
                 var rect = _tabIcon.getBoundingClientRect();
@@ -379,7 +480,7 @@ var Patrol = (function() {
                 startX = window.innerWidth / 2;
                 startY = window.innerHeight - 100;
             }
-        } else if (fromState === 'pause' || fromState === 'rest') {
+        } else if (fromState === 'standby' || fromState === 'rest') {
             // Continue from last position
             if (_walkPath.length > 0) {
                 var last = _walkPath[_walkPath.length - 1];
@@ -395,7 +496,7 @@ var Patrol = (function() {
         }
 
         // Phase 2: use scanAhead when continuing from pause/rest
-        var useScanAhead = (fromState === 'pause' || fromState === 'rest');
+        var useScanAhead = (fromState === 'standby' || fromState === 'rest');
         _walkPath = generatePath(startX, startY, useScanAhead);
         _walkIndex = 0;
         _isLeftFoot = true;
@@ -404,7 +505,7 @@ var Patrol = (function() {
     }
 
     function stepOnce() {
-        if (!_sm || _sm.state !== 'walk') return;
+        if (!_sm || _sm.state !== 'patrol') return;
         if (_walkIndex >= _walkPath.length) {
             _sm.transition('walkEnd');
             return;
@@ -479,14 +580,14 @@ var Patrol = (function() {
 
         // After 5s, continue walking
         _pauseTimer = setTimeout(function() {
-            if (_sm && _sm.state === 'pause') {
+            if (_sm && _sm.state === 'standby') {
                 _sm.transition('pauseTimeout');
             }
         }, 5000);
 
         // After 15s total, enter rest
         _restTimer = setTimeout(function() {
-            if (_sm && _sm.state === 'pause') {
+            if (_sm && _sm.state === 'standby') {
                 _sm.transition('restTimeout');
             }
         }, 15000);
@@ -502,7 +603,7 @@ var Patrol = (function() {
     function handleHome(fromState, event) {
         clearWalkTimers();
 
-        if (fromState === 'home') return; // no-op
+        if (fromState === 'off_duty') return; // no-op
 
         // Choose exit animation based on event
         switch (event) {
@@ -550,16 +651,11 @@ var Patrol = (function() {
             var toX = abaoRect.left + abaoRect.width / 2;
             var toY = abaoRect.top + abaoRect.height / 2;
 
-            // Create arc light point
+            // Create convergence point — straight line, clean, no fuss
             var arc = document.createElement('div');
             arc.className = 'patrol-arc';
-            // Mid point: between from and to, arced upward
-            var midX = (fromX + toX) / 2;
-            var midY = Math.min(fromY, toY) - 40;
             arc.style.setProperty('--arc-from-x', fromX + 'px');
             arc.style.setProperty('--arc-from-y', fromY + 'px');
-            arc.style.setProperty('--arc-mid-x', midX + 'px');
-            arc.style.setProperty('--arc-mid-y', midY + 'px');
             arc.style.setProperty('--arc-to-x', toX + 'px');
             arc.style.setProperty('--arc-to-y', toY + 'px');
             _layer.appendChild(arc);
@@ -796,7 +892,7 @@ var Patrol = (function() {
                 clearWalkTimers();
             } else {
                 // Resume: if in walk state, continue
-                if (_sm && _sm.state === 'walk') {
+                if (_sm && _sm.state === 'patrol') {
                     stepOnce();
                 }
             }
@@ -904,11 +1000,15 @@ var Patrol = (function() {
                 });
             }
 
+            // Abao button breathing (intermittent, scroll-aware)
+            breatheInit();
+
             _initialized = true;
         },
 
         destroy: function() {
             if (!_initialized) return;
+            breatheDestroy();
 
             clearWalkTimers();
             teardownEventBridge();

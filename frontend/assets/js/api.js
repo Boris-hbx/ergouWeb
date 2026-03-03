@@ -479,8 +479,10 @@ var API = (function() {
             return await request('GET', '/expenses/analytics?' + params);
         },
 
-        parseExpensePreview: async function(images) {
-            return await request('POST', '/expenses/parse-preview', { images: images });
+        parseExpensePreview: async function(images, text) {
+            var body = { images: images || [] };
+            if (text) body.text = text;
+            return await request('POST', '/expenses/parse-preview', body);
         },
 
         deleteExpensePhoto: async function(photoId) {

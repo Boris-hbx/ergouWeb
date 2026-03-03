@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>二狗巡山 — 动画展台</title>
+    <title>二狗值班 — 动画展台</title>
     <link rel="stylesheet" href="assets/css/patrol.css">
     <style>
         :root {
@@ -271,10 +271,10 @@
 </head>
 <body>
 
-<h1>二狗巡山动画展台</h1>
+<h1>二狗值班动画展台</h1>
 
 <div class="desktop-hint">
-    桌面端预览模式 — 巡游系统仅移动端生效，此处用于调参和动画验证。建议用手机浏览器或 DevTools 移动模拟查看。
+    桌面端预览模式 — 值班系统仅移动端生效，此处用于调参和动画验证。建议用手机浏览器或 DevTools 移动模拟查看。
 </div>
 
 <!-- Section 1: Paw Rendering -->
@@ -440,7 +440,7 @@
     </div>
     <div class="showcase-controls">
         <button class="showcase-btn" onclick="tabTransition('home')">在家(实心)</button>
-        <button class="showcase-btn" onclick="tabTransition('out')">巡游(空心)</button>
+        <button class="showcase-btn" onclick="tabTransition('out')">值班(空心)</button>
         <button class="showcase-btn" onclick="tabTransition('return')">回家中</button>
         <button class="showcase-btn" onclick="tabTransition('pulse')">落定脉冲</button>
     </div>
@@ -486,7 +486,7 @@
 <div class="showcase-section">
     <h2>11. 性能基准</h2>
     <p style="font-size:12px;color:#666;margin-bottom:8px">
-        自动触发 10 秒巡游（出场→行走 20 步→退场），记录帧耗时。
+        自动触发 10 秒值班（出场→行走 20 步→退场），记录帧耗时。
     </p>
     <div class="showcase-controls">
         <button class="showcase-btn" onclick="runBenchmark('high')" id="bench-btn-high">Run (High)</button>
@@ -943,7 +943,7 @@ function tabTransition(state) {
             break;
         case 'out':
             icon.classList.add('patrol-out');
-            label.textContent = '巡游中 (空心)';
+            label.textContent = '值班中 (空心)';
             break;
         case 'return':
             icon.classList.add('patrol-returning');

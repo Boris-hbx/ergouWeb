@@ -605,25 +605,17 @@
 }
 
 /* ===== PatrolLab — 二狗实验室 ===== */
-.admin-patrol-layout {
-    display: flex;
-    gap: 24px;
-    margin-bottom: 24px;
-}
 
 .admin-patrol-status {
-    width: 220px;
-    min-width: 220px;
     display: flex;
-    flex-direction: column;
+    flex-wrap: wrap;
     gap: 16px;
+    margin-bottom: 16px;
 }
 
-.admin-patrol-preview {
+.admin-patrol-status > .admin-patrol-group {
     flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
+    min-width: 180px;
 }
 
 .admin-patrol-group {
@@ -677,56 +669,6 @@
     gap: 6px;
 }
 
-/* SVG preview box */
-.admin-patrol-svg-box {
-    background:
-        linear-gradient(to right, var(--border-color, rgba(0,0,0,0.04)) 1px, transparent 1px),
-        linear-gradient(to bottom, var(--border-color, rgba(0,0,0,0.04)) 1px, transparent 1px);
-    background-size: 16px 16px;
-    border: 1px solid var(--border-color, rgba(0,0,0,0.1));
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 200px;
-    padding: 24px;
-}
-
-.admin-patrol-svg {
-    width: 160px;
-    height: 200px;
-    transition: opacity 0.2s;
-}
-
-/* Pose buttons */
-.admin-patrol-poses {
-    display: flex;
-    gap: 6px;
-    flex-wrap: wrap;
-}
-
-/* SVG fine-tuning controls */
-.admin-patrol-svg-controls {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.ap-svg-ctrl-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 13px;
-}
-
-.ap-color-swatch {
-    width: 16px;
-    height: 16px;
-    border-radius: 4px;
-    border: 1px solid var(--border-color, rgba(0,0,0,0.15));
-    display: inline-block;
-}
-
 /* Sliders shared */
 .ap-slider {
     flex: 1;
@@ -762,6 +704,7 @@
     border: 1px solid var(--border-color, rgba(0,0,0,0.1));
     border-radius: 8px;
     padding: 16px;
+    margin-top: 16px;
 }
 
 .admin-patrol-slider-grid {
@@ -783,51 +726,11 @@
     opacity: 0.65;
 }
 
-/* SVG pose animations */
-.patrol-svg-tail {
-    animation: patrol-wag 0.6s ease-in-out infinite alternate;
-    transform-origin: 20px 22px;
-}
-
-@keyframes patrol-wag {
-    0%   { transform: rotate(-12deg); }
-    100% { transform: rotate(12deg); }
-}
-
-.patrol-svg-walk-fl,
-.patrol-svg-walk-br {
-    animation: patrol-walk-leg-a 0.5s ease-in-out infinite alternate;
-}
-
-.patrol-svg-walk-fr,
-.patrol-svg-walk-bl {
-    animation: patrol-walk-leg-b 0.5s ease-in-out infinite alternate;
-}
-
-@keyframes patrol-walk-leg-a {
-    0%   { transform: rotate(-8deg); }
-    100% { transform: rotate(8deg); }
-}
-
-@keyframes patrol-walk-leg-b {
-    0%   { transform: rotate(8deg); }
-    100% { transform: rotate(-8deg); }
-}
 
 /* Responsive */
 @media (max-width: 768px) {
-    .admin-patrol-layout {
-        flex-direction: column;
-    }
     .admin-patrol-status {
-        width: 100%;
-        min-width: unset;
-        flex-direction: row;
-        flex-wrap: wrap;
-    }
-    .admin-patrol-status .admin-patrol-group {
-        flex: 1;
-        min-width: 180px;
+        flex-direction: column;
     }
     .admin-patrol-slider-grid {
         grid-template-columns: 1fr;

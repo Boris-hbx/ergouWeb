@@ -106,7 +106,11 @@ pub struct ParsePreviewImage {
 
 #[derive(Debug, Deserialize)]
 pub struct ParsePreviewRequest {
+    #[serde(default)]
     pub images: Vec<ParsePreviewImage>,
+    /// User-provided text (notes, amount description) for AI analysis
+    #[serde(default)]
+    pub text: Option<String>,
 }
 
 #[derive(Debug, Serialize)]

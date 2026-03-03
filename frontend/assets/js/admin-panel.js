@@ -1098,75 +1098,6 @@ var AdminPanel = (function() {
         _totalFrames: 0,
         _updateTimer: null,
         _paused: false,
-        _currentPose: 'stand',
-
-        // ── SVG body outlines (极简线稿, viewBox 0 0 32 32) ──
-        _poses: {
-            stand: [
-                '<path d="M9 4 L7 1 L8 4" fill="none"/>', // left ear
-                '<path d="M17 4 L19 1 L18 4" fill="none"/>', // right ear
-                '<ellipse cx="13" cy="6" rx="6" ry="4.5" fill="none"/>', // head
-                '<path d="M19 8 Q22 14 20 22" fill="none"/>', // body back
-                '<path d="M7 8 Q5 14 7 22" fill="none"/>', // body front
-                '<path d="M20 22 Q24 20 22 28" fill="none"/>', // tail
-                '<line x1="8" y1="22" x2="7" y2="30"/>', // front-left leg
-                '<line x1="12" y1="22" x2="11" y2="30"/>', // front-right leg
-                '<line x1="17" y1="22" x2="16" y2="30"/>', // back-left leg
-                '<line x1="20" y1="22" x2="19" y2="30"/>' // back-right leg
-            ],
-            walk: [
-                '<path d="M9 4 L7 1 L8 4" fill="none"/>',
-                '<path d="M17 4 L19 1 L18 4" fill="none"/>',
-                '<ellipse cx="13" cy="6" rx="6" ry="4.5" fill="none"/>',
-                '<path d="M19 8 Q23 13 21 22" fill="none"/>', // slight forward lean
-                '<path d="M7 8 Q4 13 6 22" fill="none"/>',
-                '<path d="M21 22 Q25 19 23 27" fill="none"/>',
-                '<line x1="7" y1="22" x2="5" y2="30" class="patrol-svg-walk-fl"/>', // legs animated
-                '<line x1="11" y1="22" x2="13" y2="30" class="patrol-svg-walk-fr"/>',
-                '<line x1="16" y1="22" x2="18" y2="30" class="patrol-svg-walk-bl"/>',
-                '<line x1="20" y1="22" x2="18" y2="30" class="patrol-svg-walk-br"/>'
-            ],
-            sit: [
-                '<path d="M9 6 L7 3 L8 6" fill="none"/>',
-                '<path d="M17 6 L19 3 L18 6" fill="none"/>',
-                '<ellipse cx="13" cy="8" rx="6" ry="4.5" fill="none"/>', // head lower
-                '<path d="M19 11 Q22 16 20 22" fill="none"/>',
-                '<path d="M7 11 Q5 16 7 22" fill="none"/>',
-                '<path d="M20 22 Q24 20 22 28" fill="none"/>',
-                '<path d="M8 22 Q6 24 10 26" fill="none"/>', // tucked front legs
-                '<path d="M12 22 Q10 24 14 26" fill="none"/>',
-                '<path d="M16 22 Q14 24 18 26" fill="none"/>', // tucked back legs
-                '<path d="M20 22 Q18 24 22 26" fill="none"/>'
-            ],
-            wag: [
-                '<path d="M9 4 L7 1 L8 4" fill="none"/>',
-                '<path d="M17 4 L19 1 L18 4" fill="none"/>',
-                '<ellipse cx="13" cy="6" rx="6" ry="4.5" fill="none"/>',
-                '<path d="M19 8 Q22 14 20 22" fill="none"/>',
-                '<path d="M7 8 Q5 14 7 22" fill="none"/>',
-                '<path d="M20 22 Q24 20 22 28" class="patrol-svg-tail"/>', // animated tail
-                '<line x1="8" y1="22" x2="7" y2="30"/>',
-                '<line x1="12" y1="22" x2="11" y2="30"/>',
-                '<line x1="17" y1="22" x2="16" y2="30"/>',
-                '<line x1="20" y1="22" x2="19" y2="30"/>'
-            ],
-            stretch: [
-                '<path d="M7 8 L5 5 L6 8" fill="none"/>',
-                '<path d="M15 8 L17 5 L16 8" fill="none"/>',
-                '<ellipse cx="11" cy="10" rx="6" ry="4" fill="none"/>', // head low-forward
-                '<path d="M17 12 Q22 14 21 20" fill="none"/>', // arched back
-                '<path d="M5 12 Q2 14 4 20" fill="none"/>',
-                '<path d="M21 20 Q25 18 23 26" fill="none"/>',
-                '<line x1="5" y1="20" x2="2" y2="30"/>', // front legs stretched forward
-                '<line x1="9" y1="20" x2="6" y2="30"/>',
-                '<line x1="17" y1="20" x2="17" y2="30"/>', // back legs straight
-                '<line x1="21" y1="20" x2="21" y2="30"/>'
-            ]
-        },
-
-        _poseLabels: {
-            stand: '站立', walk: '行走', sit: '趴下', wag: '摇尾巴', stretch: '伸懒腰'
-        },
 
         load: function() {
             var el = document.getElementById('admin-patrol-content');
@@ -1186,15 +1117,15 @@ var AdminPanel = (function() {
             var self = this;
             var connected = !!this._refs;
 
-            var html = '<div class="admin-patrol-layout">';
+            var html = '';
 
-            // ── Left column: status + controls ──
+            // ── Status + controls (horizontal groups) ──
             html += '<div class="admin-patrol-status">';
 
             // Real-time status
             html += '<div class="admin-patrol-group">';
             html += '<div class="admin-patrol-group-title">实时状态</div>';
-            html += '<div class="ap-row"><span class="ap-label">状态</span><span class="ap-val" id="ap-state">' + (connected ? 'home' : '未连接') + '</span></div>';
+            html += '<div class="ap-row"><span class="ap-label">状态</span><span class="ap-val" id="ap-state">' + (connected ? 'off_duty' : '未连接') + '</span></div>';
             html += '<div class="ap-row"><span class="ap-label">位置</span><span class="ap-val" id="ap-pos">-</span></div>';
             html += '<div class="ap-row"><span class="ap-label">爪印</span><span class="ap-val" id="ap-paws">0/8</span></div>';
             html += '<div class="ap-row"><span class="ap-label">冷却</span><span class="ap-val" id="ap-cooldown">ready</span></div>';
@@ -1221,50 +1152,11 @@ var AdminPanel = (function() {
             html += '<button class="admin-btn admin-btn-secondary ap-ctrl" data-action="terrain">地形</button>';
             html += '</div>';
             if (!connected) {
-                html += '<div class="ap-hint">巡山系统未初始化（仅移动端）</div>';
+                html += '<div class="ap-hint">值班系统未初始化（仅移动端）</div>';
             }
             html += '</div>';
 
-            html += '</div>'; // end left
-
-            // ── Right column: SVG preview ──
-            html += '<div class="admin-patrol-preview">';
-            html += '<div class="admin-patrol-group-title">SVG 设计预览</div>';
-            html += '<div class="admin-patrol-svg-box" id="ap-svg-box">';
-            html += this.renderSVG('stand');
-            html += '</div>';
-
-            // Pose buttons
-            html += '<div class="admin-patrol-poses" id="ap-poses">';
-            var poses = ['stand', 'walk', 'sit', 'wag', 'stretch'];
-            for (var i = 0; i < poses.length; i++) {
-                var p = poses[i];
-                html += '<button class="admin-btn ' + (p === 'stand' ? 'admin-btn-primary' : 'admin-btn-secondary') + ' ap-pose" data-pose="' + p + '">' + this._poseLabels[p] + '</button>';
-            }
-            html += '</div>';
-
-            // Color & opacity controls
-            html += '<div class="admin-patrol-svg-controls">';
-            html += '<div class="ap-svg-ctrl-row">';
-            html += '<span class="ap-label">颜色</span>';
-            html += '<span class="ap-val ap-color-swatch" id="ap-color-swatch"></span>';
-            html += '<span class="ap-val" style="font-size:11px;">跟随主题</span>';
-            html += '</div>';
-            html += '<div class="ap-svg-ctrl-row">';
-            html += '<span class="ap-label">透明度</span>';
-            html += '<input type="range" class="ap-slider" min="0.1" max="1" step="0.05" value="0.8" id="ap-svg-opacity">';
-            html += '<span class="ap-val" id="ap-svg-opacity-val">0.8</span>';
-            html += '</div>';
-            html += '<div class="ap-svg-ctrl-row">';
-            html += '<span class="ap-label">线宽</span>';
-            html += '<input type="range" class="ap-slider" min="0.5" max="3" step="0.25" value="1.2" id="ap-svg-stroke">';
-            html += '<span class="ap-val" id="ap-svg-stroke-val">1.2</span>';
-            html += '</div>';
-            html += '</div>';
-
-            html += '</div>'; // end right
-
-            html += '</div>'; // end layout
+            html += '</div>'; // end status
 
             // ── Bottom: parameter sliders ──
             html += '<div class="admin-patrol-sliders">';
@@ -1291,16 +1183,6 @@ var AdminPanel = (function() {
                 '</div>';
         },
 
-        renderSVG: function(pose) {
-            var paths = this._poses[pose];
-            if (!paths) return '';
-            var color = getComputedStyle(document.documentElement).getPropertyValue('--primary-color').trim() || '#667eea';
-            return '<svg class="admin-patrol-svg" viewBox="0 0 26 32" xmlns="http://www.w3.org/2000/svg">' +
-                '<g stroke="' + color + '" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="none">' +
-                paths.join('') +
-                '</g></svg>';
-        },
-
         bindEvents: function() {
             var self = this;
 
@@ -1312,34 +1194,6 @@ var AdminPanel = (function() {
                     self.handleControl(action, btn);
                 });
             });
-
-            // Pose buttons
-            var poseBtns = document.querySelectorAll('.ap-pose');
-            poseBtns.forEach(function(btn) {
-                btn.addEventListener('click', function() {
-                    self.switchPose(btn.dataset.pose);
-                });
-            });
-
-            // SVG opacity slider
-            var opSlider = document.getElementById('ap-svg-opacity');
-            if (opSlider) {
-                opSlider.addEventListener('input', function() {
-                    document.getElementById('ap-svg-opacity-val').textContent = parseFloat(this.value).toFixed(2);
-                    var svg = document.querySelector('.admin-patrol-svg');
-                    if (svg) svg.style.opacity = this.value;
-                });
-            }
-
-            // SVG stroke width slider
-            var swSlider = document.getElementById('ap-svg-stroke');
-            if (swSlider) {
-                swSlider.addEventListener('input', function() {
-                    document.getElementById('ap-svg-stroke-val').textContent = parseFloat(this.value).toFixed(2);
-                    var g = document.querySelector('.admin-patrol-svg g');
-                    if (g) g.setAttribute('stroke-width', this.value);
-                });
-            }
 
             // Parameter sliders → dispatch events
             this.bindParamSlider('ap-idle', function(v) {
@@ -1361,13 +1215,6 @@ var AdminPanel = (function() {
             this.bindParamSlider('ap-paw-opacity', function(v) {
                 document.dispatchEvent(new CustomEvent('patrol:debugParam', { detail: { key: 'opacity', value: parseFloat(v) } }));
             }, function(v) { return parseFloat(v).toFixed(2); });
-
-            // Update color swatch
-            var swatch = document.getElementById('ap-color-swatch');
-            if (swatch) {
-                var color = getComputedStyle(document.documentElement).getPropertyValue('--primary-color').trim() || '#667eea';
-                swatch.style.background = color;
-            }
         },
 
         bindParamSlider: function(prefix, onInput, fmtFn) {
@@ -1385,7 +1232,7 @@ var AdminPanel = (function() {
             switch (action) {
                 case 'force':
                     if (refs && refs.sm) {
-                        refs.sm.forceState('peek');
+                        refs.sm.forceState('on_duty');
                         setTimeout(function() {
                             if (refs.sm) refs.sm.transition('peekDone');
                         }, 300);
@@ -1409,30 +1256,6 @@ var AdminPanel = (function() {
                     }
                     break;
             }
-        },
-
-        switchPose: function(pose) {
-            if (!this._poses[pose]) return;
-            this._currentPose = pose;
-
-            // Update SVG
-            var box = document.getElementById('ap-svg-box');
-            if (box) {
-                box.innerHTML = this.renderSVG(pose);
-                // Re-apply opacity/stroke from sliders
-                var opSlider = document.getElementById('ap-svg-opacity');
-                var swSlider = document.getElementById('ap-svg-stroke');
-                var svg = box.querySelector('.admin-patrol-svg');
-                if (svg && opSlider) svg.style.opacity = opSlider.value;
-                var g = box.querySelector('g');
-                if (g && swSlider) g.setAttribute('stroke-width', swSlider.value);
-            }
-
-            // Update buttons
-            var btns = document.querySelectorAll('.ap-pose');
-            btns.forEach(function(b) {
-                b.className = 'admin-btn ' + (b.dataset.pose === pose ? 'admin-btn-primary' : 'admin-btn-secondary') + ' ap-pose';
-            });
         },
 
         startPerfMonitor: function() {
@@ -1461,6 +1284,20 @@ var AdminPanel = (function() {
                 self._updateTimer = setTimeout(update, 500);
             }
             update();
+        },
+
+        stopPerfMonitor: function() {
+            if (this._rafId) {
+                cancelAnimationFrame(this._rafId);
+                this._rafId = null;
+            }
+        },
+
+        stopDisplayUpdate: function() {
+            if (this._updateTimer) {
+                clearTimeout(this._updateTimer);
+                this._updateTimer = null;
+            }
         },
 
         updateDisplay: function() {
