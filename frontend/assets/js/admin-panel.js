@@ -442,7 +442,7 @@ var AdminPanel = (function() {
                 var m = messages[i];
                 var cls = m.role === 'user' ? 'user' : 'assistant';
                 html += '<div class="admin-chat-msg ' + cls + '">';
-                html += esc(m.content_text || '');
+                html += esc(m.content || m.content_text || '');
                 html += '<div class="msg-meta">' + shortDateTime(m.created_at);
                 if (m.token_count) html += ' · ' + fmt(m.token_count) + ' tokens';
                 html += '</div></div>';
