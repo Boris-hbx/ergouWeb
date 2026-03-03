@@ -2581,7 +2581,19 @@ fn is_sensitive_content(content: &str) -> bool {
 
 // ─── Person (人物档案) tools ───
 
+fn require_admin(db: &Connection, user_id: &str) -> Option<Value> {
+    let role: String = db
+        .query_row("SELECT role FROM users WHERE id=?1", [user_id], |r| r.get(0))
+        .unwrap_or_default();
+    if role != "admin" && role != "owner" {
+        Some(json!({"error": "只有主人能教我认人，你没这个权限。"}))
+    } else {
+        None
+    }
+}
+
 fn tool_save_person(db: &Connection, user_id: &str, input: &Value) -> Value {
+    if let Some(err) = require_admin(db, user_id) { return err; }
     let name = match input["name"].as_str() {
         Some(n) if !n.trim().is_empty() => n.trim(),
         _ => return json!({"error": "name 不能为空"}),
@@ -2636,6 +2648,7 @@ fn tool_save_person(db: &Connection, user_id: &str, input: &Value) -> Value {
 }
 
 fn tool_update_person(db: &Connection, user_id: &str, input: &Value) -> Value {
+    if let Some(err) = require_admin(db, user_id) { return err; }
     let id = match input["id"].as_str() {
         Some(i) if !i.is_empty() => i,
         _ => return json!({"error": "id is required"}),
@@ -2689,6 +2702,7 @@ fn tool_update_person(db: &Connection, user_id: &str, input: &Value) -> Value {
 }
 
 fn tool_delete_person(db: &Connection, user_id: &str, input: &Value) -> Value {
+    if let Some(err) = require_admin(db, user_id) { return err; }
     let id = match input["id"].as_str() {
         Some(i) if !i.is_empty() => i,
         _ => return json!({"error": "id is required"}),
