@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::auth::{check_guest_ai_quota, ActiveUserId};
-use crate::services::{claude::ClaudeClient, context, tool_executor};
+use crate::services::{context, llm::LlmClient, tool_executor};
 use crate::state::AppState;
 
 #[derive(Debug, Deserialize)]
@@ -88,15 +88,15 @@ pub async fn chat_handler(
         }
     }
 
-    // Initialize Claude client
-    let claude = match ClaudeClient::new() {
+    // Initialize LLM client based on user preference
+    let llm = match LlmClient::for_user(&state.db.lock(), &user_id.0) {
         Some(c) => c,
         None => {
             return (
                 StatusCode::SERVICE_UNAVAILABLE,
                 Json(ChatResponse {
                     success: false,
-                    message: Some("AI 服务未配置，请设置 ANTHROPIC_API_KEY".into()),
+                    message: Some("AI 服务未配置".into()),
                     conversation_id: None,
                     reply: None,
                     tool_calls: None,
@@ -203,10 +203,26 @@ pub async fn chat_handler(
     // Add current message to history
     history_messages.push(json!({"role": "user", "content": message}));
 
+    // Read user timezone
+    let user_timezone = {
+        let db = state.db.lock();
+        db.query_row(
+            "SELECT timezone FROM user_settings WHERE user_id = ?1",
+            [&user_id.0],
+            |row| row.get::<_, String>(0),
+        )
+        .unwrap_or_else(|_| "America/Toronto".to_string())
+    };
+
     // Build system prompt with page context
     let system_prompt = {
         let db = state.db.lock();
-        context::build_system_prompt_with_page(&db, &user_id.0, req.page_context.as_ref())
+        context::build_system_prompt_with_page(
+            &db,
+            &user_id.0,
+            req.page_context.as_ref(),
+            &user_timezone,
+        )
     };
 
     let tools = tool_executor::tool_definitions();
@@ -217,8 +233,8 @@ pub async fn chat_handler(
     let conv_id_clone = conversation_id.clone();
     let start = std::time::Instant::now();
 
-    // Call Claude with tool use loop
-    let result = claude
+    // Call LLM with tool use loop
+    let result = llm
         .chat(&system_prompt, history_messages, &tools, |name, input| {
             let db = tool_state.db.lock();
             tool_executor::execute_tool(&db, &tool_user_id, name, input)

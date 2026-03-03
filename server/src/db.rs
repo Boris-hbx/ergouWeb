@@ -121,6 +121,26 @@ fn run_migrations(conn: &Connection) {
         conn.execute_batch("ALTER TABLE users ADD COLUMN ai_calls_remaining INTEGER DEFAULT NULL;")
             .ok();
     }
+
+    // Add ai_model preference to user_settings
+    let has_ai_model: bool = conn
+        .prepare("SELECT ai_model FROM user_settings LIMIT 1")
+        .is_ok();
+    if !has_ai_model {
+        conn.execute_batch("ALTER TABLE user_settings ADD COLUMN ai_model TEXT DEFAULT 'auto';")
+            .ok();
+    }
+
+    // Add timezone preference to user_settings
+    let has_timezone: bool = conn
+        .prepare("SELECT timezone FROM user_settings LIMIT 1")
+        .is_ok();
+    if !has_timezone {
+        conn.execute_batch(
+            "ALTER TABLE user_settings ADD COLUMN timezone TEXT DEFAULT 'America/Toronto';",
+        )
+        .ok();
+    }
 }
 
 fn create_tables(conn: &Connection) {
@@ -526,6 +546,32 @@ fn create_tables(conn: &Connection) {
             PRIMARY KEY (trip_id, user_id)
         );
         CREATE INDEX IF NOT EXISTS idx_trip_collab_user ON trip_collaborators(user_id);
+
+        -- Ergou memories (二狗记忆)
+        CREATE TABLE IF NOT EXISTS ergou_memories (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL REFERENCES users(id),
+            category TEXT NOT NULL DEFAULT 'user_fact',
+            content TEXT NOT NULL,
+            source_conversation_id TEXT,
+            created_at TEXT NOT NULL,
+            last_accessed_at TEXT NOT NULL,
+            access_count INTEGER DEFAULT 0
+        );
+        CREATE INDEX IF NOT EXISTS idx_ergou_memories_user ON ergou_memories(user_id, last_accessed_at DESC);
+
+        -- Security events (安全事件)
+        CREATE TABLE IF NOT EXISTS security_events (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL REFERENCES users(id),
+            event_type TEXT NOT NULL,
+            severity TEXT NOT NULL,
+            description TEXT NOT NULL,
+            conversation_id TEXT,
+            admin_notified INTEGER DEFAULT 0,
+            created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_security_events_user ON security_events(user_id, created_at DESC);
         ",
     )
     .expect("Failed to create tables");
@@ -537,8 +583,26 @@ pub fn daily_backup(conn: &Connection, backup_dir: &str) {
     let today = chrono::Local::now().format("%Y-%m-%d").to_string();
     let backup_path = format!("{}/next-{}.db", backup_dir, today);
 
+    // Validate backup path stays within the designated directory
+    let canonical_dir = match fs::canonicalize(backup_dir) {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("[backup] Cannot resolve backup dir {}: {}", backup_dir, e);
+            return;
+        }
+    };
+    let full_path = canonical_dir.join(format!("next-{}.db", today));
+    if !full_path.starts_with(&canonical_dir) {
+        eprintln!(
+            "[backup] Path traversal blocked: {:?} escapes {:?}",
+            full_path, canonical_dir
+        );
+        return;
+    }
+
     if !Path::new(&backup_path).exists() {
-        let sql = format!("VACUUM INTO '{}'", backup_path);
+        let safe_path = full_path.to_string_lossy().replace('\'', "''");
+        let sql = format!("VACUUM INTO '{}'", safe_path);
         if let Err(e) = conn.execute_batch(&sql) {
             eprintln!("Backup failed: {}", e);
         } else {

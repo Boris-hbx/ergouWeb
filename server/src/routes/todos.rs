@@ -1,6 +1,7 @@
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
+    response::IntoResponse,
     Json,
 };
 use serde::{Deserialize, Serialize};
@@ -11,6 +12,14 @@ use crate::auth::{ActiveUserId, UserId};
 use crate::models::todo::*;
 use crate::services::collaboration;
 use crate::state::AppState;
+
+fn db_error(ctx: &str, e: rusqlite::Error) -> (StatusCode, Json<serde_json::Value>) {
+    eprintln!("[{}] db error: {}", ctx, e);
+    (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(json!({"success": false, "error": "内部错误"})),
+    )
+}
 
 #[derive(Debug, Serialize)]
 pub struct TodosResponse {
@@ -65,12 +74,16 @@ fn load_next_reminder(
 
 /// Load changelog for a todo from the database
 fn load_changelog(db: &rusqlite::Connection, todo_id: &str) -> Vec<ChangeEntry> {
-    let mut stmt = db
-        .prepare(
-            "SELECT field, label, from_val, to_val, time FROM todo_changelog WHERE todo_id = ?1 ORDER BY id DESC LIMIT 50",
-        )
-        .unwrap();
-    stmt.query_map([todo_id], |row| {
+    let mut stmt = match db.prepare(
+        "SELECT field, label, from_val, to_val, time FROM todo_changelog WHERE todo_id = ?1 ORDER BY id DESC LIMIT 50",
+    ) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("[todos] load_changelog prepare error: {}", e);
+            return Vec::new();
+        }
+    };
+    let result = stmt.query_map([todo_id], |row| {
         Ok(ChangeEntry {
             field: row.get(0)?,
             label: row.get(1)?,
@@ -78,10 +91,14 @@ fn load_changelog(db: &rusqlite::Connection, todo_id: &str) -> Vec<ChangeEntry> 
             new_value: row.get(3).unwrap_or_default(),
             timestamp: row.get(4)?,
         })
-    })
-    .unwrap()
-    .filter_map(|r| r.ok())
-    .collect()
+    });
+    match result {
+        Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
+        Err(e) => {
+            eprintln!("[todos] load_changelog query error: {}", e);
+            Vec::new()
+        }
+    }
 }
 
 /// Build a Todo from a database row
@@ -116,30 +133,39 @@ pub async fn list_todos(
     State(state): State<AppState>,
     user_id: UserId,
     Query(query): Query<ListQuery>,
-) -> (StatusCode, Json<TodosResponse>) {
+) -> impl IntoResponse {
     let db = state.db.lock();
+
+    // Helper macro for prepare+query with error handling
+    macro_rules! query_todos {
+        ($db:expr, $sql:expr, $params:expr, $ctx:expr) => {{
+            let mut stmt = match $db.prepare($sql) {
+                Ok(s) => s,
+                Err(e) => return db_error($ctx, e).into_response(),
+            };
+            let result = stmt.query_map($params, row_to_todo);
+            match result {
+                Ok(rows) => rows.filter_map(|r| r.ok()).collect::<Vec<Todo>>(),
+                Err(e) => return db_error($ctx, e).into_response(),
+            }
+        }};
+    }
 
     // Own todos
     let mut items: Vec<Todo> = if let Some(tab) = &query.tab {
-        let mut stmt = db
-            .prepare(
-                "SELECT id, text, content, tab, quadrant, progress, completed_at, completed, due_date, deleted, assignee, tags, created_at, updated_at, deleted_at FROM todos WHERE user_id = ?1 AND tab = ?2 AND deleted = 0 ORDER BY completed ASC, created_at ASC",
-            )
-            .unwrap();
-        stmt.query_map(rusqlite::params![user_id.0, tab], row_to_todo)
-            .unwrap()
-            .filter_map(|r| r.ok())
-            .collect()
+        query_todos!(
+            db,
+            "SELECT id, text, content, tab, quadrant, progress, completed_at, completed, due_date, deleted, assignee, tags, created_at, updated_at, deleted_at FROM todos WHERE user_id = ?1 AND tab = ?2 AND deleted = 0 ORDER BY completed ASC, created_at ASC",
+            rusqlite::params![user_id.0, tab],
+            "todos/list"
+        )
     } else {
-        let mut stmt = db
-            .prepare(
-                "SELECT id, text, content, tab, quadrant, progress, completed_at, completed, due_date, deleted, assignee, tags, created_at, updated_at, deleted_at FROM todos WHERE user_id = ?1 AND deleted = 0 ORDER BY completed ASC, created_at ASC",
-            )
-            .unwrap();
-        stmt.query_map([&user_id.0], row_to_todo)
-            .unwrap()
-            .filter_map(|r| r.ok())
-            .collect()
+        query_todos!(
+            db,
+            "SELECT id, text, content, tab, quadrant, progress, completed_at, completed, due_date, deleted, assignee, tags, created_at, updated_at, deleted_at FROM todos WHERE user_id = ?1 AND deleted = 0 ORDER BY completed ASC, created_at ASC",
+            [&user_id.0],
+            "todos/list"
+        )
     };
 
     // Collaborative todos (from todo_collaborators) - use collaborator view settings
@@ -147,17 +173,14 @@ pub async fn list_todos(
     let collab_sql_all = "SELECT t.id, t.text, t.content, tc.tab, tc.quadrant, t.progress, t.completed_at, t.completed, t.due_date, t.deleted, t.assignee, t.tags, t.created_at, t.updated_at, t.deleted_at FROM todos t JOIN todo_collaborators tc ON t.id = tc.todo_id WHERE tc.user_id = ?1 AND tc.status = 'active' AND t.deleted = 0 ORDER BY t.completed ASC, t.created_at ASC";
 
     let collab_items: Vec<Todo> = if let Some(tab) = &query.tab {
-        let mut stmt = db.prepare(collab_sql_tab).unwrap();
-        stmt.query_map(rusqlite::params![user_id.0, tab], row_to_todo)
-            .unwrap()
-            .filter_map(|r| r.ok())
-            .collect()
+        query_todos!(
+            db,
+            collab_sql_tab,
+            rusqlite::params![user_id.0, tab],
+            "todos/list-collab"
+        )
     } else {
-        let mut stmt = db.prepare(collab_sql_all).unwrap();
-        stmt.query_map([&user_id.0], row_to_todo)
-            .unwrap()
-            .filter_map(|r| r.ok())
-            .collect()
+        query_todos!(db, collab_sql_all, [&user_id.0], "todos/list-collab")
     };
 
     // Merge and deduplicate (own todos take priority)
@@ -194,6 +217,7 @@ pub async fn list_todos(
             message: None,
         }),
     )
+        .into_response()
 }
 
 pub async fn get_todo(

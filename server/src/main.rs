@@ -145,6 +145,7 @@ pub fn build_app(state: AppState) -> Router {
         )
         .route("/{id}/export/xlsx", get(routes::trips::export_xlsx))
         .route("/{id}/export/photos", get(routes::trips::export_photos))
+        .route("/{id}/export/bundle", get(routes::trips::export_bundle))
         .route("/analyze", post(routes::trips::analyze_item))
         .layer(DefaultBodyLimit::max(50_000_000));
 
@@ -259,12 +260,29 @@ pub fn build_app(state: AppState) -> Router {
             post(routes::collaborate::withdraw_confirmation),
         );
 
+    // Settings routes (user preferences)
+    let settings_routes = Router::new()
+        .route("/ai-model", get(auth::get_ai_model).put(auth::set_ai_model))
+        .route(
+            "/timezone",
+            get(auth::get_timezone).put(auth::set_timezone),
+        )
+        .route(
+            "/memories",
+            get(auth::list_memories).delete(auth::delete_all_memories),
+        )
+        .route(
+            "/memories/{id}",
+            delete(auth::delete_memory_by_id),
+        );
+
     // Health check
     let start_time = std::time::Instant::now();
 
     // API router
     let api_routes = Router::new()
         .nest("/auth", auth_routes)
+        .nest("/settings", settings_routes)
         .nest("/todos", todo_routes)
         .nest("/routines", routine_routes)
         .nest("/reviews", review_routes)
@@ -287,7 +305,12 @@ pub fn build_app(state: AppState) -> Router {
                 .route("/dashboard", get(routes::admin::dashboard))
                 .route("/pending-users", get(routes::admin::pending_users))
                 .route("/users/{id}/approve", post(routes::admin::approve_user))
-                .route("/users/{id}/reject", post(routes::admin::reject_user)),
+                .route("/users/{id}/reject", post(routes::admin::reject_user))
+                .route("/security-events", get(routes::admin::security_events))
+                .route(
+                    "/users/{id}/restore",
+                    post(routes::admin::restore_user),
+                ),
         )
         .route("/moment", get(routes::moment::get_moment))
         .route(
@@ -393,11 +416,12 @@ async fn main() {
             // Clean expired sessions from DB
             {
                 let db = cleanup_state.db.lock();
-                db.execute(
+                if let Err(e) = db.execute(
                     "DELETE FROM sessions WHERE expires_at < datetime('now')",
                     [],
-                )
-                .ok();
+                ) {
+                    eprintln!("[cleanup] session cleanup failed: {}", e);
+                }
             }
         }
     });
@@ -425,7 +449,7 @@ async fn main() {
                 match tokio::fs::read_to_string(format!("{}/sw.js", sw_dir)).await {
                     Ok(body) => (
                         [
-                            (http::header::CONTENT_TYPE, "application/javascript"),
+                            (http::header::CONTENT_TYPE, "application/javascript; charset=utf-8"),
                             (
                                 http::header::CACHE_CONTROL,
                                 "no-cache, no-store, must-revalidate",
@@ -470,7 +494,19 @@ async fn main() {
         .fallback_service(
             tower_http::services::ServeDir::new(&frontend_dir)
                 .append_index_html_on_directories(true),
-        );
+        )
+        .layer(axum::middleware::map_response(|mut response: axum::response::Response| async move {
+            if let Some(ct) = response.headers().get(http::header::CONTENT_TYPE).cloned() {
+                if let Ok(s) = ct.to_str() {
+                    if s.starts_with("text/") && !s.contains("charset") {
+                        if let Ok(v) = HeaderValue::from_str(&format!("{}; charset=utf-8", s)) {
+                            response.headers_mut().insert(http::header::CONTENT_TYPE, v);
+                        }
+                    }
+                }
+            }
+            response
+        }));
 
     let addr = format!("0.0.0.0:{}", port);
     println!("Next server listening on {}", addr);

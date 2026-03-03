@@ -56,29 +56,50 @@ pub async fn list_friends(
 ) -> (StatusCode, Json<FriendsResponse>) {
     let db = state.db.lock();
 
-    let mut stmt = db
-        .prepare(
-            "SELECT f.id, u.id, u.username, u.display_name
+    let mut stmt = match db.prepare(
+        "SELECT f.id, u.id, u.username, u.display_name
              FROM friendships f
              JOIN users u ON (
                  CASE WHEN f.requester_id = ?1 THEN f.addressee_id ELSE f.requester_id END = u.id
              )
              WHERE (f.requester_id = ?1 OR f.addressee_id = ?1) AND f.status = 'accepted'",
-        )
-        .unwrap();
+    ) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("[friends] db error: {}", e);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(FriendsResponse {
+                    success: false,
+                    items: vec![],
+                    message: Some("内部错误".into()),
+                }),
+            );
+        }
+    };
 
-    let items: Vec<FriendInfo> = stmt
-        .query_map([&user_id.0], |row| {
-            Ok(FriendInfo {
-                friendship_id: row.get(0)?,
-                id: row.get(1)?,
-                username: row.get(2)?,
-                display_name: row.get(3)?,
-            })
+    let result = stmt.query_map([&user_id.0], |row| {
+        Ok(FriendInfo {
+            friendship_id: row.get(0)?,
+            id: row.get(1)?,
+            username: row.get(2)?,
+            display_name: row.get(3)?,
         })
-        .unwrap()
-        .filter_map(|r| r.ok())
-        .collect();
+    });
+    let items: Vec<FriendInfo> = match result {
+        Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
+        Err(e) => {
+            eprintln!("[friends] db error: {}", e);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(FriendsResponse {
+                    success: false,
+                    items: vec![],
+                    message: Some("内部错误".into()),
+                }),
+            );
+        }
+    };
 
     (
         StatusCode::OK,
@@ -96,33 +117,54 @@ pub async fn list_friend_requests(
 ) -> (StatusCode, Json<FriendRequestsResponse>) {
     let db = state.db.lock();
 
-    let mut stmt = db
-        .prepare(
-            "SELECT f.id, u.id, u.username, u.display_name, f.status, f.created_at
+    let mut stmt = match db.prepare(
+        "SELECT f.id, u.id, u.username, u.display_name, f.status, f.created_at
              FROM friendships f
              JOIN users u ON f.requester_id = u.id
              WHERE f.addressee_id = ?1 AND f.status = 'pending'
              ORDER BY f.created_at DESC",
-        )
-        .unwrap();
+    ) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("[friends] db error: {}", e);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(FriendRequestsResponse {
+                    success: false,
+                    items: vec![],
+                    message: Some("内部错误".into()),
+                }),
+            );
+        }
+    };
 
-    let items: Vec<FriendRequest> = stmt
-        .query_map([&user_id.0], |row| {
-            Ok(FriendRequest {
-                id: row.get(0)?,
-                from_user: FriendInfo {
-                    friendship_id: row.get(0)?,
-                    id: row.get(1)?,
-                    username: row.get(2)?,
-                    display_name: row.get(3)?,
-                },
-                status: row.get(4)?,
-                created_at: row.get(5)?,
-            })
+    let result = stmt.query_map([&user_id.0], |row| {
+        Ok(FriendRequest {
+            id: row.get(0)?,
+            from_user: FriendInfo {
+                friendship_id: row.get(0)?,
+                id: row.get(1)?,
+                username: row.get(2)?,
+                display_name: row.get(3)?,
+            },
+            status: row.get(4)?,
+            created_at: row.get(5)?,
         })
-        .unwrap()
-        .filter_map(|r| r.ok())
-        .collect();
+    });
+    let items: Vec<FriendRequest> = match result {
+        Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
+        Err(e) => {
+            eprintln!("[friends] db error: {}", e);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(FriendRequestsResponse {
+                    success: false,
+                    items: vec![],
+                    message: Some("内部错误".into()),
+                }),
+            );
+        }
+    };
 
     (
         StatusCode::OK,
@@ -202,11 +244,19 @@ pub async fn send_friend_request(
     let id = uuid::Uuid::new_v4().to_string()[..8].to_string();
     let now = chrono::Utc::now().to_rfc3339();
 
-    db.execute(
+    if let Err(e) = db.execute(
         "INSERT INTO friendships (id, requester_id, addressee_id, status, created_at, updated_at) VALUES (?1, ?2, ?3, 'pending', ?4, ?5)",
         rusqlite::params![id, user_id.0, target_id, now, now],
-    )
-    .unwrap();
+    ) {
+        eprintln!("[friends] db error: {}", e);
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(SimpleResponse {
+                success: false,
+                message: Some("内部错误".into()),
+            }),
+        );
+    }
 
     (
         StatusCode::OK,
@@ -422,21 +472,36 @@ pub async fn search_users(
     let db = state.db.lock();
     let keyword = format!("%{}%", query.q);
 
-    let mut stmt = db
-        .prepare("SELECT id, username, display_name FROM users WHERE username LIKE ?1 AND id != ?2 LIMIT 10")
-        .unwrap();
+    let mut stmt = match db.prepare(
+        "SELECT id, username, display_name FROM users WHERE username LIKE ?1 AND id != ?2 LIMIT 10",
+    ) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("[friends] db error: {}", e);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"success": false, "error": "内部错误"})),
+            );
+        }
+    };
 
-    let users: Vec<serde_json::Value> = stmt
-        .query_map(rusqlite::params![keyword, user_id.0], |row| {
-            Ok(json!({
-                "id": row.get::<_, String>(0)?,
-                "username": row.get::<_, String>(1)?,
-                "display_name": row.get::<_, Option<String>>(2)?
-            }))
-        })
-        .unwrap()
-        .filter_map(|r| r.ok())
-        .collect();
+    let result = stmt.query_map(rusqlite::params![keyword, user_id.0], |row| {
+        Ok(json!({
+            "id": row.get::<_, String>(0)?,
+            "username": row.get::<_, String>(1)?,
+            "display_name": row.get::<_, Option<String>>(2)?
+        }))
+    });
+    let users: Vec<serde_json::Value> = match result {
+        Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
+        Err(e) => {
+            eprintln!("[friends] db error: {}", e);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"success": false, "error": "内部错误"})),
+            );
+        }
+    };
 
     (
         StatusCode::OK,
@@ -598,14 +663,22 @@ pub async fn share_item(
 
     let id = uuid::Uuid::new_v4().to_string()[..8].to_string();
     let now = chrono::Utc::now().to_rfc3339();
-    let snapshot_str = serde_json::to_string(&snapshot).unwrap();
+    let snapshot_str = serde_json::to_string(&snapshot).unwrap_or_default();
     let message = req.message.unwrap_or_default();
 
-    db.execute(
+    if let Err(e) = db.execute(
         "INSERT INTO shared_items (id, sender_id, recipient_id, item_type, item_id, item_snapshot, message, status, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'unread', ?8)",
         rusqlite::params![id, user_id.0, req.friend_id, req.item_type, req.item_id, snapshot_str, message, now],
-    )
-    .unwrap();
+    ) {
+        eprintln!("[friends] db error: {}", e);
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(SimpleResponse {
+                success: false,
+                message: Some("内部错误".into()),
+            }),
+        );
+    }
 
     (
         StatusCode::OK,
@@ -621,6 +694,16 @@ pub async fn shared_inbox(
     user_id: UserId,
     Query(params): Query<HashMap<String, String>>,
 ) -> (StatusCode, Json<SharedItemsResponse>) {
+    if reject_if_guest(&state, &user_id.0).is_some() {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(SharedItemsResponse {
+                success: false,
+                items: vec![],
+                message: Some("体验模式不支持此功能，注册账户解锁".into()),
+            }),
+        );
+    }
     let db = state.db.lock();
     let item_type_filter = params.get("type").cloned().unwrap_or_default();
 
@@ -644,7 +727,20 @@ pub async fn shared_inbox(
         )
     };
 
-    let mut stmt = db.prepare(&sql).unwrap();
+    let mut stmt = match db.prepare(&sql) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("[friends] db error: {}", e);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(SharedItemsResponse {
+                    success: false,
+                    items: vec![],
+                    message: Some("内部错误".into()),
+                }),
+            );
+        }
+    };
 
     let row_mapper = |row: &rusqlite::Row| -> rusqlite::Result<SharedItem> {
         let display_name: Option<String> = row.get(2)?;
@@ -667,15 +763,37 @@ pub async fn shared_inbox(
     };
 
     let items: Vec<SharedItem> = if use_filter {
-        stmt.query_map(rusqlite::params![user_id.0, item_type_filter], &row_mapper)
-            .unwrap()
-            .filter_map(|r| r.ok())
-            .collect()
+        let result = stmt.query_map(rusqlite::params![user_id.0, item_type_filter], &row_mapper);
+        match result {
+            Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
+            Err(e) => {
+                eprintln!("[friends] db error: {}", e);
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(SharedItemsResponse {
+                        success: false,
+                        items: vec![],
+                        message: Some("内部错误".into()),
+                    }),
+                );
+            }
+        }
     } else {
-        stmt.query_map([&user_id.0], &row_mapper)
-            .unwrap()
-            .filter_map(|r| r.ok())
-            .collect()
+        let result = stmt.query_map([&user_id.0], &row_mapper);
+        match result {
+            Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
+            Err(e) => {
+                eprintln!("[friends] db error: {}", e);
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(SharedItemsResponse {
+                        success: false,
+                        items: vec![],
+                        message: Some("内部错误".into()),
+                    }),
+                );
+            }
+        }
     };
 
     (
@@ -880,29 +998,42 @@ pub async fn shared_sent(
 
     let db = state.db.lock();
 
-    let mut stmt = db
-        .prepare(
-            "SELECT s.recipient_id, u.username, u.display_name, s.status, s.created_at
+    let mut stmt = match db.prepare(
+        "SELECT s.recipient_id, u.username, u.display_name, s.status, s.created_at
              FROM shared_items s
              JOIN users u ON s.recipient_id = u.id
              WHERE s.sender_id = ?1 AND s.item_type = ?2 AND s.item_id = ?3
              ORDER BY s.created_at DESC",
-        )
-        .unwrap();
+    ) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("[friends] db error: {}", e);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"success": false, "error": "内部错误"})),
+            );
+        }
+    };
 
-    let items: Vec<serde_json::Value> = stmt
-        .query_map(rusqlite::params![user_id.0, item_type, item_id], |row| {
-            Ok(json!({
-                "recipient_id": row.get::<_, String>(0)?,
-                "username": row.get::<_, String>(1)?,
-                "display_name": row.get::<_, Option<String>>(2)?,
-                "status": row.get::<_, String>(3)?,
-                "created_at": row.get::<_, String>(4)?
-            }))
-        })
-        .unwrap()
-        .filter_map(|r| r.ok())
-        .collect();
+    let result = stmt.query_map(rusqlite::params![user_id.0, item_type, item_id], |row| {
+        Ok(json!({
+            "recipient_id": row.get::<_, String>(0)?,
+            "username": row.get::<_, String>(1)?,
+            "display_name": row.get::<_, Option<String>>(2)?,
+            "status": row.get::<_, String>(3)?,
+            "created_at": row.get::<_, String>(4)?
+        }))
+    });
+    let items: Vec<serde_json::Value> = match result {
+        Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
+        Err(e) => {
+            eprintln!("[friends] db error: {}", e);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"success": false, "error": "内部错误"})),
+            );
+        }
+    };
 
     (
         StatusCode::OK,

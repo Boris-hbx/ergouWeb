@@ -73,25 +73,37 @@ pub async fn dashboard(State(state): State<AppState>, user_id: UserId) -> impl I
     // Per-user details
     let mut user_list = Vec::new();
     {
-        let mut stmt = db
-            .prepare(
-                "SELECT u.username, u.display_name, u.created_at,
+        let mut stmt = match db.prepare(
+            "SELECT u.username, u.display_name, u.created_at,
                     (SELECT MAX(s.created_at) FROM sessions s WHERE s.user_id = u.id) as last_active,
                     (SELECT COUNT(*) FROM sessions s WHERE s.user_id = u.id) as total_sessions
                 FROM users u ORDER BY u.created_at ASC",
-            )
-            .unwrap();
-        let rows = stmt
-            .query_map([], |r| {
-                Ok(json!({
-                    "username": r.get::<_, String>(0)?,
-                    "display_name": r.get::<_, Option<String>>(1)?,
-                    "created_at": r.get::<_, String>(2)?,
-                    "last_active": r.get::<_, Option<String>>(3)?,
-                    "total_sessions": r.get::<_, i64>(4)?
-                }))
-            })
-            .unwrap();
+        ) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("[admin] db error: {}", e);
+                return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"success": false, "error": "内部错误"})));
+            }
+        };
+        let result = stmt.query_map([], |r| {
+            Ok(json!({
+                "username": r.get::<_, String>(0)?,
+                "display_name": r.get::<_, Option<String>>(1)?,
+                "created_at": r.get::<_, String>(2)?,
+                "last_active": r.get::<_, Option<String>>(3)?,
+                "total_sessions": r.get::<_, i64>(4)?
+            }))
+        });
+        let rows = match result {
+            Ok(rows) => rows,
+            Err(e) => {
+                eprintln!("[admin] db error: {}", e);
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({"success": false, "error": "内部错误"})),
+                );
+            }
+        };
         for row in rows.flatten() {
             user_list.push(row);
         }
@@ -151,35 +163,57 @@ pub async fn dashboard(State(state): State<AppState>, user_id: UserId) -> impl I
         )
         .unwrap_or_else(|_| json!({}));
 
-    let ai_today = query_ai_period(&db, "date('now')");
-    let ai_week = query_ai_period(&db, "date('now', '-7 days')");
-    let ai_month = query_ai_period(&db, "date('now', '-30 days')");
+    let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
+    let week_ago = (chrono::Utc::now() - chrono::Duration::days(7))
+        .format("%Y-%m-%d")
+        .to_string();
+    let month_ago = (chrono::Utc::now() - chrono::Duration::days(30))
+        .format("%Y-%m-%d")
+        .to_string();
+    let ai_today = query_ai_period(&db, &today);
+    let ai_week = query_ai_period(&db, &week_ago);
+    let ai_month = query_ai_period(&db, &month_ago);
 
     // Per-user AI usage
     let mut ai_per_user = Vec::new();
     {
-        let mut stmt = db
-            .prepare(
-                "SELECT u.username, u.display_name, COUNT(c.id),
+        let mut stmt = match db.prepare(
+            "SELECT u.username, u.display_name, COUNT(c.id),
                     COALESCE(SUM(c.input_tokens),0), COALESCE(SUM(c.output_tokens),0),
                     COALESCE(SUM(c.tool_calls),0)
                 FROM users u LEFT JOIN chat_usage_log c ON c.user_id = u.id
                 GROUP BY u.id
                 ORDER BY (COALESCE(SUM(c.input_tokens),0)+COALESCE(SUM(c.output_tokens),0)) DESC",
-            )
-            .unwrap();
-        let rows = stmt
-            .query_map([], |r| {
-                Ok(json!({
-                    "username": r.get::<_, String>(0)?,
-                    "display_name": r.get::<_, Option<String>>(1)?,
-                    "messages": r.get::<_, i64>(2)?,
-                    "input_tokens": r.get::<_, i64>(3)?,
-                    "output_tokens": r.get::<_, i64>(4)?,
-                    "tool_calls": r.get::<_, i64>(5)?
-                }))
-            })
-            .unwrap();
+        ) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("[admin] db error: {}", e);
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({"success": false, "error": "内部错误"})),
+                );
+            }
+        };
+        let result = stmt.query_map([], |r| {
+            Ok(json!({
+                "username": r.get::<_, String>(0)?,
+                "display_name": r.get::<_, Option<String>>(1)?,
+                "messages": r.get::<_, i64>(2)?,
+                "input_tokens": r.get::<_, i64>(3)?,
+                "output_tokens": r.get::<_, i64>(4)?,
+                "tool_calls": r.get::<_, i64>(5)?
+            }))
+        });
+        let rows = match result {
+            Ok(rows) => rows,
+            Err(e) => {
+                eprintln!("[admin] db error: {}", e);
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({"success": false, "error": "内部错误"})),
+                );
+            }
+        };
         for row in rows.flatten() {
             ai_per_user.push(row);
         }
@@ -235,23 +269,33 @@ pub async fn pending_users(State(state): State<AppState>, user_id: UserId) -> im
         return e;
     }
 
-    let mut stmt = db
-        .prepare(
-            "SELECT id, username, display_name, created_at FROM users WHERE status = 'pending' ORDER BY created_at ASC",
-        )
-        .unwrap();
-    let rows: Vec<serde_json::Value> = stmt
-        .query_map([], |r| {
-            Ok(json!({
-                "id": r.get::<_, String>(0)?,
-                "username": r.get::<_, String>(1)?,
-                "display_name": r.get::<_, Option<String>>(2)?,
-                "created_at": r.get::<_, String>(3)?
-            }))
-        })
-        .unwrap()
-        .flatten()
-        .collect();
+    let mut stmt = match db.prepare(
+        "SELECT id, username, display_name, created_at FROM users WHERE status = 'pending' ORDER BY created_at ASC",
+    ) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("[admin] db error: {}", e);
+            return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"success": false, "error": "内部错误"})));
+        }
+    };
+    let result = stmt.query_map([], |r| {
+        Ok(json!({
+            "id": r.get::<_, String>(0)?,
+            "username": r.get::<_, String>(1)?,
+            "display_name": r.get::<_, Option<String>>(2)?,
+            "created_at": r.get::<_, String>(3)?
+        }))
+    });
+    let rows: Vec<serde_json::Value> = match result {
+        Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
+        Err(e) => {
+            eprintln!("[admin] db error: {}", e);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"success": false, "error": "内部错误"})),
+            );
+        }
+    };
 
     (
         StatusCode::OK,
@@ -335,18 +379,126 @@ pub async fn reject_user(
     )
 }
 
-fn query_ai_period(db: &rusqlite::Connection, since: &str) -> serde_json::Value {
-    let sql = format!(
-        "SELECT COUNT(*), COALESCE(SUM(input_tokens),0), COALESCE(SUM(output_tokens),0)
-         FROM chat_usage_log WHERE created_at >= {}",
-        since
-    );
-    db.query_row(&sql, [], |r| {
+/// GET /api/admin/security-events — list recent security events
+pub async fn security_events(
+    State(state): State<AppState>,
+    user_id: UserId,
+) -> impl IntoResponse {
+    let db = state.db.lock();
+    if let Err(e) = require_admin(&db, &user_id.0) {
+        return e;
+    }
+
+    let mut stmt = match db.prepare(
+        "SELECT se.id, se.user_id, COALESCE(u.display_name, u.username) as user_name, se.event_type, se.severity, se.description, se.admin_notified, se.created_at
+         FROM security_events se LEFT JOIN users u ON u.id = se.user_id
+         ORDER BY se.created_at DESC LIMIT 50",
+    ) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("[admin] security events db error: {}", e);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"success": false, "error": "内部错误"})),
+            );
+        }
+    };
+
+    let rows: Vec<serde_json::Value> = match stmt.query_map([], |r| {
         Ok(json!({
-            "messages": r.get::<_, i64>(0)?,
-            "input_tokens": r.get::<_, i64>(1)?,
-            "output_tokens": r.get::<_, i64>(2)?
+            "id": r.get::<_, String>(0)?,
+            "user_id": r.get::<_, String>(1)?,
+            "user_name": r.get::<_, String>(2)?,
+            "event_type": r.get::<_, String>(3)?,
+            "severity": r.get::<_, String>(4)?,
+            "description": r.get::<_, String>(5)?,
+            "admin_notified": r.get::<_, i64>(6)?,
+            "created_at": r.get::<_, String>(7)?
         }))
-    })
+    }) {
+        Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
+        Err(e) => {
+            eprintln!("[admin] security events db error: {}", e);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"success": false, "error": "内部错误"})),
+            );
+        }
+    };
+
+    // Also get suspended users
+    let mut suspended = Vec::new();
+    if let Ok(mut stmt2) = db.prepare(
+        "SELECT id, username, display_name, updated_at FROM users WHERE status = 'suspended' ORDER BY updated_at DESC",
+    ) {
+        if let Ok(rows2) = stmt2.query_map([], |r| {
+            Ok(json!({
+                "id": r.get::<_, String>(0)?,
+                "username": r.get::<_, String>(1)?,
+                "display_name": r.get::<_, Option<String>>(2)?,
+                "suspended_at": r.get::<_, String>(3)?
+            }))
+        }) {
+            for row in rows2.flatten() {
+                suspended.push(row);
+            }
+        }
+    }
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "success": true,
+            "events": rows,
+            "suspended_users": suspended
+        })),
+    )
+}
+
+/// POST /api/admin/users/{id}/restore — restore a suspended user
+pub async fn restore_user(
+    State(state): State<AppState>,
+    user_id: UserId,
+    Path(target_id): Path<String>,
+) -> impl IntoResponse {
+    let db = state.db.lock();
+    if let Err(e) = require_admin(&db, &user_id.0) {
+        return e;
+    }
+
+    let now = chrono::Utc::now().to_rfc3339();
+    let affected = db
+        .execute(
+            "UPDATE users SET status = 'active', updated_at = ?1 WHERE id = ?2 AND status = 'suspended'",
+            rusqlite::params![now, target_id],
+        )
+        .unwrap_or(0);
+
+    if affected == 0 {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(json!({"success": false, "message": "用户不存在或非挂起状态"})),
+        );
+    }
+
+    (
+        StatusCode::OK,
+        Json(json!({"success": true, "message": "已恢复用户"})),
+    )
+}
+
+fn query_ai_period(db: &rusqlite::Connection, since_date: &str) -> serde_json::Value {
+    db.query_row(
+        "SELECT COUNT(*), COALESCE(SUM(input_tokens),0), COALESCE(SUM(output_tokens),0)
+         FROM chat_usage_log WHERE created_at >= ?1",
+        [since_date],
+        |r| {
+            Ok(json!({
+                "messages": r.get::<_, i64>(0)?,
+                "input_tokens": r.get::<_, i64>(1)?,
+                "output_tokens": r.get::<_, i64>(2)?
+            }))
+        },
+    )
     .unwrap_or_else(|_| json!({}))
 }
