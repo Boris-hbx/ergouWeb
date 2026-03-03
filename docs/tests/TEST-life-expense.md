@@ -3,25 +3,9 @@
 
 ## 已知 Bug
 
-### BUG-1: 三个核心函数未定义导致模块完全不可用 [P0 阻断]
+### ~~BUG-1: 三个核心函数未定义导致模块完全不可用~~ [已修复]
 
-**现象**: 点击生活 → 记账 → "+" FAB 按钮无反应
-
-**根因**: `expense.js` 中以下三个函数被调用但从未定义：
-
-| 函数名 | 调用位置 | 影响 |
-|--------|---------|------|
-| `currencySymbol(currency)` | 渲染金额、预览、详情（15+ 处） | 所有金额显示崩溃 |
-| `renderCurrencyToggle()` | `openAddModal()` L354, `editEntry()` L1100 | 打开弹窗直接报错 |
-| `loadRates()` | `init()` L40, `loadSummary()` L139 | 模块初始化直接报错 |
-
-**影响链**:
-```
-用户点击 "+" → openAddModal() → renderCurrencyToggle() → ReferenceError → 函数终止
-用户进入记账 → Expense.init() → loadRates() → ReferenceError → 列表不加载
-```
-
-**修复方案**: 在 `expense.js` IIFE 内补全这三个函数 + `setCurrency()`，HTML 补 `#expense-currency-toggle` 容器。
+**状态**: 已修复。`currencySymbol()`、`renderCurrencyToggle()`、`loadRates()`、`setCurrency()` 均已在 `expense.js` IIFE 内定义（L1276-L1311），`setCurrency` 已在 return 中暴露。
 
 ### BUG-3: expense-amount-prefix 硬编码 "¥" [P2]
 

@@ -167,3 +167,49 @@ showToast('提示信息', 'info');     // 蓝色
 | `english` | 英语场景学习 | `switchPage('english')` |
 | `inbox` | 收件箱（协作确认 + 分享） | `switchPage('inbox')` |
 | `settings` | 设置（账户 + 好友 + 联系人） | `switchPage('settings')` |
+
+## 公共组件
+
+### PhotoManager（照片处理）
+
+位置: `frontend/assets/js/utils.js`
+
+统一处理照片选择、自动压缩、缩略图预览、删除、放大查看、Base64 转换。所有涉及照片上传的模块（记账、差旅等）必须使用此组件。
+
+**初始化:**
+```javascript
+var pm = new PhotoManager({
+    container: '#my-photo-grid',        // 缩略图渲染容器（CSS 选择器）
+    onChange: function(files) {          // 照片列表变化回调
+        // files 是当前照片 File 数组的副本
+        updateMyButtons(files.length);
+    }
+});
+```
+
+**方法:**
+
+| 方法 | 说明 |
+|------|------|
+| `pm.addFiles(fileList)` | 添加文件，自动过滤非图片并提示，触发渲染和回调 |
+| `pm.remove(index)` | 删除指定位置的照片，局部更新网格 |
+| `pm.clear()` | 清空所有照片 |
+| `pm.getFiles()` | 获取当前 File 数组（用于 FormData 上传） |
+| `pm.getBase64()` | 返回 Promise\<Array\>，压缩后的 Base64 数据（用于 AI 识别） |
+
+**HTML 结构:**
+```html
+<div class="pm-grid" id="my-photo-grid"></div>
+<label>
+    <span>+ 添加照片</span>
+    <input type="file" multiple accept="image/*" style="display:none"
+           onchange="MyModule.handlePhotos(this.files)">
+</label>
+```
+
+**CSS 类名:** `pm-grid`、`pm-thumb`、`pm-remove`、`pm-lightbox`、`pm-lightbox-close`
+
+**按钮模式规范:**
+- 保存按钮始终可见可用
+- AI 分析/识别按钮作为独立的可选操作，不替换保存按钮
+- 有照片时：保存(secondary) + AI识别(primary) 并排显示

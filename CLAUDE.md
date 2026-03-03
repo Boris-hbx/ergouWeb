@@ -87,6 +87,18 @@ main 分支 → git merge dev → deploy production 发版 → git tag vX.Y.Z
 - CSS 变量: `var(--primary-color)` 等
 - 编码: UTF-8
 
+## 公共 UI 组件
+
+新功能涉及以下能力时，**必须复用公共组件，不得各自实现**：
+
+| 组件 | 位置 | 用途 |
+|------|------|------|
+| `PhotoManager` | `utils.js` | 照片选择、自动压缩、缩略图预览、删除、放大查看、Base64 转换 |
+
+**按钮模式规范**: 保存按钮始终可用，AI 分析/识别按钮始终作为可选的独立操作，不得替换保存按钮。
+
+详见 `docs/ref/FRONTEND.md` 公共组件章节。
+
 ## 新功能开发流程
 
 1. **测试用例先行**: 在 `docs/tests/` 编写测试用例，明确预期行为
