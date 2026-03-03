@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Patrol System - 二狗巡山 Visual Layer
+   Patrol System - 二狗值班 Visual Layer
    CSS classes follow patrol-interfaces.js section 8 naming conventions
    ========================================================================== */
 
@@ -177,7 +177,7 @@
   transition: opacity 0.5s ease;
 }
 
-/* 二狗出去巡游 — 空心轮廓 + 歪头 */
+/* 二狗外出值班 — 空心轮廓 + 歪头 */
 .tab-icon-patrol.patrol-out {
   transform: rotate(2deg);
 }

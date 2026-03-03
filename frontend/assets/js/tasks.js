@@ -808,7 +808,8 @@ function saveProgress(itemId, progress, completed) {
                 itemId: itemId,
                 quadrant: quadrant,
                 isLastInQuadrant: othersInQuadrant.length === 0,
-                cardRect: cardRect
+                cardRect: cardRect,
+                cardEl: cardEl
             };
         }
     }

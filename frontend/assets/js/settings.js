@@ -163,7 +163,7 @@ async function selectAiModel(model) {
     }
 }
 
-// ========== 二狗巡山开关 ==========
+// ========== 二狗值班开关 ==========
 
 function initPatrolToggle() {
     var toggle = document.getElementById('patrol-toggle');

@@ -1,5 +1,5 @@
 /**
- * patrol-terrain.js — 二狗巡山地形感知系统
+ * patrol-terrain.js — 二狗值班地形感知系统
  * SPEC-057 Phase 2: 地形感知
  *
  * 包含: TerrainScanner, PathPlanner

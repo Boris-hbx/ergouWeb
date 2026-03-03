@@ -324,8 +324,8 @@ var Expense = (function() {
         if (previewDiv) previewDiv.style.display = state === 'preview' ? '' : 'none';
 
         if (title) {
-            if (state === 'preview') title.textContent = '识别结果';
-            else if (state === 'analyzing') title.textContent = '识别中...';
+            if (state === 'preview') title.textContent = '分析结果';
+            else if (state === 'analyzing') title.textContent = '分析中...';
             else title.textContent = _editingId ? '编辑' : '记一笔';
         }
 
@@ -348,22 +348,13 @@ var Expense = (function() {
             return;
         }
 
-        // input state
-        var hasPhotos = _photoManager && _photoManager.getFiles().length > 0;
-        if (hasPhotos) {
-            // Has photos — show save + AI recognize side by side
-            footer.innerHTML =
-                '<button class="btn btn-secondary" onclick="Expense.closeAddModal()">取消</button>' +
-                '<div class="expense-footer-dual">' +
-                    '<button class="btn btn-secondary" onclick="Expense.submitEntry()">保存</button>' +
-                    '<button class="btn btn-primary" onclick="Expense.startParse()" style="background:linear-gradient(135deg,#667eea,#764ba2)">识别账单 &#10024;</button>' +
-                '</div>';
-        } else {
-            // No photos — normal save
-            footer.innerHTML =
-                '<button class="btn btn-secondary" onclick="Expense.closeAddModal()">取消</button>' +
-                '<button class="btn btn-primary" onclick="Expense.submitEntry()">保存</button>';
-        }
+        // input state — always show save + 二狗分析 side by side
+        footer.innerHTML =
+            '<button class="btn btn-secondary" onclick="Expense.closeAddModal()">取消</button>' +
+            '<div class="expense-footer-dual">' +
+                '<button class="btn btn-secondary" onclick="Expense.submitEntry()">保存</button>' +
+                '<button class="btn btn-primary" onclick="Expense.startParse()" style="background:linear-gradient(135deg,#667eea,#764ba2)">二狗分析 &#10024;</button>' +
+            '</div>';
     }
 
     // ===== Add Entry =====
@@ -433,20 +424,30 @@ var Expense = (function() {
 
     async function startParse() {
         var photos = _photoManager ? _photoManager.getFiles() : [];
-        if (photos.length === 0) {
-            showToast('请先添加照片', 'error');
+        var notesEl = document.getElementById('expense-notes-input');
+        var amountEl = document.getElementById('expense-amount-input');
+        var notes = notesEl ? notesEl.value.trim() : '';
+        var amount = amountEl ? amountEl.value.trim() : '';
+
+        if (photos.length === 0 && !notes && !amount) {
+            showToast('请输入文字或添加照片', 'error');
             return;
         }
 
-        log('startParse', { photoCount: photos.length });
+        log('startParse', { photoCount: photos.length, hasNotes: !!notes, hasAmount: !!amount });
         setModalState('analyzing');
         startFakeProgress();
 
         try {
-            var images = await _photoManager.getBase64();
-            log('startParse base64Ready', { count: images.length, totalBytes: images.reduce(function(s, i) { return s + i.data.length; }, 0) });
+            var images = photos.length > 0 ? await _photoManager.getBase64() : [];
+            var textParts = [];
+            if (notes) textParts.push('备注: ' + notes);
+            if (amount) textParts.push('金额: ' + amount);
+            var text = textParts.join('\n') || null;
 
-            var result = await API.parseExpensePreview(images);
+            log('startParse ready', { imageCount: images.length, text: text });
+
+            var result = await API.parseExpensePreview(images, text);
             stopFakeProgress();
 
             log('startParse response', { success: result.success, hasPreview: !!result.preview, message: result.message || null });
@@ -1054,29 +1055,20 @@ var Expense = (function() {
     function updateDetailFooter(detail) {
         var footer = document.getElementById('expense-detail-footer');
         if (!footer) return;
-        var hasPhotos = detail.photos && detail.photos.length > 0;
-        var canAnalyze = hasPhotos && !detail.ai_processed;
-        if (canAnalyze) {
-            var aiHint = '';
-            var aiGuestAttr = '';
-            if (window._userStatus === 'guest') {
-                var _r = window._guestAiRemaining;
-                var _hintText = (_r !== undefined && _r > 0) ? '(剩余' + _r + '次)' : (_r !== undefined ? '(已用完)' : '');
-                var _warnCls = (_r !== undefined && _r <= 3) ? ' guest-ai-warning' : '';
-                aiHint = ' <span class="guest-ai-hint' + _warnCls + '">' + _hintText + '</span>';
-                aiGuestAttr = ' data-guest-ai-action="1"';
-            }
-            footer.innerHTML =
-                '<button class="btn btn-danger-text" onclick="Expense.deleteEntry()">删除</button>' +
-                '<button class="btn btn-primary" onclick="Expense.analyzeExisting()"' + aiGuestAttr + ' style="background:linear-gradient(135deg,#667eea,#764ba2)">二狗分析 ✨' + aiHint + '</button>' +
-                '<button class="btn btn-secondary" onclick="Expense.shareCurrentEntry()">📤</button>' +
-                '<button class="btn btn-secondary" onclick="Expense.editEntry()">编辑</button>';
-        } else {
-            footer.innerHTML =
-                '<button class="btn btn-danger-text" onclick="Expense.deleteEntry()">删除</button>' +
-                '<button class="btn btn-secondary" onclick="Expense.shareCurrentEntry()">📤</button>' +
-                '<button class="btn btn-primary" onclick="Expense.editEntry()">编辑</button>';
+        var aiHint = '';
+        var aiGuestAttr = '';
+        if (window._userStatus === 'guest') {
+            var _r = window._guestAiRemaining;
+            var _hintText = (_r !== undefined && _r > 0) ? '(剩余' + _r + '次)' : (_r !== undefined ? '(已用完)' : '');
+            var _warnCls = (_r !== undefined && _r <= 3) ? ' guest-ai-warning' : '';
+            aiHint = ' <span class="guest-ai-hint' + _warnCls + '">' + _hintText + '</span>';
+            aiGuestAttr = ' data-guest-ai-action="1"';
         }
+        footer.innerHTML =
+            '<button class="btn btn-danger-text" onclick="Expense.deleteEntry()">删除</button>' +
+            '<button class="btn btn-primary" onclick="Expense.analyzeExisting()"' + aiGuestAttr + ' style="background:linear-gradient(135deg,#667eea,#764ba2)">二狗分析 ✨' + aiHint + '</button>' +
+            '<button class="btn btn-secondary" onclick="Expense.shareCurrentEntry()">📤</button>' +
+            '<button class="btn btn-secondary" onclick="Expense.editEntry()">编辑</button>';
     }
 
     async function analyzeExisting() {
@@ -1084,7 +1076,7 @@ var Expense = (function() {
         log('analyzeExisting', _currentDetailId);
         var body = document.getElementById('expense-detail-body');
         if (body) {
-            body.innerHTML = '<div class="expense-analyzing"><div class="expense-analyzing-icon">✨</div><p class="expense-analyzing-text">二狗正在分析照片...</p></div>';
+            body.innerHTML = '<div class="expense-analyzing"><div class="expense-analyzing-icon">✨</div><p class="expense-analyzing-text">二狗正在分析...</p></div>';
         }
         var footer = document.getElementById('expense-detail-footer');
         if (footer) footer.innerHTML = '';
