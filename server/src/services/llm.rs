@@ -2,7 +2,7 @@ use rusqlite::Connection;
 use serde_json::{json, Value};
 
 const CLAUDE_API_URL: &str = "https://api.anthropic.com/v1/messages";
-const CLAUDE_MODEL: &str = "claude-sonnet-4-6-20250514";
+const CLAUDE_MODEL: &str = "claude-opus-4-6-20250514";
 
 const KIMI_API_URL: &str = "https://api.moonshot.cn/v1/chat/completions";
 const KIMI_MODEL: &str = "kimi-k2-0711";
