@@ -22,8 +22,8 @@ async function loadSettingsData() {
     }
     // Guest mode: hide password change and friends sections
     if (window._userStatus === 'guest') {
-        var pwdSection = document.getElementById('settings-password-section');
-        if (pwdSection) pwdSection.style.display = 'none';
+        var pwdBtn = document.querySelector('#settings-account-section .settings-change-pwd-btn');
+        if (pwdBtn) pwdBtn.style.display = 'none';
         var friendsSection = document.getElementById('settings-friends-section');
         if (friendsSection) {
             friendsSection.innerHTML = '<h4>好友</h4><div class="friends-empty">注册后可管理好友</div>';
@@ -113,8 +113,8 @@ var _currentAiModel = 'auto';
 async function loadAiModel() {
     if (window._userStatus === 'guest') {
         // Guest: disable all buttons, show hint
-        var desc = document.getElementById('ai-model-desc');
-        if (desc) desc.textContent = '注册后可切换模型';
+        var heading = document.getElementById('ai-model-heading');
+        if (heading) heading.textContent = 'AI 模型 — 注册后可切换';
         document.querySelectorAll('.ai-model-btn').forEach(function(btn) {
             btn.disabled = true;
             btn.classList.add('ai-model-disabled');
@@ -230,6 +230,16 @@ async function selectTimezone(tz) {
         highlightTimezone(prevTz);
         showToast('保存失败', 'error');
     }
+}
+
+// ========== 头像网格展开/收起 ==========
+
+function toggleAvatarGrid() {
+    var grid = document.getElementById('avatar-preset-grid');
+    var link = document.getElementById('avatar-toggle-link');
+    if (!grid || !link) return;
+    var expanded = grid.classList.toggle('expanded');
+    link.textContent = expanded ? '收起' : '更多';
 }
 
 // ========== 头像系统 ==========
@@ -388,23 +398,12 @@ var Contacts = (function() {
     var contacts = [];
     var sectionInserted = false;
 
-    // Ensure the contacts section exists in the DOM
+    // Ensure the contacts area is visible in the DOM
     function ensureSection() {
         if (sectionInserted) return;
-        var friendsSection = document.getElementById('add-friend-btn');
-        if (!friendsSection) return;
-        var parentSection = friendsSection.closest('.settings-section');
-        if (!parentSection) return;
-
-        var section = document.createElement('div');
-        section.className = 'settings-section';
-        section.id = 'contacts-section';
-        section.innerHTML =
-            '<h4>联系人</h4>' +
-            '<div id="contacts-list"><div class="friends-empty">暂无联系人</div></div>' +
-            '<button class="btn btn-primary settings-add-friend-btn" id="add-contact-btn" onclick="Contacts.addSelfContact()">+ 添加联系人</button>';
-
-        parentSection.parentNode.insertBefore(section, parentSection.nextSibling);
+        var area = document.getElementById('contacts-area');
+        if (!area) return;
+        area.style.display = '';
         sectionInserted = true;
     }
 
@@ -424,11 +423,14 @@ var Contacts = (function() {
     function renderContacts(items) {
         var container = document.getElementById('contacts-list');
         if (!container) return;
+        var area = document.getElementById('contacts-area');
 
         if (items.length === 0) {
+            if (area) area.style.display = 'none';
             container.innerHTML = '<div class="friends-empty">暂无联系人</div>';
             return;
         }
+        if (area) area.style.display = '';
 
         // Split into linked (friends) and self-managed
         var linked = items.filter(function(c) { return c.friendship_id; });

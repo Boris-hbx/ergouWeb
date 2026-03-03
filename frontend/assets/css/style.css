@@ -8635,8 +8635,8 @@ body.dark-mode .action-sheet-cancel {
 /* 头像选择器（设置页面） */
 .avatar-picker {
     display: flex;
-    flex-direction: column;
-    align-items: center;
+    flex-direction: row;
+    align-items: flex-start;
     gap: 16px;
     padding: 8px 0;
 }
@@ -8672,13 +8672,34 @@ body.dark-mode .action-sheet-cancel {
 .avatar-preset-grid {
     display: flex;
     flex-wrap: wrap;
-    gap: 10px;
-    justify-content: center;
+    gap: 8px;
+    justify-content: flex-start;
+    max-height: 96px;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+}
+
+.avatar-preset-grid.expanded {
+    max-height: 500px;
+}
+
+.avatar-grid-wrapper {
+    flex: 1;
+    min-width: 0;
+}
+
+.avatar-toggle-link {
+    display: inline-block;
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--primary-color, #667eea);
+    cursor: pointer;
+    user-select: none;
 }
 
 .avatar-preset {
-    width: 48px;
-    height: 48px;
+    width: 40px;
+    height: 40px;
     border-radius: 50%;
     overflow: hidden;
     cursor: pointer;
@@ -8748,7 +8769,7 @@ body.dark-mode .action-sheet-cancel {
 .settings-container {
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 12px;
 }
 
 .settings-page-header {
@@ -8789,7 +8810,18 @@ body.dark-mode .action-sheet-cancel {
     background: var(--bg-card, rgba(255, 255, 255, 0.06));
     border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
     border-radius: 12px;
-    padding: 20px;
+    padding: 16px;
+}
+
+.settings-divider {
+    border: none;
+    border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+    margin: 16px 0 12px;
+}
+
+.contacts-sub-title {
+    margin: 0 0 12px 0 !important;
+    font-size: 0.9rem !important;
 }
 
 .settings-section h4 {
@@ -8932,8 +8964,9 @@ body.dark-mode .action-sheet-cancel {
     cursor: pointer;
     transition: opacity 0.2s;
 }
-#settings-password-section .settings-change-pwd-btn {
-    margin-top: 0;
+#settings-account-section .settings-change-pwd-btn {
+    margin-top: 12px;
+    width: auto;
 }
 
 .settings-change-pwd-btn:hover {
@@ -8959,6 +8992,7 @@ body.dark-mode .action-sheet-cancel {
 /* 退出登录按钮 */
 .settings-logout-btn {
     width: 100%;
+    margin-top: 16px;
     padding: 10px 20px;
     border: 1px solid var(--danger-color, #e74c3c);
     border-radius: 8px;
@@ -8978,7 +9012,7 @@ body.dark-mode .action-sheet-cancel {
 /* 应用信息 */
 .settings-about {
     text-align: center;
-    padding: 30px 20px;
+    padding: 16px;
 }
 
 .settings-app-name {

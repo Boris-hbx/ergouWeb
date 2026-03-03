@@ -316,6 +316,7 @@ pub fn build_app(state: AppState) -> Router {
                 .route("/users/{id}/force-logout", post(routes::admin::force_logout))
                 .route("/users/{id}/suspend", post(routes::admin::suspend_user))
                 // New endpoints: Conversation Monitor
+                .route("/conversations/users", get(routes::admin::conversation_user_summary))
                 .route("/conversations", get(routes::admin::list_conversations))
                 .route("/conversations/{id}/messages", get(routes::admin::get_conversation_messages))
                 // New endpoints: AI Dashboard

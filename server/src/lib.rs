@@ -259,7 +259,10 @@ pub fn build_app(state: state::AppState) -> Router {
                 .route("/dashboard", get(routes::admin::dashboard))
                 .route("/pending-users", get(routes::admin::pending_users))
                 .route("/users/{id}/approve", post(routes::admin::approve_user))
-                .route("/users/{id}/reject", post(routes::admin::reject_user)),
+                .route("/users/{id}/reject", post(routes::admin::reject_user))
+                .route("/conversations/users", get(routes::admin::conversation_user_summary))
+                .route("/conversations", get(routes::admin::list_conversations))
+                .route("/conversations/{id}/messages", get(routes::admin::get_conversation_messages)),
         )
         .route("/moment", get(routes::moment::get_moment))
         .route(

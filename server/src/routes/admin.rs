@@ -650,6 +650,54 @@ pub async fn suspend_user(
 
 // ===== Conversation Monitor =====
 
+/// GET /api/admin/conversations/users — per-user conversation summary
+pub async fn conversation_user_summary(
+    State(state): State<AppState>,
+    admin: AdminUserId,
+    axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
+) -> impl IntoResponse {
+    let _ = admin;
+    let db = state.db.lock();
+
+    let date_from = params.get("date_from").cloned().unwrap_or_else(|| "2000-01-01".into());
+    let date_to = params.get("date_to").cloned().unwrap_or_else(|| "2099-12-31".into());
+
+    let mut stmt = match db.prepare(
+        "SELECT c.user_id, COALESCE(u.display_name, u.username) as user_name,
+                COUNT(c.id) as conv_count,
+                (SELECT COUNT(*) FROM chat_messages m WHERE m.conversation_id IN (SELECT c2.id FROM conversations c2 WHERE c2.user_id = c.user_id AND c2.updated_at >= ?1 AND c2.updated_at <= ?2 || 'T23:59:59')) as msg_count,
+                COALESCE((SELECT SUM(cl.input_tokens + cl.output_tokens) FROM chat_usage_log cl WHERE cl.conversation_id IN (SELECT c3.id FROM conversations c3 WHERE c3.user_id = c.user_id AND c3.updated_at >= ?1 AND c3.updated_at <= ?2 || 'T23:59:59')), 0) as token_sum,
+                MAX(c.updated_at) as last_active
+         FROM conversations c
+         JOIN users u ON u.id = c.user_id
+         WHERE c.updated_at >= ?1 AND c.updated_at <= ?2 || 'T23:59:59'
+         GROUP BY c.user_id
+         ORDER BY last_active DESC"
+    ) {
+        Ok(s) => s,
+        Err(e) => {
+            tracing::warn!("[admin] conversation_user_summary error: {}", e);
+            return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"success": false, "error": "内部错误"})));
+        }
+    };
+
+    let users: Vec<serde_json::Value> = stmt
+        .query_map(rusqlite::params![date_from, date_to], |r| {
+            Ok(json!({
+                "user_id": r.get::<_, String>(0)?,
+                "user_name": r.get::<_, String>(1)?,
+                "conv_count": r.get::<_, i64>(2)?,
+                "msg_count": r.get::<_, i64>(3)?,
+                "token_sum": r.get::<_, i64>(4)?,
+                "last_active": r.get::<_, String>(5)?
+            }))
+        })
+        .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        .unwrap_or_default();
+
+    (StatusCode::OK, Json(json!({"success": true, "users": users})))
+}
+
 /// GET /api/admin/conversations — paginated list
 pub async fn list_conversations(
     State(state): State<AppState>,

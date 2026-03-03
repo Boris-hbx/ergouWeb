@@ -8,15 +8,15 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Next">
     <title>Next - Focus on the Right Thing</title>
-    <link rel="stylesheet" href="assets/css/base.css?v=20260303d">
-    <link rel="stylesheet" href="assets/css/style.css?v=20260303d">
-    <link rel="stylesheet" href="assets/css/components.css?v=20260303d">
-    <link rel="stylesheet" href="assets/css/mobile.css?v=20260303d">
-    <link rel="stylesheet" href="assets/css/abao.css?v=20260303d">
-    <link rel="stylesheet" href="assets/css/english.css?v=20260303d">
-    <link rel="stylesheet" href="assets/css/health.css?v=20260303d">
-    <link rel="stylesheet" href="assets/css/patrol.css?v=20260303d">
-    <link rel="stylesheet" href="assets/css/admin-panel.css?v=20260303d">
+    <link rel="stylesheet" href="assets/css/base.css?v=20260303e">
+    <link rel="stylesheet" href="assets/css/style.css?v=20260303e">
+    <link rel="stylesheet" href="assets/css/components.css?v=20260303e">
+    <link rel="stylesheet" href="assets/css/mobile.css?v=20260303e">
+    <link rel="stylesheet" href="assets/css/abao.css?v=20260303e">
+    <link rel="stylesheet" href="assets/css/english.css?v=20260303e">
+    <link rel="stylesheet" href="assets/css/health.css?v=20260303e">
+    <link rel="stylesheet" href="assets/css/patrol.css?v=20260303e">
+    <link rel="stylesheet" href="assets/css/admin-panel.css?v=20260303e">
     <link rel="manifest" href="assets/manifest.json">
     <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
     <script>
@@ -416,6 +416,7 @@
                         <span class="avatar-text" id="settings-avatar-text">B</span>
                         <img class="avatar-img" id="settings-avatar-img" src="" style="display:none">
                     </div>
+                    <div class="avatar-grid-wrapper">
                     <div class="avatar-preset-grid" id="avatar-preset-grid">
                         <div class="avatar-preset" data-avatar="preset:cat" onclick="selectPresetAvatar(this)">
                             <img src="assets/images/preset-cat.png" alt="Cat">
@@ -497,10 +498,12 @@
                         📷 上传自定义头像
                         <input type="file" accept="image/*" onchange="handleAvatarUpload(event)" style="display:none">
                     </label>
+                    <span class="avatar-toggle-link" id="avatar-toggle-link" onclick="toggleAvatarGrid()">更多</span>
+                    </div>
                 </div>
             </div>
             <!-- 账户信息 -->
-            <div class="settings-section">
+            <div class="settings-section" id="settings-account-section">
                 <h4>账户信息</h4>
                 <div class="setting-group-inline">
                     <label>用户名</label>
@@ -510,9 +513,6 @@
                     <label>昵称</label>
                     <div class="settings-value" id="settings-display-name">--</div>
                 </div>
-            </div>
-            <!-- 修改密码 -->
-            <div class="settings-section" id="settings-password-section">
                 <button class="btn btn-primary settings-change-pwd-btn"
                         onclick="openPwdModal()">修改密码</button>
             </div>
@@ -542,7 +542,7 @@
                     </div>
                 </div>
             </div>
-            <!-- 好友 -->
+            <!-- 好友 + 联系人 -->
             <div class="settings-section" id="settings-friends-section">
                 <h4>好友</h4>
                 <div id="friend-requests"></div>
@@ -550,11 +550,16 @@
                     <div class="friends-empty">还没有好友</div>
                 </div>
                 <button class="btn btn-primary settings-add-friend-btn" id="add-friend-btn">+ 添加好友</button>
+                <div id="contacts-area" style="display:none">
+                    <div class="settings-divider"></div>
+                    <h4 class="contacts-sub-title">联系人</h4>
+                    <div id="contacts-list"><div class="friends-empty">暂无联系人</div></div>
+                    <button class="btn btn-primary settings-add-friend-btn" id="add-contact-btn" onclick="Contacts.addSelfContact()">+ 添加联系人</button>
+                </div>
             </div>
             <!-- AI 模型 -->
             <div class="settings-section" id="settings-ai-section">
-                <h4>AI 模型</h4>
-                <p class="setting-desc" id="ai-model-desc">选择二狗使用的 AI 模型</p>
+                <h4 id="ai-model-heading">AI 模型</h4>
                 <div class="ai-model-options" id="ai-model-options">
                     <button class="ai-model-btn active" data-model="auto" onclick="selectAiModel('auto')">
                         <span class="ai-model-name">自动</span>
@@ -633,16 +638,13 @@
                     2. 选择 <strong>"添加到主屏幕"</strong> 或 <strong>"安装应用"</strong>
                 </div>
             </div>
-            <!-- 退出登录 -->
-            <div class="settings-section">
-                <button class="btn btn-danger settings-logout-btn"
-                        onclick="doLogout()">退出登录</button>
-            </div>
-            <!-- 应用信息 -->
+            <!-- 应用信息 + 退出登录 -->
             <div class="settings-section settings-about">
                 <div class="settings-app-name">Next</div>
                 <div class="settings-app-tagline">Focus on the Right Thing</div>
                 <div class="settings-app-version">Version 1.2.0</div>
+                <button class="btn btn-danger settings-logout-btn"
+                        onclick="doLogout()">退出登录</button>
             </div>
         </div>
     </div>
@@ -659,6 +661,7 @@
                 <a class="admin-nav-item" data-section="risk"><span class="admin-nav-icon">🛡️</span>风控</a>
                 <a class="admin-nav-item" data-section="system"><span class="admin-nav-icon">⚙️</span>系统</a>
                 <a class="admin-nav-item" data-section="audit"><span class="admin-nav-icon">📋</span>审计</a>
+                <a class="admin-nav-item" data-section="patrol"><span class="admin-nav-icon">🐕</span>二狗</a>
             </div>
             <div class="admin-content-area">
                 <div class="admin-section active" id="admin-sec-overview">
@@ -688,6 +691,10 @@
                 <div class="admin-section" id="admin-sec-audit">
                     <div class="admin-section-title">审计日志</div>
                     <div id="admin-audit-content"></div>
+                </div>
+                <div class="admin-section" id="admin-sec-patrol">
+                    <div class="admin-section-title">二狗实验室</div>
+                    <div id="admin-patrol-content"></div>
                 </div>
             </div>
         </div>
@@ -1373,39 +1380,39 @@
     </div>
 
     <!-- JS Modules -->
-    <script src="assets/js/observability.js?v=20260303d"></script>
-    <script src="assets/js/api.js?v=20260303d"></script>
-    <script src="assets/js/utils.js?v=20260303d"></script>
-    <script src="assets/js/jelly-indicator.js?v=20260303d"></script>
-    <script src="assets/js/app.js?v=20260303d"></script>
-    <script src="assets/js/tasks.js?v=20260303d"></script>
-    <script src="assets/js/modal.js?v=20260303d"></script>
-    <script src="assets/js/datepicker.js?v=20260303d"></script>
-    <script src="assets/js/drag.js?v=20260303d"></script>
-    <script src="assets/js/actionsheet.js?v=20260303d"></script>
-    <script src="assets/js/share-modal.js?v=20260303d"></script>
-    <script src="assets/js/review.js?v=20260303d"></script>
-    <script src="assets/js/routines.js?v=20260303d"></script>
-    <script src="assets/js/features.js?v=20260303d"></script>
-    <script src="assets/js/particles.js?v=20260303d"></script>
-    <script src="assets/js/living-line.js?v=20260303d"></script>
-    <script src="assets/js/abao.js?v=20260303d"></script>
-    <script src="assets/js/english.js?v=20260303d"></script>
-    <script src="assets/js/life.js?v=20260303d"></script>
-    <script src="assets/js/expense.js?v=20260303d"></script>
-    <script src="assets/js/expense-analytics.js?v=20260303d"></script>
-    <script src="assets/js/trip.js?v=20260303d"></script>
-    <script src="assets/js/health-data.js?v=20260303d"></script>
-    <script src="assets/js/health-renderer.js?v=20260303d"></script>
-    <script src="assets/js/health.js?v=20260303d"></script>
-    <script src="assets/js/friends.js?v=20260303d"></script>
-    <script src="assets/js/notifications.js?v=20260303d"></script>
-    <script src="assets/js/settings.js?v=20260303d"></script>
-    <script src="assets/js/admin-panel.js?v=20260303d"></script>
-    <script src="assets/js/patrol-utils.js?v=20260303d"></script>
-    <script src="assets/js/patrol-terrain.js?v=20260303d"></script>
-    <script src="assets/js/patrol-debug.js?v=20260303d"></script>
-    <script src="assets/js/patrol.js?v=20260303d"></script>
+    <script src="assets/js/observability.js?v=20260303e"></script>
+    <script src="assets/js/api.js?v=20260303e"></script>
+    <script src="assets/js/utils.js?v=20260303e"></script>
+    <script src="assets/js/jelly-indicator.js?v=20260303e"></script>
+    <script src="assets/js/app.js?v=20260303e"></script>
+    <script src="assets/js/tasks.js?v=20260303e"></script>
+    <script src="assets/js/modal.js?v=20260303e"></script>
+    <script src="assets/js/datepicker.js?v=20260303e"></script>
+    <script src="assets/js/drag.js?v=20260303e"></script>
+    <script src="assets/js/actionsheet.js?v=20260303e"></script>
+    <script src="assets/js/share-modal.js?v=20260303e"></script>
+    <script src="assets/js/review.js?v=20260303e"></script>
+    <script src="assets/js/routines.js?v=20260303e"></script>
+    <script src="assets/js/features.js?v=20260303e"></script>
+    <script src="assets/js/particles.js?v=20260303e"></script>
+    <script src="assets/js/living-line.js?v=20260303e"></script>
+    <script src="assets/js/abao.js?v=20260303e"></script>
+    <script src="assets/js/english.js?v=20260303e"></script>
+    <script src="assets/js/life.js?v=20260303e"></script>
+    <script src="assets/js/expense.js?v=20260303e"></script>
+    <script src="assets/js/expense-analytics.js?v=20260303e"></script>
+    <script src="assets/js/trip.js?v=20260303e"></script>
+    <script src="assets/js/health-data.js?v=20260303e"></script>
+    <script src="assets/js/health-renderer.js?v=20260303e"></script>
+    <script src="assets/js/health.js?v=20260303e"></script>
+    <script src="assets/js/friends.js?v=20260303e"></script>
+    <script src="assets/js/notifications.js?v=20260303e"></script>
+    <script src="assets/js/settings.js?v=20260303e"></script>
+    <script src="assets/js/admin-panel.js?v=20260303e"></script>
+    <script src="assets/js/patrol-utils.js?v=20260303e"></script>
+    <script src="assets/js/patrol-terrain.js?v=20260303e"></script>
+    <script src="assets/js/patrol-debug.js?v=20260303e"></script>
+    <script src="assets/js/patrol.js?v=20260303e"></script>
 
     <script>
     // Initialize
