@@ -56,11 +56,68 @@ pub fn parse_tz(tz_str: &str) -> Tz {
 
 /// Build people context: inject known people into prompt
 fn build_people_context(db: &Connection, user_id: &str) -> String {
+    let mut ctx = String::new();
+
+    // ── Part 1: 认出当前用户 ──
+    // 如果当前用户的 username/display_name 匹配 owner 的人物档案，注入身份上下文
+    if let Ok((username, display_name)) = db.query_row(
+        "SELECT username, display_name FROM users WHERE id=?1",
+        [user_id],
+        |r| Ok((r.get::<_, String>(0)?, r.get::<_, Option<String>>(1)?)),
+    ) {
+        let dn = display_name.as_deref().unwrap_or("");
+        if let Ok(mut stmt) = db.prepare(
+            "SELECT ep.nickname, ep.relationship, ep.attitude, ep.notes
+             FROM ergou_people ep
+             JOIN users u ON u.id = ep.user_id
+             WHERE u.role IN ('owner', 'admin') AND ep.user_id != ?1
+             AND (LOWER(ep.name) = LOWER(?2) OR (?3 != '' AND LOWER(ep.name) = LOWER(?3)))",
+        ) {
+            if let Ok(rows) = stmt.query_map(
+                rusqlite::params![user_id, username, dn],
+                |r| Ok((
+                    r.get::<_, String>(0)?,
+                    r.get::<_, String>(1)?,
+                    r.get::<_, String>(2)?,
+                    r.get::<_, String>(3)?,
+                )),
+            ) {
+                if let Some(row) = rows.flatten().next() {
+                    let (nickname, relationship, attitude, notes) = row;
+                    ctx.push_str("\n## 当前用户身份\n你认出了当前用户！");
+                    ctx.push_str(&format!(
+                        "这是主人的{}。\n",
+                        sanitize_for_prompt(&relationship, 50)
+                    ));
+                    if !nickname.is_empty() {
+                        ctx.push_str(&format!(
+                            "称呼ta为「{}」。\n",
+                            sanitize_for_prompt(&nickname, 50)
+                        ));
+                    }
+                    if !attitude.is_empty() {
+                        ctx.push_str(&format!(
+                            "态度要求：{}\n",
+                            sanitize_for_prompt(&attitude, 200)
+                        ));
+                    }
+                    if !notes.is_empty() {
+                        ctx.push_str(&format!(
+                            "主人告诉你的信息：{}\n",
+                            sanitize_for_prompt(&notes, 500)
+                        ));
+                    }
+                }
+            }
+        }
+    }
+
+    // ── Part 2: 当前用户的人物列表（主人视角）──
     let mut stmt = match db.prepare(
         "SELECT name, relationship, nickname, attitude FROM ergou_people WHERE user_id=?1 ORDER BY created_at ASC",
     ) {
         Ok(s) => s,
-        Err(_) => return String::new(),
+        Err(_) => return ctx,
     };
 
     let rows: Vec<(String, String, String, String)> = match stmt.query_map([user_id], |row| {
@@ -72,25 +129,31 @@ fn build_people_context(db: &Connection, user_id: &str) -> String {
         ))
     }) {
         Ok(rows) => rows.flatten().collect(),
-        Err(_) => return String::new(),
+        Err(_) => return ctx,
     };
 
-    if rows.is_empty() {
-        return String::new();
-    }
+    if !rows.is_empty() {
+        ctx.push_str("\n## 你认识的人\n以下是用户生活中的重要人物，对话中提到时请自然使用对应称呼和态度：\n");
 
-    let mut ctx = String::from("\n## 你认识的人\n以下是用户生活中的重要人物，对话中提到时请自然使用对应称呼和态度：\n");
-
-    for (name, relationship, nickname, attitude) in &rows {
-        ctx.push_str(&format!(
-            "- {} — 关系:{} | 称呼:{} | 态度:{}\n",
-            sanitize_for_prompt(name, 50),
-            sanitize_for_prompt(relationship, 50),
-            if nickname.is_empty() { name.as_str() } else { nickname.as_str() },
-            if attitude.is_empty() { "（无特殊）" } else { attitude.as_str() }
-        ));
+        for (name, relationship, nickname, attitude) in &rows {
+            ctx.push_str(&format!(
+                "- {} — 关系:{} | 称呼:{} | 态度:{}\n",
+                sanitize_for_prompt(name, 50),
+                sanitize_for_prompt(relationship, 50),
+                if nickname.is_empty() {
+                    name.as_str()
+                } else {
+                    nickname.as_str()
+                },
+                if attitude.is_empty() {
+                    "（无特殊）"
+                } else {
+                    attitude.as_str()
+                }
+            ));
+        }
+        ctx.push_str("（自然融入对话，不要刻意逐条展示。用户提到这些人时用对应称呼。）\n");
     }
-    ctx.push_str("（自然融入对话，不要刻意逐条展示。用户提到这些人时用对应称呼。）\n");
 
     ctx
 }

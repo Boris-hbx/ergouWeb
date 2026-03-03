@@ -57,9 +57,14 @@ pub struct SimpleResponse {
 }
 
 // Shared receipt parsing system prompt — used by both parse_receipts and parse_preview
-const RECEIPT_PARSE_PROMPT: &str = r#"你是收据/票据/账单解析专家。分析图片，提取消费信息。
+const RECEIPT_PARSE_PROMPT: &str = r#"你是消费记录分析专家。根据提供的信息（图片、文字描述、或两者结合）提取消费信息。
 
-核心原则：**无论什么类型的单据，都必须输出 JSON，绝不输出其他文字。**
+核心原则：**无论输入是什么形式，都必须输出 JSON，绝不输出其他文字。**
+
+输入形式：
+- 可能只有收据/账单照片
+- 可能只有用户的文字描述（如"星巴克拿铁 35元"）
+- 可能同时有照片和文字描述，此时综合分析，文字可补充照片信息
 
 处理规则：
 1. 超市/商场收据（有商品明细）：逐项提取所有商品到 items 数组。
@@ -68,6 +73,7 @@ const RECEIPT_PARSE_PROMPT: &str = r#"你是收据/票据/账单解析专家。�
 4. 付款凭证（只有金额没有商品）：items 放一项，name 写商家或消费类型。
 5. 有小费的单据：total_amount 填实际刷卡金额（含小费），tip 填小费金额。
 6. 多张照片涉及不同日期的单据：每个 item 加上 "date": "YYYY-MM-DD" 字段。顶层 date 填最早日期。
+7. 纯文字描述：根据描述尽可能提取商家、金额、标签等信息。items 至少放一项。
 
 商品提取规则：
 - 多张图片可能是同一张长收据的不同部分，有重叠。按 amount 去重，不要遗漏。
@@ -905,26 +911,31 @@ pub async fn parse_receipts(
         Err(e) => return e,
     };
 
-    // Get photos for this entry
+    // Get photos and notes for this entry
     let photos: Vec<(String, String)>;
+    let entry_notes: String;
+    let entry_amount: f64;
     {
         let db = state.db.lock();
 
-        // Verify ownership
-        let exists: bool = db
-            .query_row(
-                "SELECT COUNT(*) FROM expense_entries WHERE id = ?1 AND user_id = ?2",
-                rusqlite::params![entry_id, user_id.0],
-                |row| row.get::<_, i64>(0),
-            )
-            .unwrap_or(0)
-            > 0;
+        // Verify ownership and get notes/amount
+        let entry_info = db.query_row(
+            "SELECT notes, amount FROM expense_entries WHERE id = ?1 AND user_id = ?2",
+            rusqlite::params![entry_id, user_id.0],
+            |row| Ok((row.get::<_, String>(0).unwrap_or_default(), row.get::<_, f64>(1).unwrap_or(0.0))),
+        );
 
-        if !exists {
-            return (
-                StatusCode::NOT_FOUND,
-                Json(json!({ "success": false, "message": "条目不存在" })),
-            );
+        match entry_info {
+            Ok((notes, amount)) => {
+                entry_notes = notes;
+                entry_amount = amount;
+            }
+            Err(_) => {
+                return (
+                    StatusCode::NOT_FOUND,
+                    Json(json!({ "success": false, "message": "条目不存在" })),
+                );
+            }
         }
 
         photos = db
@@ -938,10 +949,12 @@ pub async fn parse_receipts(
             .unwrap_or_default();
     }
 
-    if photos.is_empty() {
+    let has_notes = !entry_notes.trim().is_empty() || entry_amount > 0.0;
+
+    if photos.is_empty() && !has_notes {
         return (
             StatusCode::BAD_REQUEST,
-            Json(json!({ "success": false, "message": "没有照片可解析" })),
+            Json(json!({ "success": false, "message": "没有照片或文字可分析" })),
         );
     }
 
@@ -954,14 +967,7 @@ pub async fn parse_receipts(
         }
     }
 
-    if images.is_empty() {
-        return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({ "success": false, "message": "无法读取照片文件" })),
-        );
-    }
-
-    // Call LLM vision API
+    // Call LLM API
     let client = match crate::services::llm::LlmClient::for_user(&state.db.lock(), &user_id.0) {
         Some(c) => c,
         None => {
@@ -972,16 +978,19 @@ pub async fn parse_receipts(
         }
     };
 
-    let user_msg = if images.len() > 1 {
-        "请解析这张收据。多张图片是同一张收据的不同部分，有重叠，请去重。"
+    // Build user message with available context
+    let text_context = build_analysis_text(&entry_notes, entry_amount);
+    let user_msg = build_user_message(&text_context, &images);
+
+    let ai_result = if images.is_empty() {
+        // Text-only: use simple_generate
+        client.simple_generate(RECEIPT_PARSE_PROMPT, &user_msg, 8192).await
     } else {
-        "请解析这张收据/账单。"
+        // Has images (possibly with text): use vision_generate
+        client.vision_generate(RECEIPT_PARSE_PROMPT, images, &user_msg, 8192).await
     };
 
-    match client
-        .vision_generate(RECEIPT_PARSE_PROMPT, images, user_msg, 8192)
-        .await
-    {
+    match ai_result {
         Ok(text) => {
             // Parse the JSON response
             let parsed = parse_ai_receipt_response(&text);
@@ -1073,13 +1082,15 @@ pub async fn parse_preview(
         }
     };
 
-    if req.images.is_empty() {
+    let has_text = req.text.as_ref().is_some_and(|t| !t.trim().is_empty());
+
+    if req.images.is_empty() && !has_text {
         return (
             StatusCode::BAD_REQUEST,
             Json(ParsePreviewResponse {
                 success: false,
                 preview: None,
-                message: Some("没有照片可解析".into()),
+                message: Some("请提供照片或文字描述".into()),
                 ai_remaining: None,
             }),
         );
@@ -1106,16 +1117,18 @@ pub async fn parse_preview(
         .map(|img| (img.data, img.mime_type))
         .collect();
 
-    let user_msg = if images.len() > 1 {
-        "请解析这张收据。多张图片是同一张收据的不同部分，有重叠，请去重。"
+    let text_ref = req.text.as_deref().unwrap_or("");
+    let user_msg = build_user_message(text_ref, &images);
+
+    let ai_result = if images.is_empty() {
+        // Text-only: use simple_generate
+        client.simple_generate(RECEIPT_PARSE_PROMPT, &user_msg, 8192).await
     } else {
-        "请解析这张收据/账单。"
+        // Has images (possibly with text): use vision_generate
+        client.vision_generate(RECEIPT_PARSE_PROMPT, images, &user_msg, 8192).await
     };
 
-    match client
-        .vision_generate(RECEIPT_PARSE_PROMPT, images, user_msg, 8192)
-        .await
-    {
+    match ai_result {
         Ok(text) => {
             let parsed = parse_ai_receipt_response(&text);
             (
@@ -1165,6 +1178,48 @@ pub async fn parse_preview(
                 }),
             )
         }
+    }
+}
+
+// ===== AI message helpers =====
+
+/// Build text context from notes and amount for AI analysis
+fn build_analysis_text(notes: &str, amount: f64) -> String {
+    let mut parts = Vec::new();
+    if !notes.trim().is_empty() {
+        parts.push(format!("用户备注: {}", notes.trim()));
+    }
+    if amount > 0.0 {
+        parts.push(format!("金额: {:.2}", amount));
+    }
+    parts.join("\n")
+}
+
+/// Build user message combining text context and image info
+fn build_user_message(text_context: &str, images: &[(String, String)]) -> String {
+    let has_text = !text_context.is_empty();
+    let has_images = !images.is_empty();
+
+    match (has_text, has_images) {
+        (true, true) => {
+            let img_hint = if images.len() > 1 {
+                "多张图片是同一张收据的不同部分，有重叠，请去重。"
+            } else {
+                ""
+            };
+            format!("{}\n\n请综合分析照片和文字信息，提取消费详情。{}", text_context, img_hint)
+        }
+        (false, true) => {
+            if images.len() > 1 {
+                "请解析这张收据。多张图片是同一张收据的不同部分，有重叠，请去重。".into()
+            } else {
+                "请解析这张收据/账单。".into()
+            }
+        }
+        (true, false) => {
+            format!("{}\n\n请根据以上信息分析这笔消费，提取商家、金额、标签等。", text_context)
+        }
+        (false, false) => "请分析这笔消费。".into(),
     }
 }
 
