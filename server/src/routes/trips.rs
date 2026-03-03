@@ -293,30 +293,45 @@ pub async fn get_trip(
         })
         .unwrap_or_default();
 
-    // Get photos for each item
+    // Get all photos for this trip's items in one query (avoids N+1)
+    let all_photos: Vec<TripPhoto> = db
+        .prepare(
+            "SELECT p.id, p.item_id, p.filename, p.file_size, p.mime_type, p.created_at, p.storage_path
+             FROM trip_photos p
+             JOIN trip_items ti ON ti.id = p.item_id
+             WHERE ti.trip_id = ?1
+             ORDER BY p.item_id, p.created_at",
+        )
+        .and_then(|mut stmt| {
+            stmt.query_map(rusqlite::params![id], |row| {
+                Ok(TripPhoto {
+                    id: row.get(0)?,
+                    item_id: row.get(1)?,
+                    filename: row.get(2)?,
+                    file_size: row.get(3)?,
+                    mime_type: row.get(4)?,
+                    created_at: row.get(5)?,
+                    storage_path: row.get(6)?,
+                })
+            })
+            .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        })
+        .unwrap_or_default();
+
+    // Group photos by item_id
+    let mut photos_map: std::collections::HashMap<String, Vec<TripPhoto>> =
+        std::collections::HashMap::new();
+    for photo in all_photos {
+        photos_map
+            .entry(photo.item_id.clone())
+            .or_default()
+            .push(photo);
+    }
+
     let items_with_photos: Vec<TripItemWithPhotos> = items
         .into_iter()
         .map(|item| {
-            let photos: Vec<TripPhoto> = db
-                .prepare(
-                    "SELECT id, item_id, filename, file_size, mime_type, created_at, storage_path
-                     FROM trip_photos WHERE item_id = ?1 ORDER BY created_at",
-                )
-                .and_then(|mut stmt| {
-                    stmt.query_map(rusqlite::params![item.id], |row| {
-                        Ok(TripPhoto {
-                            id: row.get(0)?,
-                            item_id: row.get(1)?,
-                            filename: row.get(2)?,
-                            file_size: row.get(3)?,
-                            mime_type: row.get(4)?,
-                            created_at: row.get(5)?,
-                            storage_path: row.get(6)?,
-                        })
-                    })
-                    .map(|rows| rows.filter_map(|r| r.ok()).collect())
-                })
-                .unwrap_or_default();
+            let photos = photos_map.remove(&item.id).unwrap_or_default();
             TripItemWithPhotos { item, photos }
         })
         .collect();
