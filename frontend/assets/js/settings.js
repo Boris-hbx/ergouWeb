@@ -274,6 +274,7 @@ function selectPresetAvatar(el) {
     // Sync to server
     API.updateAvatar(value).catch(function(e) {
         console.error('[settings] updateAvatar:', e);
+        showToast('头像同步失败，下次刷新可能丢失', 'error');
     });
 }
 
@@ -306,6 +307,7 @@ function handleAvatarUpload(event) {
             // Sync to server
             API.updateAvatar(dataURL).catch(function(e) {
                 console.error('[settings] updateAvatar:', e);
+                showToast('头像同步失败，下次刷新可能丢失', 'error');
             });
             showToast('头像已更新', 'success');
         };
@@ -639,3 +641,10 @@ loadSettingsData = async function() {
     Contacts.loadContacts();
     loadMemories();
 };
+
+// BUG-1 fix: settings.js 加载完成后立即应用头像，避免 checkAuth 竞态
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() { applyAvatar(); });
+} else {
+    applyAvatar();
+}

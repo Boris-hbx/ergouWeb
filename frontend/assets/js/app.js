@@ -22,6 +22,8 @@
             // Sync server avatar to localStorage, then apply
             if (data.user.avatar) {
                 localStorage.setItem('userAvatar', data.user.avatar);
+            } else {
+                localStorage.removeItem('userAvatar');
             }
             if (typeof applyAvatar === 'function') applyAvatar();
 

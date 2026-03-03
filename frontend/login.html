@@ -306,6 +306,7 @@
                 localStorage.setItem('loggedIn', 'true');
                 localStorage.setItem('username', data.user.username);
                 if (data.user.display_name) localStorage.setItem('displayName', data.user.display_name);
+                if (data.user.avatar) localStorage.setItem('userAvatar', data.user.avatar);
                 window.location.href = '/';
             } else {
                 hideGuestDialog();
@@ -374,6 +375,7 @@
                 if (data.user.display_name) {
                     localStorage.setItem('displayName', data.user.display_name);
                 }
+                if (data.user.avatar) localStorage.setItem('userAvatar', data.user.avatar);
                 window.location.href = '/';
             } else {
                 errEl.textContent = data.message || '操作失败';
