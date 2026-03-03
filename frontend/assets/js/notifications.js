@@ -355,10 +355,11 @@ var Notifications = (function() {
     function openTodo(todoId, btn) {
         dismissBanner(btn);
         closePanel();
-        // Open todo detail modal
-        if (typeof openTaskDetail === 'function') {
-            openTaskDetail(todoId);
-        }
+        // Switch to todo page and open task card
+        if (typeof switchPage === 'function') switchPage('todo');
+        setTimeout(function() {
+            if (typeof showTaskCard === 'function') showTaskCard(todoId);
+        }, 300);
     }
 
     async function acknowledgeFromPanel(reminderId, notifId) {

@@ -421,7 +421,7 @@ var Friends = (function() {
             case 'todo':
                 if (typeof switchPage === 'function') switchPage('todo');
                 setTimeout(function() {
-                    if (typeof openTaskDetail === 'function') openTaskDetail(newId);
+                    if (typeof showTaskCard === 'function') showTaskCard(newId);
                 }, 600);
                 break;
 

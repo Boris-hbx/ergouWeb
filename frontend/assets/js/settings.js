@@ -477,7 +477,7 @@ var Contacts = (function() {
         if (!name || !name.trim()) return;
         var note = prompt('备注 (可选):') || '';
 
-        API.createContact(name.trim(), note).then(function(resp) {
+        API.createContact({ name: name.trim(), note: note || undefined }).then(function(resp) {
             if (resp.success) {
                 showToast('联系人已添加', 'success');
                 loadContacts();

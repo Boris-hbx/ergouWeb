@@ -890,8 +890,7 @@ var Abao = (function() {
             // Todos
             if (!refreshed.todo && (tool.indexOf('todo') >= 0 || tool === 'batch_update_todos' || tool === 'create_reminder')) {
                 refreshed.todo = true;
-                if (typeof window.loadTodos === 'function') window.loadTodos();
-                else if (typeof window.refreshTasks === 'function') window.refreshTasks();
+                if (typeof loadItems === 'function') loadItems();
             }
             // Routines
             if (!refreshed.routine && tool.indexOf('routine') >= 0) {

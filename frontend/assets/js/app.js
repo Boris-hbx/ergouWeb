@@ -27,6 +27,9 @@
             }
             if (typeof applyAvatar === 'function') applyAvatar();
 
+            // Store current user info for cross-module use
+            window._currentUser = data.user;
+
             // Handle account status
             window._userStatus = data.user.status || 'active';
             if (window._userStatus === 'pending') {
