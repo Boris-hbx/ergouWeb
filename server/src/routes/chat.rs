@@ -273,7 +273,7 @@ pub async fn chat_handler(
             let usage_id = uuid::Uuid::new_v4().to_string();
             db.execute(
                 "INSERT INTO chat_usage_log (id, user_id, conversation_id, model, input_tokens, output_tokens, tool_calls, latency_ms, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
-                rusqlite::params![usage_id, tool_user_id, conv_id_clone, "claude-sonnet-4-6-20250514", chat_result.input_tokens, chat_result.output_tokens, chat_result.tool_calls.len() as i64, latency_ms, now],
+                rusqlite::params![usage_id, tool_user_id, conv_id_clone, "claude-opus-4-6-20250514", chat_result.input_tokens, chat_result.output_tokens, chat_result.tool_calls.len() as i64, latency_ms, now],
             )
             .ok();
 
