@@ -86,6 +86,8 @@ main 分支 → git merge dev → deploy production 发版 → git tag vX.Y.Z
 - 用户反馈: `showToast(message, type)`
 - CSS 变量: `var(--primary-color)` 等
 - 编码: UTF-8
+- 后端日志: 新代码用 `tracing` 宏（`info!`, `warn!`, `error!`），禁止 `eprintln!()`
+- 前端错误: catch 块禁止为空，至少 `console.error('[模块名]', error)`
 
 ## 公共 UI 组件
 

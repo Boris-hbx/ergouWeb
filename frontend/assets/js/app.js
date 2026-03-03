@@ -189,6 +189,8 @@ function loadQuadrantState() {
 function switchPage(page) {
     if (currentPage === page) return;
     currentPage = page;
+    // Breadcrumb: navigation
+    if (typeof Observability !== 'undefined') Observability.addBreadcrumb('nav', page);
 
     // 更新桌面端 nav-link
     var activeSidebarLink = null;

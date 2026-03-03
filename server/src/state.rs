@@ -19,4 +19,6 @@ pub struct AppState {
     pub ai_rate_limits: Arc<Mutex<HashMap<String, Instant>>>,
     /// Guest login rate limiting: IP -> (count, window_start)
     pub guest_ip_rate_limits: Arc<Mutex<HashMap<String, (u32, Instant)>>>,
+    /// Client error report rate limiting: IP -> (count, window_start)
+    pub error_report_limits: Arc<Mutex<HashMap<String, (u32, Instant)>>>,
 }

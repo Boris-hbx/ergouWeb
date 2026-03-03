@@ -572,6 +572,21 @@ fn create_tables(conn: &Connection) {
             created_at TEXT NOT NULL
         );
         CREATE INDEX IF NOT EXISTS idx_security_events_user ON security_events(user_id, created_at DESC);
+
+        CREATE TABLE IF NOT EXISTS client_errors (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            error_message TEXT NOT NULL,
+            stack TEXT,
+            app_version TEXT,
+            url TEXT,
+            user_agent TEXT,
+            screen_size TEXT,
+            network_online INTEGER DEFAULT 1,
+            user_id TEXT,
+            breadcrumbs TEXT,
+            created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_client_errors_created ON client_errors(created_at);
         ",
     )
     .expect("Failed to create tables");

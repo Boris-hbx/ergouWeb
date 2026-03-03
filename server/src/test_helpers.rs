@@ -16,6 +16,7 @@ pub fn test_state() -> AppState {
         login_user_lockouts: Arc::new(Mutex::new(HashMap::new())),
         ai_rate_limits: Arc::new(Mutex::new(HashMap::new())),
         guest_ip_rate_limits: Arc::new(Mutex::new(HashMap::new())),
+        error_report_limits: Arc::new(Mutex::new(HashMap::new())),
     }
 }
 

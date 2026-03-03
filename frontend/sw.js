@@ -1,4 +1,12 @@
-const CACHE_NAME = 'next-v21';
+const CACHE_NAME = 'next-v22';
+
+// Global error handlers
+self.addEventListener('error', event => {
+    console.error('[SW] uncaught:', event.error || event.message);
+});
+self.addEventListener('unhandledrejection', event => {
+    console.error('[SW] unhandled rejection:', event.reason);
+});
 const STATIC_ASSETS = [
     '/',
     '/index.html',
@@ -26,6 +34,7 @@ const STATIC_ASSETS = [
     '/assets/js/trip.js',
     '/assets/js/utils.js',
     '/assets/js/health.js',
+    '/assets/js/observability.js',
 ];
 
 // Install: cache static assets
@@ -54,7 +63,7 @@ self.addEventListener('push', event => {
     let data = { title: '提醒', body: '', type: 'reminder' };
     try {
         if (event.data) data = Object.assign(data, event.data.json());
-    } catch(e) {}
+    } catch(e) { console.error('[SW] push data parse error:', e); }
 
     const options = {
         body: data.body || '',
@@ -95,7 +104,7 @@ self.addEventListener('notificationclick', event => {
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'same-origin',
                 body: JSON.stringify({ minutes: 5 })
-            }).catch(() => {})
+            }).catch(e => { console.error('[SW] snooze failed:', e); })
         );
         return;
     }
@@ -154,8 +163,9 @@ self.addEventListener('fetch', event => {
                 }
                 return response;
             })
-            .catch(() => {
+            .catch(err => {
                 // Fallback to cache
+                console.error('[SW] fetch failed:', event.request.url, err);
                 return caches.match(event.request);
             })
     );

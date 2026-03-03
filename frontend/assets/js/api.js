@@ -12,9 +12,14 @@ var API = (function() {
             opts.headers['Content-Type'] = 'application/json';
             opts.body = JSON.stringify(body);
         }
+        var _t0 = Date.now();
         try {
             var resp = await fetch(BASE + path, opts);
             var data = await resp.json();
+            // Breadcrumb: record API call
+            if (typeof Observability !== 'undefined') {
+                Observability.addBreadcrumb('api', method + ' ' + path + ' → ' + resp.status + ' (' + (Date.now() - _t0) + 'ms)');
+            }
             if (resp.status === 401) {
                 // Session expired, redirect to login
                 window.location.href = '/login.html';
@@ -40,6 +45,10 @@ var API = (function() {
             return data;
         } catch (err) {
             if (err.message === 'UNAUTHORIZED' || err.message === 'ACCOUNT_PENDING' || err.message === 'GUEST_RESTRICTED' || err.message === 'GUEST_AI_EXHAUSTED') throw err;
+            // Breadcrumb: record failed API call
+            if (typeof Observability !== 'undefined') {
+                Observability.addBreadcrumb('api', method + ' ' + path + ' → ERR (' + (Date.now() - _t0) + 'ms)');
+            }
             console.error('[API] error:', method, path, err);
             throw err;
         }

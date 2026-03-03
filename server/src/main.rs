@@ -20,6 +20,7 @@ use parking_lot::Mutex;
 use state::AppState;
 use std::sync::Arc;
 use tower_http::set_header::SetResponseHeaderLayer;
+use tower_http::trace::TraceLayer;
 
 /// Build the full application router. Extracted so integration tests can call
 /// `build_app(test_state())` and use `tower::ServiceExt::oneshot()`.
@@ -316,7 +317,8 @@ pub fn build_app(state: AppState) -> Router {
         .route(
             "/uploads/{user_id}/{filename}",
             get(routes::expenses::serve_photo),
-        );
+        )
+        .route("/client-errors", post(routes::observability::report_client_error));
 
     Router::new()
         .route("/health", get(move || async move {
@@ -352,11 +354,21 @@ pub fn build_app(state: AppState) -> Router {
             HeaderValue::from_static("camera=(self), microphone=(), geolocation=()"),
         ))
         .layer(DefaultBodyLimit::max(1_048_576)) // 1MB global body size limit
+        .layer(TraceLayer::new_for_http())
         .with_state(state)
 }
 
 #[tokio::main]
 async fn main() {
+    // Initialize structured logging
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info,tower_http=info")),
+        )
+        .compact()
+        .init();
+
     let db_path = std::env::var("DATABASE_PATH").unwrap_or_else(|_| "data/next.db".to_string());
     let port: u16 = std::env::var("PORT")
         .ok()
@@ -373,6 +385,7 @@ async fn main() {
         login_user_lockouts: Arc::new(Mutex::new(std::collections::HashMap::new())),
         ai_rate_limits: Arc::new(Mutex::new(std::collections::HashMap::new())),
         guest_ip_rate_limits: Arc::new(Mutex::new(std::collections::HashMap::new())),
+        error_report_limits: Arc::new(Mutex::new(std::collections::HashMap::new())),
     };
 
     // Spawn reminder poller (checks every 30s for due reminders)
@@ -413,6 +426,11 @@ async fn main() {
                 let mut limits = cleanup_state.ai_rate_limits.lock();
                 limits.retain(|_, t| t.elapsed().as_secs() < 60);
             }
+            // Clean expired error report rate limits
+            {
+                let mut limits = cleanup_state.error_report_limits.lock();
+                limits.retain(|_, (_, t)| t.elapsed().as_secs() < 60);
+            }
             // Clean expired sessions from DB
             {
                 let db = cleanup_state.db.lock();
@@ -421,6 +439,13 @@ async fn main() {
                     [],
                 ) {
                     eprintln!("[cleanup] session cleanup failed: {}", e);
+                }
+                // Clean client_errors older than 14 days
+                if let Err(e) = db.execute(
+                    "DELETE FROM client_errors WHERE created_at < datetime('now', '-14 days')",
+                    [],
+                ) {
+                    eprintln!("[cleanup] client_errors cleanup failed: {}", e);
                 }
             }
         }
