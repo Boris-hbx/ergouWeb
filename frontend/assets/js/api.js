@@ -12,9 +12,14 @@ var API = (function() {
             opts.headers['Content-Type'] = 'application/json';
             opts.body = JSON.stringify(body);
         }
+        var _t0 = Date.now();
         try {
             var resp = await fetch(BASE + path, opts);
             var data = await resp.json();
+            // Breadcrumb: record API call
+            if (typeof Observability !== 'undefined') {
+                Observability.addBreadcrumb('api', method + ' ' + path + ' → ' + resp.status + ' (' + (Date.now() - _t0) + 'ms)');
+            }
             if (resp.status === 401) {
                 // Session expired, redirect to login
                 window.location.href = '/login.html';
@@ -40,6 +45,10 @@ var API = (function() {
             return data;
         } catch (err) {
             if (err.message === 'UNAUTHORIZED' || err.message === 'ACCOUNT_PENDING' || err.message === 'GUEST_RESTRICTED' || err.message === 'GUEST_AI_EXHAUSTED') throw err;
+            // Breadcrumb: record failed API call
+            if (typeof Observability !== 'undefined') {
+                Observability.addBreadcrumb('api', method + ' ' + path + ' → ERR (' + (Date.now() - _t0) + 'ms)');
+            }
             console.error('[API] error:', method, path, err);
             throw err;
         }
@@ -49,6 +58,7 @@ var API = (function() {
         window._guestAiRemaining = remaining;
         var el = document.getElementById('guest-ai-count');
         if (el) el.textContent = remaining;
+        if (typeof updateAllGuestAiHints === 'function') updateAllGuestAiHints();
     }
 
     return {
@@ -85,6 +95,23 @@ var API = (function() {
 
         updateAvatar: async function(avatar) {
             return await request('PUT', '/auth/avatar', { avatar: avatar });
+        },
+
+        // ===== Settings APIs =====
+        getAiModel: async function() {
+            return await request('GET', '/settings/ai-model');
+        },
+
+        setAiModel: async function(model) {
+            return await request('PUT', '/settings/ai-model', { model: model });
+        },
+
+        getTimezone: async function() {
+            return await request('GET', '/settings/timezone');
+        },
+
+        setTimezone: async function(tz) {
+            return await request('PUT', '/settings/timezone', { timezone: tz });
         },
 
         // ===== Todo APIs =====
@@ -456,6 +483,10 @@ var API = (function() {
             return await request('POST', '/expenses/parse-preview', { images: images });
         },
 
+        deleteExpensePhoto: async function(photoId) {
+            return await request('DELETE', '/expenses/photos/' + encodeURIComponent(photoId));
+        },
+
         // ===== Trip APIs (差旅) =====
         getTrips: async function() {
             return await request('GET', '/trips');
@@ -534,6 +565,27 @@ var API = (function() {
         },
         rejectUser: async function(id) {
             return await request('POST', '/admin/users/' + encodeURIComponent(id) + '/reject');
+        },
+        getSecurityEvents: async function() {
+            return await request('GET', '/admin/security-events');
+        },
+        restoreUser: async function(id) {
+            return await request('POST', '/admin/users/' + encodeURIComponent(id) + '/restore');
+        },
+        // Generic admin request helper for new admin panel endpoints
+        adminRequest: async function(method, path, body) {
+            return await request(method, path, body);
+        },
+
+        // ===== Memory APIs =====
+        getMemories: async function() {
+            return await request('GET', '/settings/memories');
+        },
+        deleteMemory: async function(id) {
+            return await request('DELETE', '/settings/memories/' + encodeURIComponent(id));
+        },
+        deleteAllMemories: async function() {
+            return await request('DELETE', '/settings/memories');
         },
 
         // 环境检测 (always web now)

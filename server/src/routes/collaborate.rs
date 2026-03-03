@@ -204,23 +204,36 @@ pub async fn list_collaborators(
         }
     }
 
-    let mut stmt = db
-        .prepare(
-            "SELECT tc.user_id, COALESCE(u.display_name, u.username) as name, tc.role, tc.status FROM todo_collaborators tc JOIN users u ON tc.user_id = u.id WHERE tc.todo_id = ?1 AND tc.status = 'active'",
-        )
-        .unwrap();
-    let collabs: Vec<CollaboratorInfo> = stmt
-        .query_map([&todo_id], |row| {
-            Ok(CollaboratorInfo {
-                user_id: row.get(0)?,
-                display_name: row.get(1)?,
-                role: row.get(2)?,
-                status: row.get(3)?,
-            })
+    let mut stmt = match db.prepare(
+        "SELECT tc.user_id, COALESCE(u.display_name, u.username) as name, tc.role, tc.status FROM todo_collaborators tc JOIN users u ON tc.user_id = u.id WHERE tc.todo_id = ?1 AND tc.status = 'active'",
+    ) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("[collaborate] db error: {}", e);
+            return (StatusCode::INTERNAL_SERVER_ERROR, Json(CollaboratorsResponse { success: false, items: vec![] }));
+        }
+    };
+    let result = stmt.query_map([&todo_id], |row| {
+        Ok(CollaboratorInfo {
+            user_id: row.get(0)?,
+            display_name: row.get(1)?,
+            role: row.get(2)?,
+            status: row.get(3)?,
         })
-        .unwrap()
-        .filter_map(|r| r.ok())
-        .collect();
+    });
+    let collabs: Vec<CollaboratorInfo> = match result {
+        Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
+        Err(e) => {
+            eprintln!("[collaborate] db error: {}", e);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(CollaboratorsResponse {
+                    success: false,
+                    items: vec![],
+                }),
+            );
+        }
+    };
     items.extend(collabs);
 
     (
@@ -241,29 +254,50 @@ pub async fn list_pending_confirmations(
 
     let sql = "SELECT pc.id, pc.item_type, pc.item_id, pc.action, pc.initiated_by,                u.display_name, u.username, pc.initiated_at, pc.status,                t.text as item_text                FROM pending_confirmations pc                JOIN users u ON pc.initiated_by = u.id                LEFT JOIN todos t ON pc.item_type = 'todo' AND pc.item_id = t.id                WHERE pc.status = 'pending'                AND (pc.initiated_by = ?1                     OR EXISTS (SELECT 1 FROM todo_collaborators tc WHERE tc.todo_id = pc.item_id AND tc.user_id = ?1 AND tc.status = 'active')                     OR EXISTS (SELECT 1 FROM todos t2 WHERE t2.id = pc.item_id AND t2.user_id = ?1))                ORDER BY pc.initiated_at DESC";
 
-    let mut stmt = db.prepare(sql).unwrap();
+    let mut stmt = match db.prepare(sql) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("[collaborate] db error: {}", e);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ConfirmationsResponse {
+                    success: false,
+                    items: vec![],
+                }),
+            );
+        }
+    };
 
-    let items: Vec<PendingConfirmation> = stmt
-        .query_map([&user_id.0], |row| {
-            let display_name: Option<String> = row.get(5)?;
-            let username: String = row.get(6)?;
-            Ok(PendingConfirmation {
-                id: row.get(0)?,
-                item_type: row.get(1)?,
-                item_id: row.get(2)?,
-                action: row.get(3)?,
-                initiated_by: row.get(4)?,
-                initiated_at: row.get(7)?,
-                status: row.get(8)?,
-                resolved_at: None,
-                initiator_name: Some(display_name.unwrap_or_else(|| username.clone())),
-                initiator_username: Some(username),
-                item_text: row.get(9)?,
-            })
+    let result = stmt.query_map([&user_id.0], |row| {
+        let display_name: Option<String> = row.get(5)?;
+        let username: String = row.get(6)?;
+        Ok(PendingConfirmation {
+            id: row.get(0)?,
+            item_type: row.get(1)?,
+            item_id: row.get(2)?,
+            action: row.get(3)?,
+            initiated_by: row.get(4)?,
+            initiated_at: row.get(7)?,
+            status: row.get(8)?,
+            resolved_at: None,
+            initiator_name: Some(display_name.unwrap_or_else(|| username.clone())),
+            initiator_username: Some(username),
+            item_text: row.get(9)?,
         })
-        .unwrap()
-        .filter_map(|r| r.ok())
-        .collect();
+    });
+    let items: Vec<PendingConfirmation> = match result {
+        Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
+        Err(e) => {
+            eprintln!("[collaborate] db error: {}", e);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ConfirmationsResponse {
+                    success: false,
+                    items: vec![],
+                }),
+            );
+        }
+    };
 
     (
         StatusCode::OK,

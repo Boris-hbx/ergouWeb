@@ -20,6 +20,7 @@ use parking_lot::Mutex;
 use state::AppState;
 use std::sync::Arc;
 use tower_http::set_header::SetResponseHeaderLayer;
+use tower_http::trace::TraceLayer;
 
 /// Build the full application router. Extracted so integration tests can call
 /// `build_app(test_state())` and use `tower::ServiceExt::oneshot()`.
@@ -145,6 +146,7 @@ pub fn build_app(state: AppState) -> Router {
         )
         .route("/{id}/export/xlsx", get(routes::trips::export_xlsx))
         .route("/{id}/export/photos", get(routes::trips::export_photos))
+        .route("/{id}/export/bundle", get(routes::trips::export_bundle))
         .route("/analyze", post(routes::trips::analyze_item))
         .layer(DefaultBodyLimit::max(50_000_000));
 
@@ -259,12 +261,29 @@ pub fn build_app(state: AppState) -> Router {
             post(routes::collaborate::withdraw_confirmation),
         );
 
+    // Settings routes (user preferences)
+    let settings_routes = Router::new()
+        .route("/ai-model", get(auth::get_ai_model).put(auth::set_ai_model))
+        .route(
+            "/timezone",
+            get(auth::get_timezone).put(auth::set_timezone),
+        )
+        .route(
+            "/memories",
+            get(auth::list_memories).delete(auth::delete_all_memories),
+        )
+        .route(
+            "/memories/{id}",
+            delete(auth::delete_memory_by_id),
+        );
+
     // Health check
     let start_time = std::time::Instant::now();
 
     // API router
     let api_routes = Router::new()
         .nest("/auth", auth_routes)
+        .nest("/settings", settings_routes)
         .nest("/todos", todo_routes)
         .nest("/routines", routine_routes)
         .nest("/reviews", review_routes)
@@ -284,16 +303,36 @@ pub fn build_app(state: AppState) -> Router {
         .nest(
             "/admin",
             Router::new()
+                // Existing endpoints
                 .route("/dashboard", get(routes::admin::dashboard))
                 .route("/pending-users", get(routes::admin::pending_users))
                 .route("/users/{id}/approve", post(routes::admin::approve_user))
-                .route("/users/{id}/reject", post(routes::admin::reject_user)),
+                .route("/users/{id}/reject", post(routes::admin::reject_user))
+                .route("/security-events", get(routes::admin::security_events))
+                .route("/users/{id}/restore", post(routes::admin::restore_user))
+                // New endpoints: User Management
+                .route("/users", get(routes::admin::list_users))
+                .route("/users/{id}/role", put(routes::admin::change_role))
+                .route("/users/{id}/force-logout", post(routes::admin::force_logout))
+                .route("/users/{id}/suspend", post(routes::admin::suspend_user))
+                // New endpoints: Conversation Monitor
+                .route("/conversations", get(routes::admin::list_conversations))
+                .route("/conversations/{id}/messages", get(routes::admin::get_conversation_messages))
+                // New endpoints: AI Dashboard
+                .route("/ai-usage", get(routes::admin::ai_usage))
+                .route("/ai-usage/providers", get(routes::admin::ai_providers))
+                // New endpoints: Risk & System
+                .route("/security-events-v2", get(routes::admin::security_events_v2))
+                .route("/security-events/{id}/review", post(routes::admin::review_security_event))
+                .route("/system-status", get(routes::admin::system_status))
+                .route("/audit-log", get(routes::admin::audit_log)),
         )
         .route("/moment", get(routes::moment::get_moment))
         .route(
             "/uploads/{user_id}/{filename}",
             get(routes::expenses::serve_photo),
-        );
+        )
+        .route("/client-errors", post(routes::observability::report_client_error));
 
     Router::new()
         .route("/health", get(move || async move {
@@ -329,11 +368,21 @@ pub fn build_app(state: AppState) -> Router {
             HeaderValue::from_static("camera=(self), microphone=(), geolocation=()"),
         ))
         .layer(DefaultBodyLimit::max(1_048_576)) // 1MB global body size limit
+        .layer(TraceLayer::new_for_http())
         .with_state(state)
 }
 
 #[tokio::main]
 async fn main() {
+    // Initialize structured logging
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info,tower_http=info")),
+        )
+        .compact()
+        .init();
+
     let db_path = std::env::var("DATABASE_PATH").unwrap_or_else(|_| "data/next.db".to_string());
     let port: u16 = std::env::var("PORT")
         .ok()
@@ -345,11 +394,14 @@ async fn main() {
 
     let state = AppState {
         db: Arc::new(Mutex::new(conn)),
+        db_path: db_path.clone(),
+        start_time: std::time::Instant::now(),
         moment_cache: Arc::new(Mutex::new(std::collections::HashMap::new())),
         login_ip_attempts: Arc::new(Mutex::new(std::collections::HashMap::new())),
         login_user_lockouts: Arc::new(Mutex::new(std::collections::HashMap::new())),
         ai_rate_limits: Arc::new(Mutex::new(std::collections::HashMap::new())),
         guest_ip_rate_limits: Arc::new(Mutex::new(std::collections::HashMap::new())),
+        error_report_limits: Arc::new(Mutex::new(std::collections::HashMap::new())),
     };
 
     // Spawn reminder poller (checks every 30s for due reminders)
@@ -390,14 +442,27 @@ async fn main() {
                 let mut limits = cleanup_state.ai_rate_limits.lock();
                 limits.retain(|_, t| t.elapsed().as_secs() < 60);
             }
+            // Clean expired error report rate limits
+            {
+                let mut limits = cleanup_state.error_report_limits.lock();
+                limits.retain(|_, (_, t)| t.elapsed().as_secs() < 60);
+            }
             // Clean expired sessions from DB
             {
                 let db = cleanup_state.db.lock();
-                db.execute(
+                if let Err(e) = db.execute(
                     "DELETE FROM sessions WHERE expires_at < datetime('now')",
                     [],
-                )
-                .ok();
+                ) {
+                    eprintln!("[cleanup] session cleanup failed: {}", e);
+                }
+                // Clean client_errors older than 14 days
+                if let Err(e) = db.execute(
+                    "DELETE FROM client_errors WHERE created_at < datetime('now', '-14 days')",
+                    [],
+                ) {
+                    eprintln!("[cleanup] client_errors cleanup failed: {}", e);
+                }
             }
         }
     });
@@ -425,7 +490,7 @@ async fn main() {
                 match tokio::fs::read_to_string(format!("{}/sw.js", sw_dir)).await {
                     Ok(body) => (
                         [
-                            (http::header::CONTENT_TYPE, "application/javascript"),
+                            (http::header::CONTENT_TYPE, "application/javascript; charset=utf-8"),
                             (
                                 http::header::CACHE_CONTROL,
                                 "no-cache, no-store, must-revalidate",
@@ -470,7 +535,19 @@ async fn main() {
         .fallback_service(
             tower_http::services::ServeDir::new(&frontend_dir)
                 .append_index_html_on_directories(true),
-        );
+        )
+        .layer(axum::middleware::map_response(|mut response: axum::response::Response| async move {
+            if let Some(ct) = response.headers().get(http::header::CONTENT_TYPE).cloned() {
+                if let Ok(s) = ct.to_str() {
+                    if s.starts_with("text/") && !s.contains("charset") {
+                        if let Ok(v) = HeaderValue::from_str(&format!("{}; charset=utf-8", s)) {
+                            response.headers_mut().insert(http::header::CONTENT_TYPE, v);
+                        }
+                    }
+                }
+            }
+            response
+        }));
 
     let addr = format!("0.0.0.0:{}", port);
     println!("Next server listening on {}", addr);

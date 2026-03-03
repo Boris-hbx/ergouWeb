@@ -5,17 +5,14 @@ async function loadSettingsData() {
     try {
         var data = await API.getMe();
         if (data.success && data.user) {
-            document.getElementById('settings-username').textContent = data.user.username;
+            document.getElementById('settings-username').textContent =
+                data.user.username || '--';
             document.getElementById('settings-display-name').textContent =
-                data.user.display_name || data.user.username;
+                data.user.display_name || '--';
         }
     } catch(e) {
-        // ignore
+        console.error('[settings] loadSettingsData:', e);
     }
-    // 清空密码字段
-    document.getElementById('settings-old-password').value = '';
-    document.getElementById('settings-new-password').value = '';
-    document.getElementById('settings-confirm-password').value = '';
     // 初始化头像选择器
     highlightSelectedPreset();
     applyAvatar();
@@ -28,7 +25,44 @@ async function loadSettingsData() {
         var pwdSection = document.getElementById('settings-password-section');
         if (pwdSection) pwdSection.style.display = 'none';
         var friendsSection = document.getElementById('settings-friends-section');
-        if (friendsSection) friendsSection.style.display = 'none';
+        if (friendsSection) {
+            friendsSection.innerHTML = '<h4>好友</h4><div class="friends-empty">注册后可管理好友</div>';
+        }
+    }
+    // Load AI model preference
+    loadAiModel();
+    // Load timezone preference
+    loadTimezone();
+    // Init patrol toggle
+    initPatrolToggle();
+}
+
+// 密码 Modal
+var _pwdEscHandler = null;
+
+function openPwdModal() {
+    var overlay = document.getElementById('pwd-modal-overlay');
+    overlay.style.display = 'flex';
+    document.getElementById('settings-old-password').value = '';
+    document.getElementById('settings-new-password').value = '';
+    document.getElementById('settings-confirm-password').value = '';
+    setTimeout(function() {
+        document.getElementById('settings-old-password').focus();
+    }, 50);
+    _pwdEscHandler = function(e) {
+        if (e.key === 'Escape') closePwdModal();
+    };
+    document.addEventListener('keydown', _pwdEscHandler);
+}
+
+function closePwdModal() {
+    document.getElementById('pwd-modal-overlay').style.display = 'none';
+    document.getElementById('settings-old-password').value = '';
+    document.getElementById('settings-new-password').value = '';
+    document.getElementById('settings-confirm-password').value = '';
+    if (_pwdEscHandler) {
+        document.removeEventListener('keydown', _pwdEscHandler);
+        _pwdEscHandler = null;
     }
 }
 
@@ -55,9 +89,7 @@ async function changePassword() {
         var data = await API.changePassword(oldPwd, newPwd);
         if (data.success) {
             showToast('密码修改成功', 'success');
-            document.getElementById('settings-old-password').value = '';
-            document.getElementById('settings-new-password').value = '';
-            document.getElementById('settings-confirm-password').value = '';
+            closePwdModal();
         } else {
             showToast(data.message || '密码修改失败', 'error');
         }
@@ -68,15 +100,162 @@ async function changePassword() {
 
 // 退出登录
 async function doLogout() {
-    try { await API.logout(); } catch(e) {}
+    try { await API.logout(); } catch(e) {
+        console.error('[settings] logout:', e);
+    }
     window.location.href = '/login.html';
+}
+
+// ========== AI 模型选择 ==========
+
+var _currentAiModel = 'auto';
+
+async function loadAiModel() {
+    if (window._userStatus === 'guest') {
+        // Guest: disable all buttons, show hint
+        var desc = document.getElementById('ai-model-desc');
+        if (desc) desc.textContent = '注册后可切换模型';
+        document.querySelectorAll('.ai-model-btn').forEach(function(btn) {
+            btn.disabled = true;
+            btn.classList.add('ai-model-disabled');
+        });
+        return;
+    }
+    try {
+        var data = await API.getAiModel();
+        if (data.success && data.model) {
+            _currentAiModel = data.model;
+            highlightAiModel(data.model);
+        }
+    } catch(e) {
+        console.error('[settings] loadAiModel:', e);
+    }
+}
+
+function highlightAiModel(model) {
+    document.querySelectorAll('.ai-model-btn').forEach(function(btn) {
+        btn.classList.toggle('active', btn.dataset.model === model);
+    });
+}
+
+async function selectAiModel(model) {
+    if (window._userStatus === 'guest') return;
+    if (model === _currentAiModel) return;
+
+    var prevModel = _currentAiModel;
+    _currentAiModel = model;
+    highlightAiModel(model);
+
+    try {
+        var data = await API.setAiModel(model);
+        if (data.success) {
+            var names = { auto: '自动', doubao: '模型 A', claude: '模型 B' };
+            showToast('已切换到 ' + (names[model] || model), 'success');
+        } else {
+            _currentAiModel = prevModel;
+            highlightAiModel(prevModel);
+            showToast(data.message || '保存失败', 'error');
+        }
+    } catch(e) {
+        _currentAiModel = prevModel;
+        highlightAiModel(prevModel);
+        showToast('保存失败', 'error');
+    }
+}
+
+// ========== 二狗巡山开关 ==========
+
+function initPatrolToggle() {
+    var toggle = document.getElementById('patrol-toggle');
+    if (!toggle) return;
+    toggle.checked = localStorage.getItem('patrol-enabled') !== '0';
+}
+
+function togglePatrol(enabled) {
+    localStorage.setItem('patrol-enabled', enabled ? '1' : '0');
+    if (typeof Patrol !== 'undefined') {
+        if (enabled) {
+            Patrol.init();
+        } else {
+            Patrol.destroy();
+        }
+    }
+}
+
+// ========== 二狗时区设置 ==========
+
+var _currentTimezone = 'America/Toronto';
+
+async function loadTimezone() {
+    if (window._userStatus === 'guest') return;
+    try {
+        var data = await API.getTimezone();
+        if (data.success && data.timezone) {
+            _currentTimezone = data.timezone;
+            highlightTimezone(data.timezone);
+        }
+    } catch(e) {
+        console.error('[settings] loadTimezone:', e);
+    }
+}
+
+function highlightTimezone(tz) {
+    var container = document.getElementById('timezone-options');
+    if (!container) return;
+    container.querySelectorAll('.ai-model-btn').forEach(function(btn) {
+        btn.classList.toggle('active', btn.dataset.tz === tz);
+    });
+}
+
+async function selectTimezone(tz) {
+    if (window._userStatus === 'guest') return;
+    if (tz === _currentTimezone) return;
+
+    var prevTz = _currentTimezone;
+    _currentTimezone = tz;
+    highlightTimezone(tz);
+
+    try {
+        var data = await API.setTimezone(tz);
+        if (data.success) {
+            var names = { 'America/Toronto': '多伦多', 'America/Vancouver': '温哥华', 'Asia/Shanghai': '北京' };
+            showToast('时区已切换到 ' + (names[tz] || tz), 'success');
+        } else {
+            _currentTimezone = prevTz;
+            highlightTimezone(prevTz);
+            showToast(data.message || '保存失败', 'error');
+        }
+    } catch(e) {
+        _currentTimezone = prevTz;
+        highlightTimezone(prevTz);
+        showToast('保存失败', 'error');
+    }
 }
 
 // ========== 头像系统 ==========
 
 var AVATAR_PRESETS = {
     'preset:cat': 'assets/images/preset-cat.png',
-    'preset:panda': 'assets/images/preset-panda.png'
+    'preset:panda': 'assets/images/preset-panda.png',
+    'preset:boris': 'assets/images/preset-boris.png',
+    'preset:shiba': 'assets/images/preset-shiba.png',
+    'preset:catpaw': 'assets/images/preset-catpaw.png',
+    'preset:whitecat': 'assets/images/preset-whitecat.png',
+    'preset:emoji-ball': 'assets/images/preset-emoji-ball.png',
+    'preset:pandaman': 'assets/images/preset-pandaman.png',
+    'preset:samoyed': 'assets/images/preset-samoyed.png',
+    'preset:cartooncat': 'assets/images/preset-cartooncat.png',
+    'preset:pandatea': 'assets/images/preset-pandatea.png',
+    'preset:backview': 'assets/images/preset-backview.png',
+    'preset:cutecat': 'assets/images/preset-cutecat.png',
+    'preset:hamster': 'assets/images/preset-hamster.png',
+    'preset:bunny': 'assets/images/preset-bunny.png',
+    'preset:shibapair': 'assets/images/preset-shibapair.png',
+    'preset:tangping': 'assets/images/preset-tangping.png',
+    'preset:doge': 'assets/images/preset-doge.png',
+    'preset:shibarest': 'assets/images/preset-shibarest.png',
+    'preset:shibaflower': 'assets/images/preset-shibaflower.png',
+    'preset:cheems': 'assets/images/preset-cheems.png'
 };
 
 var AVATAR_GRADIENTS = {
@@ -93,7 +272,10 @@ function selectPresetAvatar(el) {
     highlightSelectedPreset();
     applyAvatar();
     // Sync to server
-    API.updateAvatar(value).catch(function() {});
+    API.updateAvatar(value).catch(function(e) {
+        console.error('[settings] updateAvatar:', e);
+        showToast('头像同步失败，下次刷新可能丢失', 'error');
+    });
 }
 
 // 上传自定义头像（canvas 压缩到 128x128）
@@ -123,7 +305,10 @@ function handleAvatarUpload(event) {
             highlightSelectedPreset();
             applyAvatar();
             // Sync to server
-            API.updateAvatar(dataURL).catch(function() {});
+            API.updateAvatar(dataURL).catch(function(e) {
+                console.error('[settings] updateAvatar:', e);
+                showToast('头像同步失败，下次刷新可能丢失', 'error');
+            });
             showToast('头像已更新', 'success');
         };
         img.src = e.target.result;
@@ -292,7 +477,7 @@ var Contacts = (function() {
         if (!name || !name.trim()) return;
         var note = prompt('备注 (可选):') || '';
 
-        API.createContact(name.trim(), note).then(function(resp) {
+        API.createContact({ name: name.trim(), note: note || undefined }).then(function(resp) {
             if (resp.success) {
                 showToast('联系人已添加', 'success');
                 loadContacts();
@@ -353,9 +538,113 @@ var Contacts = (function() {
     };
 })();
 
-// Hook into settings loading: also load contacts when settings are shown
+// ─── Memory management ───
+
+async function loadMemories() {
+    var container = document.getElementById('memory-list');
+    var clearBtn = document.getElementById('clear-all-memories-btn');
+    if (!container) return;
+
+    try {
+        var res = await API.getMemories();
+        if (!res.success) {
+            container.innerHTML = '<div class="memory-empty">加载失败</div>';
+            return;
+        }
+        renderMemories(res.memories || []);
+        if (clearBtn) clearBtn.style.display = (res.memories && res.memories.length > 0) ? '' : 'none';
+    } catch(e) {
+        container.innerHTML = '<div class="memory-empty">加载失败</div>';
+    }
+}
+
+function renderMemories(memories) {
+    var container = document.getElementById('memory-list');
+    if (!container) return;
+
+    if (!memories || memories.length === 0) {
+        container.innerHTML = '<div class="memory-empty">二狗还没记住什么，聊天中自然提到的信息会被记住</div>';
+        return;
+    }
+
+    var categoryLabels = {
+        'habit': '习惯',
+        'fact': '事实',
+        'personality': '性格',
+        'intent': '意图'
+    };
+
+    var html = memories.map(function(m) {
+        var label = categoryLabels[m.category] || m.category;
+        return '<div class="memory-item" data-id="' + m.id + '">' +
+            '<div class="memory-content">' +
+                '<span class="memory-category memory-cat-' + m.category + '">' + label + '</span>' +
+                '<span class="memory-text">' + escapeHtml(m.content) + '</span>' +
+            '</div>' +
+            '<button class="memory-delete-btn" onclick="deleteMemory(\'' + m.id + '\')" title="删除">&times;</button>' +
+        '</div>';
+    }).join('');
+
+    container.innerHTML = html;
+}
+
+function escapeHtml(text) {
+    var d = document.createElement('div');
+    d.textContent = text;
+    return d.innerHTML;
+}
+
+async function deleteMemory(id) {
+    try {
+        var res = await API.deleteMemory(id);
+        if (res.success) {
+            var el = document.querySelector('.memory-item[data-id="' + id + '"]');
+            if (el) el.remove();
+            // Check if list is now empty
+            var container = document.getElementById('memory-list');
+            if (container && container.children.length === 0) {
+                renderMemories([]);
+                var clearBtn = document.getElementById('clear-all-memories-btn');
+                if (clearBtn) clearBtn.style.display = 'none';
+            }
+            showToast('已删除', 'success');
+        } else {
+            showToast(res.message || '删除失败', 'error');
+        }
+    } catch(e) {
+        showToast('删除失败', 'error');
+    }
+}
+
+async function deleteAllMemories() {
+    if (!confirm('确定要清空二狗的所有记忆吗？清空后二狗将不再记得关于你的任何信息。')) return;
+
+    try {
+        var res = await API.deleteAllMemories();
+        if (res.success) {
+            renderMemories([]);
+            var clearBtn = document.getElementById('clear-all-memories-btn');
+            if (clearBtn) clearBtn.style.display = 'none';
+            showToast('已清空所有记忆', 'success');
+        } else {
+            showToast(res.message || '清空失败', 'error');
+        }
+    } catch(e) {
+        showToast('清空失败', 'error');
+    }
+}
+
+// Hook into settings loading: also load contacts and memories when settings are shown
 var _origLoadSettingsData = loadSettingsData;
 loadSettingsData = async function() {
     await _origLoadSettingsData();
     Contacts.loadContacts();
+    loadMemories();
 };
+
+// BUG-1 fix: settings.js 加载完成后立即应用头像，避免 checkAuth 竞态
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() { applyAvatar(); });
+} else {
+    applyAvatar();
+}

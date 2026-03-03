@@ -1,0 +1,350 @@
+/* ==========================================================================
+   Patrol System - 二狗巡山 Visual Layer
+   CSS classes follow patrol-interfaces.js section 8 naming conventions
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Layer Container
+   -------------------------------------------------------------------------- */
+
+#patrol-layer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 999;
+  overflow: hidden;
+}
+
+/* --------------------------------------------------------------------------
+   Base Paw Print
+   -------------------------------------------------------------------------- */
+
+/*
+ * Heading system:
+ *   SVG toes point UP (0deg). JS sets --paw-heading to match travel direction.
+ *   --paw-mirror: 1 (left foot) or -1 (right foot, flips SVG horizontally).
+ *   Keyframes compose: scaleX(mirror) × rotate(heading) × scale(bounce).
+ */
+
+.patrol-paw {
+  --paw-heading: 0deg;
+  --paw-mirror: 1;
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  opacity: 0;
+  pointer-events: none;
+  will-change: opacity, transform;
+  transform: scaleX(var(--paw-mirror)) rotate(var(--paw-heading));
+}
+
+/* Enhanced mode: blend with underlying content */
+.patrol-enhanced .patrol-paw {
+  mix-blend-mode: soft-light;
+}
+
+/* --------------------------------------------------------------------------
+   Landing Animation
+   -------------------------------------------------------------------------- */
+
+.patrol-paw.landing {
+  animation: patrol-land 0.15s ease-out forwards;
+}
+
+/* Ripple ring 1 */
+.patrol-paw.landing::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: 100%;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+  transform: translate(-50%, -50%) scale(0.3);
+  opacity: 0;
+  animation: patrol-ripple 0.6s ease-out forwards;
+  pointer-events: none;
+}
+
+/* Ripple ring 2 (delayed) */
+.patrol-paw.landing::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: 100%;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  transform: translate(-50%, -50%) scale(0.3);
+  opacity: 0;
+  animation: patrol-ripple 0.6s ease-out 0.1s forwards;
+  pointer-events: none;
+}
+
+/* --------------------------------------------------------------------------
+   Evaporate Animation
+   -------------------------------------------------------------------------- */
+
+.patrol-paw.evaporate {
+  animation: patrol-evaporate 1.5s ease-in forwards;
+}
+
+/* --------------------------------------------------------------------------
+   Breathe Animation (rest state paws)
+   -------------------------------------------------------------------------- */
+
+.patrol-paw.breathe {
+  animation: patrol-breathe 3s ease-in-out infinite;
+}
+
+/* --------------------------------------------------------------------------
+   Keyframes — use CSS custom props so heading+mirror persist through animation
+   -------------------------------------------------------------------------- */
+
+@keyframes patrol-ripple {
+  0% {
+    transform: translate(-50%, -50%) scale(0.3);
+    opacity: 0.4;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(2.5);
+    opacity: 0;
+  }
+}
+
+@keyframes patrol-land {
+  0% {
+    transform: scaleX(var(--paw-mirror)) rotate(var(--paw-heading)) scale(0);
+    opacity: 0;
+  }
+  70% {
+    transform: scaleX(var(--paw-mirror)) rotate(var(--paw-heading)) scale(1.1);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scaleX(var(--paw-mirror)) rotate(var(--paw-heading)) scale(1);
+    opacity: 0.5;
+  }
+}
+
+@keyframes patrol-evaporate {
+  0% {
+    opacity: 0.5;
+    transform: scaleX(var(--paw-mirror)) rotate(var(--paw-heading)) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scaleX(var(--paw-mirror)) rotate(var(--paw-heading)) scale(0.95);
+  }
+}
+
+@keyframes patrol-breathe {
+  0%, 100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Tab Icon States
+   -------------------------------------------------------------------------- */
+
+.tab-icon-patrol {
+  width: 24px;
+  height: 24px;
+  transition: opacity 0.5s ease;
+  vertical-align: middle;
+  display: inline-block;
+}
+
+.tab-icon-patrol .paw-fill {
+  fill: currentColor;
+  transition: fill 0.3s ease, opacity 0.5s ease;
+}
+
+.tab-icon-patrol .paw-stroke {
+  stroke: currentColor;
+  stroke-width: 0.5;
+  fill: none;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+/* 二狗出去巡游 — 空心轮廓 */
+.tab-icon-patrol.patrol-out .paw-fill {
+  opacity: 0;
+}
+
+.tab-icon-patrol.patrol-out .paw-stroke {
+  opacity: 0.3;
+}
+
+/* 二狗回来中 */
+.tab-icon-patrol.patrol-returning .paw-fill {
+  opacity: 1;
+}
+
+.tab-icon-patrol.patrol-returning .paw-stroke {
+  opacity: 0;
+}
+
+/* 回家脉冲 */
+.tab-icon-patrol.patrol-pulse {
+  animation: patrol-tab-pulse 0.3s ease-out;
+}
+
+@keyframes patrol-tab-pulse {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+/* 聊天态: 呼吸灯 (等待回复) */
+.tab-icon-patrol.patrol-breathing {
+  animation: patrol-tab-breathe 2s ease-in-out infinite;
+}
+
+@keyframes patrol-tab-breathe {
+  0%, 100% { opacity: 0.6; }
+  50%      { opacity: 1; }
+}
+
+/* 聊天态: 微跳 (收到回复) */
+.tab-icon-patrol.patrol-bounce {
+  animation: patrol-tab-bounce 0.3s ease-out;
+}
+
+@keyframes patrol-tab-bounce {
+  0%   { transform: translateY(0); }
+  40%  { transform: translateY(-3px); }
+  100% { transform: translateY(0); }
+}
+
+/* --------------------------------------------------------------------------
+   Convergence Light Arc
+   -------------------------------------------------------------------------- */
+
+.patrol-arc {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  pointer-events: none;
+  opacity: 0;
+  will-change: transform, opacity;
+}
+
+/* --------------------------------------------------------------------------
+   Phase 3: Interaction Styles
+   -------------------------------------------------------------------------- */
+
+/* Stamped paw (task completion acknowledgment) */
+.patrol-paw.stamped {
+  transform: translate(-50%, -50%) scale(1.2) rotate(var(--paw-heading)) scaleX(var(--paw-mirror));
+  opacity: 0.7;
+  filter: drop-shadow(0 0 4px rgba(99, 102, 241, 0.5));
+  animation: patrol-stamp-in 0.25s ease-out forwards;
+}
+
+@keyframes patrol-stamp-in {
+  0% { transform: translate(-50%, -50%) scale(0.5) rotate(var(--paw-heading)) scaleX(var(--paw-mirror)); opacity: 0; }
+  60% { transform: translate(-50%, -50%) scale(1.35) rotate(var(--paw-heading)) scaleX(var(--paw-mirror)); opacity: 0.8; }
+  100% { transform: translate(-50%, -50%) scale(1.2) rotate(var(--paw-heading)) scaleX(var(--paw-mirror)); opacity: 0.7; }
+}
+
+/* Abao thinking breathing light */
+@keyframes abao-breathing {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.abao-thinking {
+  animation: abao-breathing 2s ease-in-out infinite;
+}
+
+/* --------------------------------------------------------------------------
+   Phase 4: Convergence Animation
+   -------------------------------------------------------------------------- */
+
+/* Light arc point */
+.patrol-arc {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--primary-color, #6366f1);
+  box-shadow: 0 0 8px 2px var(--primary-color, #6366f1),
+              0 0 16px 4px rgba(99, 102, 241, 0.3);
+  pointer-events: none;
+  z-index: 2;
+  animation: patrol-arc-fly 0.4s cubic-bezier(0.2, 0, 0, 1) forwards;
+}
+
+@keyframes patrol-arc-fly {
+  0% {
+    left: var(--arc-from-x);
+    top: var(--arc-from-y);
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    left: var(--arc-mid-x);
+    top: var(--arc-mid-y);
+    opacity: 1;
+    transform: scale(1.2);
+  }
+  100% {
+    left: var(--arc-to-x);
+    top: var(--arc-to-y);
+    opacity: 0;
+    transform: scale(0);
+  }
+}
+
+/* Abao logo wiggle (leaving Abao tab) */
+@keyframes abao-wiggle {
+  0% { transform: rotate(0deg); }
+  25% { transform: rotate(-3deg); }
+  75% { transform: rotate(3deg); }
+  100% { transform: rotate(0deg); }
+}
+
+.abao-wiggle {
+  animation: abao-wiggle 0.3s ease-in-out;
+}
+
+/* --------------------------------------------------------------------------
+   Reduced Motion
+   -------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  #patrol-layer {
+    display: none !important;
+  }
+
+  .patrol-paw,
+  .patrol-paw.landing,
+  .patrol-paw.evaporate,
+  .patrol-paw.breathe,
+  .tab-icon-patrol.patrol-pulse,
+  .tab-icon-patrol.patrol-breathing,
+  .tab-icon-patrol.patrol-bounce,
+  .patrol-arc {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .patrol-paw.landing::before,
+  .patrol-paw.landing::after {
+    animation: none !important;
+    display: none;
+  }
+}

@@ -599,7 +599,7 @@ async function confirmSetReminder() {
             var reminderBtn = document.getElementById('modal-set-reminder-btn');
             if (reminderBtn) reminderBtn.textContent = '修改';
             // Refresh tasks to show reminder badge
-            if (typeof loadTodos === 'function') loadTodos();
+            if (typeof loadItems === 'function') loadItems();
         } else {
             showToast(result.message || '设置失败', 'error');
         }

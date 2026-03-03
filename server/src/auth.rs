@@ -1,4 +1,5 @@
 use axum::extract::FromRequestParts;
+use axum::extract::Path;
 use axum::http::request::Parts;
 use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
 use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite};
@@ -57,6 +58,8 @@ pub struct UserInfo {
     pub avatar: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub role: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ai_calls_remaining: Option<i32>,
 }
@@ -143,6 +146,14 @@ impl FromRequestParts<AppState> for ActiveUserId {
                         "message": "账户审核中，暂时无法操作"
                     })),
                 )),
+                "suspended" => Err((
+                    StatusCode::FORBIDDEN,
+                    Json(serde_json::json!({
+                        "success": false,
+                        "error": "ACCOUNT_SUSPENDED",
+                        "message": "账户已临时挂起，请联系管理员"
+                    })),
+                )),
                 _ => Err((
                     StatusCode::FORBIDDEN,
                     Json(serde_json::json!({
@@ -152,6 +163,96 @@ impl FromRequestParts<AppState> for ActiveUserId {
                     })),
                 )),
             },
+            Err(_) => Err(unauthorized()),
+        }
+    }
+}
+
+// ─── AdminUserId: requires role=admin or role=owner ───
+
+#[derive(Debug, Clone)]
+pub struct AdminUserId(pub String);
+
+impl FromRequestParts<AppState> for AdminUserId {
+    type Rejection = (StatusCode, Json<serde_json::Value>);
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
+        let jar = CookieJar::from_request_parts(parts, state)
+            .await
+            .map_err(|_| unauthorized())?;
+
+        let token = jar
+            .get("session")
+            .map(|c| c.value().to_string())
+            .ok_or_else(unauthorized)?;
+
+        let db = state.db.lock();
+        let result = db.query_row(
+            "SELECT s.user_id, COALESCE(u.role, 'user')
+             FROM sessions s JOIN users u ON u.id = s.user_id
+             WHERE s.token = ?1 AND s.expires_at > datetime('now')",
+            [&token],
+            |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+        );
+
+        match result {
+            Ok((user_id, role)) if role == "admin" || role == "owner" => Ok(AdminUserId(user_id)),
+            Ok(_) => Err((
+                StatusCode::FORBIDDEN,
+                Json(serde_json::json!({
+                    "success": false,
+                    "error": "PERMISSION_DENIED",
+                    "message": "权限不足"
+                })),
+            )),
+            Err(_) => Err(unauthorized()),
+        }
+    }
+}
+
+// ─── OwnerUserId: requires role=owner ───
+
+#[derive(Debug, Clone)]
+pub struct OwnerUserId(pub String);
+
+impl FromRequestParts<AppState> for OwnerUserId {
+    type Rejection = (StatusCode, Json<serde_json::Value>);
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
+        let jar = CookieJar::from_request_parts(parts, state)
+            .await
+            .map_err(|_| unauthorized())?;
+
+        let token = jar
+            .get("session")
+            .map(|c| c.value().to_string())
+            .ok_or_else(unauthorized)?;
+
+        let db = state.db.lock();
+        let result = db.query_row(
+            "SELECT s.user_id, COALESCE(u.role, 'user')
+             FROM sessions s JOIN users u ON u.id = s.user_id
+             WHERE s.token = ?1 AND s.expires_at > datetime('now')",
+            [&token],
+            |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+        );
+
+        match result {
+            Ok((user_id, role)) if role == "owner" => Ok(OwnerUserId(user_id)),
+            Ok(_) => Err((
+                StatusCode::FORBIDDEN,
+                Json(serde_json::json!({
+                    "success": false,
+                    "error": "PERMISSION_DENIED",
+                    "message": "仅系统所有者可执行此操作"
+                })),
+            )),
             Err(_) => Err(unauthorized()),
         }
     }
@@ -392,22 +493,60 @@ pub async fn register(
         "pending"
     };
 
-    db.execute(
+    if let Err(e) = db.execute(
         "INSERT INTO users (id, username, password_hash, display_name, status, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
         rusqlite::params![user_id, req.username, password_hash, display_name, status, now, now],
-    )
-    .unwrap();
+    ) {
+        eprintln!("[auth] register db error: {}", e);
+        return (
+            jar,
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AuthResponse {
+                    success: false,
+                    user: None,
+                    message: Some("注册失败".into()),
+                }),
+            ),
+        );
+    }
 
     // If pending, notify all admins
     if status == "pending" {
-        let mut admin_stmt = db
-            .prepare("SELECT id FROM users WHERE role = 'admin'")
-            .unwrap();
-        let admin_ids: Vec<String> = admin_stmt
-            .query_map([], |row| row.get(0))
-            .unwrap()
-            .flatten()
-            .collect();
+        let mut admin_stmt = match db.prepare("SELECT id FROM users WHERE role = 'admin'") {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("[auth] register db error: {}", e);
+                return (
+                    jar,
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(AuthResponse {
+                            success: false,
+                            user: None,
+                            message: Some("注册失败".into()),
+                        }),
+                    ),
+                );
+            }
+        };
+        let admin_ids: Vec<String> = match admin_stmt.query_map([], |row| row.get(0)) {
+            Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
+            Err(e) => {
+                eprintln!("[auth] register db error: {}", e);
+                return (
+                    jar,
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(AuthResponse {
+                            success: false,
+                            user: None,
+                            message: Some("注册失败".into()),
+                        }),
+                    ),
+                );
+            }
+        };
         for admin_id in admin_ids {
             let notif_id = uuid::Uuid::new_v4().to_string();
             db.execute(
@@ -427,11 +566,23 @@ pub async fn register(
     // Auto-login: create session
     let token = generate_session_token();
     let expires = (chrono::Utc::now() + chrono::Duration::days(30)).to_rfc3339();
-    db.execute(
+    if let Err(e) = db.execute(
         "INSERT INTO sessions (token, user_id, created_at, expires_at) VALUES (?1, ?2, ?3, ?4)",
         rusqlite::params![token, user_id, now, expires],
-    )
-    .unwrap();
+    ) {
+        eprintln!("[auth] register session db error: {}", e);
+        return (
+            jar,
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AuthResponse {
+                    success: false,
+                    user: None,
+                    message: Some("注册失败".into()),
+                }),
+            ),
+        );
+    }
 
     let jar = jar.add(make_session_cookie(token));
 
@@ -453,6 +604,7 @@ pub async fn register(
                     display_name: Some(display_name),
                     avatar: None,
                     status: Some(status.to_string()),
+                    role: None,
                     ai_calls_remaining: None,
                 }),
                 message: Some(message.into()),
@@ -504,7 +656,7 @@ pub async fn login(
 
     // Find user
     let user_row = db.query_row(
-        "SELECT id, username, password_hash, display_name, COALESCE(avatar,''), COALESCE(status,'active') FROM users WHERE username = ?1",
+        "SELECT id, username, password_hash, display_name, COALESCE(avatar,''), COALESCE(status,'active'), COALESCE(role,'user') FROM users WHERE username = ?1",
         [&req.username],
         |row: &rusqlite::Row| {
             Ok((
@@ -514,11 +666,12 @@ pub async fn login(
                 row.get::<_, Option<String>>(3)?,
                 row.get::<_, String>(4)?,
                 row.get::<_, String>(5)?,
+                row.get::<_, String>(6)?,
             ))
         },
     );
 
-    let (user_id, username, password_hash, display_name, avatar, status) = match user_row {
+    let (user_id, username, password_hash, display_name, avatar, status, role) = match user_row {
         Ok(r) => r,
         Err(_) => {
             // Timing attack mitigation: run dummy hash even when user not found
@@ -561,11 +714,23 @@ pub async fn login(
     let token = generate_session_token();
     let now = chrono::Utc::now().to_rfc3339();
     let expires = (chrono::Utc::now() + chrono::Duration::days(30)).to_rfc3339();
-    db.execute(
+    if let Err(e) = db.execute(
         "INSERT INTO sessions (token, user_id, created_at, expires_at) VALUES (?1, ?2, ?3, ?4)",
         rusqlite::params![token, user_id, now, expires],
-    )
-    .unwrap();
+    ) {
+        eprintln!("[auth] login session db error: {}", e);
+        return (
+            jar,
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AuthResponse {
+                    success: false,
+                    user: None,
+                    message: Some("登录失败".into()),
+                }),
+            ),
+        );
+    }
 
     // Limit to 5 sessions per user
     db.execute(
@@ -607,6 +772,7 @@ pub async fn login(
                         Some(avatar)
                     },
                     status: Some(status),
+                    role: Some(role),
                     ai_calls_remaining: None,
                 }),
                 message: Some("登录成功".into()),
@@ -632,12 +798,13 @@ pub async fn me(State(state): State<AppState>, user_id: UserId) -> impl IntoResp
     let db = state.db.lock();
 
     let result = db.query_row(
-        "SELECT id, username, display_name, COALESCE(avatar,''), COALESCE(status,'active'), ai_calls_remaining FROM users WHERE id = ?1",
+        "SELECT id, username, display_name, COALESCE(avatar,''), COALESCE(status,'active'), ai_calls_remaining, COALESCE(role,'user') FROM users WHERE id = ?1",
         [&user_id.0],
         |row: &rusqlite::Row| {
             let av: String = row.get(3)?;
             let st: String = row.get(4)?;
             let ai_remaining: Option<i32> = row.get(5)?;
+            let rl: String = row.get(6)?;
             Ok(UserInfo {
                 id: row.get(0)?,
                 username: row.get(1)?,
@@ -645,6 +812,7 @@ pub async fn me(State(state): State<AppState>, user_id: UserId) -> impl IntoResp
                 avatar: if av.is_empty() { None } else { Some(av) },
                 ai_calls_remaining: if st == "guest" { ai_remaining } else { None },
                 status: Some(st),
+                role: Some(rl),
             })
         },
     );
@@ -994,12 +1162,230 @@ pub async fn guest_login(
                     display_name: Some("访客".into()),
                     avatar: None,
                     status: Some("guest".into()),
+                    role: None,
                     ai_calls_remaining: Some(GUEST_AI_QUOTA),
                 }),
                 message: Some("体验模式已开启".into()),
             }),
         ),
     )
+}
+
+// ─── AI Model Settings ───
+
+#[derive(Debug, Deserialize)]
+pub struct SetAiModelRequest {
+    pub model: String,
+}
+
+/// GET /api/settings/ai-model
+pub async fn get_ai_model(State(state): State<AppState>, user_id: UserId) -> impl IntoResponse {
+    let db = state.db.lock();
+    let model = db
+        .query_row(
+            "SELECT ai_model FROM user_settings WHERE user_id = ?1",
+            [&user_id.0],
+            |row| row.get::<_, String>(0),
+        )
+        .unwrap_or_else(|_| "auto".to_string());
+
+    Json(serde_json::json!({
+        "success": true,
+        "model": model,
+    }))
+}
+
+/// PUT /api/settings/ai-model
+pub async fn set_ai_model(
+    State(state): State<AppState>,
+    user_id: UserId,
+    Json(body): Json<SetAiModelRequest>,
+) -> impl IntoResponse {
+    let valid = ["auto", "claude", "kimi", "doubao"];
+    if !valid.contains(&body.model.as_str()) {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "success": false,
+                "message": "无效的模型选择",
+            })),
+        );
+    }
+
+    let db = state.db.lock();
+    let now = chrono::Utc::now().to_rfc3339();
+
+    // Upsert into user_settings
+    db.execute(
+        "INSERT INTO user_settings (user_id, ai_model, updated_at) VALUES (?1, ?2, ?3)
+         ON CONFLICT(user_id) DO UPDATE SET ai_model = ?2, updated_at = ?3",
+        rusqlite::params![user_id.0, body.model, now],
+    )
+    .ok();
+
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "success": true,
+        })),
+    )
+}
+
+// ─── Timezone Settings ───
+
+#[derive(Debug, Deserialize)]
+pub struct SetTimezoneRequest {
+    pub timezone: String,
+}
+
+/// GET /api/settings/timezone
+pub async fn get_timezone(State(state): State<AppState>, user_id: UserId) -> impl IntoResponse {
+    let db = state.db.lock();
+    let tz = db
+        .query_row(
+            "SELECT timezone FROM user_settings WHERE user_id = ?1",
+            [&user_id.0],
+            |row| row.get::<_, String>(0),
+        )
+        .unwrap_or_else(|_| "America/Toronto".to_string());
+
+    Json(serde_json::json!({
+        "success": true,
+        "timezone": tz,
+    }))
+}
+
+/// PUT /api/settings/timezone
+pub async fn set_timezone(
+    State(state): State<AppState>,
+    user_id: UserId,
+    Json(body): Json<SetTimezoneRequest>,
+) -> impl IntoResponse {
+    let valid = ["America/Toronto", "America/Vancouver", "Asia/Shanghai"];
+    if !valid.contains(&body.timezone.as_str()) {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "success": false,
+                "message": "无效的时区选择",
+            })),
+        );
+    }
+
+    let db = state.db.lock();
+    let now = chrono::Utc::now().to_rfc3339();
+
+    // Upsert into user_settings
+    db.execute(
+        "INSERT INTO user_settings (user_id, timezone, updated_at) VALUES (?1, ?2, ?3)
+         ON CONFLICT(user_id) DO UPDATE SET timezone = ?2, updated_at = ?3",
+        rusqlite::params![user_id.0, body.timezone, now],
+    )
+    .ok();
+
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "success": true,
+        })),
+    )
+}
+
+// ─── Memory management endpoints ───
+
+/// GET /api/settings/memories — list all memories for current user
+pub async fn list_memories(State(state): State<AppState>, user_id: UserId) -> impl IntoResponse {
+    let db = state.db.lock();
+    let mut stmt = match db.prepare(
+        "SELECT id, category, content, created_at, last_accessed_at, access_count FROM ergou_memories WHERE user_id=?1 ORDER BY last_accessed_at DESC",
+    ) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("[memories] db error: {}", e);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"success": false, "message": "查询失败"})),
+            );
+        }
+    };
+
+    let rows: Vec<serde_json::Value> = match stmt.query_map([&user_id.0], |r| {
+        Ok(serde_json::json!({
+            "id": r.get::<_, String>(0)?,
+            "category": r.get::<_, String>(1)?,
+            "content": r.get::<_, String>(2)?,
+            "created_at": r.get::<_, String>(3)?,
+            "last_accessed_at": r.get::<_, String>(4)?,
+            "access_count": r.get::<_, i64>(5)?
+        }))
+    }) {
+        Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
+        Err(e) => {
+            eprintln!("[memories] db error: {}", e);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"success": false, "message": "查询失败"})),
+            );
+        }
+    };
+
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({"success": true, "memories": rows, "count": rows.len()})),
+    )
+}
+
+/// DELETE /api/settings/memories/{id} — delete a single memory
+pub async fn delete_memory_by_id(
+    State(state): State<AppState>,
+    user_id: UserId,
+    Path(memory_id): Path<String>,
+) -> impl IntoResponse {
+    let db = state.db.lock();
+    match db.execute(
+        "DELETE FROM ergou_memories WHERE id=?1 AND user_id=?2",
+        rusqlite::params![memory_id, user_id.0],
+    ) {
+        Ok(0) => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"success": false, "message": "记忆不存在"})),
+        ),
+        Ok(_) => (
+            StatusCode::OK,
+            Json(serde_json::json!({"success": true})),
+        ),
+        Err(e) => {
+            eprintln!("[memories] delete error: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"success": false, "message": "删除失败"})),
+            )
+        }
+    }
+}
+
+/// DELETE /api/settings/memories — delete all memories for current user
+pub async fn delete_all_memories(
+    State(state): State<AppState>,
+    user_id: UserId,
+) -> impl IntoResponse {
+    let db = state.db.lock();
+    match db.execute(
+        "DELETE FROM ergou_memories WHERE user_id=?1",
+        [&user_id.0],
+    ) {
+        Ok(count) => (
+            StatusCode::OK,
+            Json(serde_json::json!({"success": true, "deleted": count})),
+        ),
+        Err(e) => {
+            eprintln!("[memories] delete all error: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"success": false, "message": "清空失败"})),
+            )
+        }
+    }
 }
 
 // ─── Helpers ───

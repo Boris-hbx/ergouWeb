@@ -398,26 +398,26 @@
 
 /* --- 浅色主题 --- */
 [data-theme="light"] .abao-panel {
-    background: rgba(255, 255, 255, 0.55);
+    background: rgba(255, 255, 255, 0.88);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border-left-color: #e1e4e8;
 }
 
 [data-theme="light"] .abao-msg.user {
-    background: rgba(var(--primary-rgb, 102,126,234), 0.12);
-    color: #24292f;
+    background: rgba(var(--primary-rgb, 102,126,234), 0.18);
+    color: #1a1a2e;
 }
 
 [data-theme="light"] .abao-msg.assistant {
-    background: #f0f0f3;
-    color: #24292f;
+    background: #e8e8ee;
+    color: #1a1a2e;
 }
 
 [data-theme="light"] .abao-input {
     background: #f6f8fa;
     border-color: #d0d7de;
-    color: #24292f;
+    color: #1a1a2e;
 }
 
 [data-theme="light"] .abao-header {

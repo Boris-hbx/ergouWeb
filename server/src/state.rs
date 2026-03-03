@@ -4,12 +4,16 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
 
-pub type MomentCache = HashMap<String, (String, chrono::DateTime<chrono::Utc>)>;
+pub type MomentCache = HashMap<String, (Vec<String>, chrono::NaiveDate)>;
 
 #[derive(Clone)]
 pub struct AppState {
     pub db: Arc<Mutex<Connection>>,
-    /// Cache for moment text: user_id -> (text, timestamp)
+    /// Path to the SQLite database file (for system status reporting)
+    pub db_path: String,
+    /// Server start time (for uptime calculation)
+    pub start_time: Instant,
+    /// Cache for moment pool: user_id -> (pool, date)
     pub moment_cache: Arc<Mutex<MomentCache>>,
     /// Login rate limiting: IP -> (attempt_count, window_start)
     pub login_ip_attempts: Arc<Mutex<HashMap<String, (u32, Instant)>>>,
@@ -19,4 +23,6 @@ pub struct AppState {
     pub ai_rate_limits: Arc<Mutex<HashMap<String, Instant>>>,
     /// Guest login rate limiting: IP -> (count, window_start)
     pub guest_ip_rate_limits: Arc<Mutex<HashMap<String, (u32, Instant)>>>,
+    /// Client error report rate limiting: IP -> (count, window_start)
+    pub error_report_limits: Arc<Mutex<HashMap<String, (u32, Instant)>>>,
 }

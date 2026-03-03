@@ -5,7 +5,7 @@ var Trip = (function() {
     var _currentTrip = null;
     var _view = 'list'; // 'list' | 'detail'
     var _editingItemId = null;
-    var _pendingPhotos = [];
+    var _itemPhotoManager = null;
 
     var TYPE_MAP = {
         flight: { icon: '✈️', label: '机票' },
@@ -207,8 +207,8 @@ var Trip = (function() {
             headerEl.innerHTML = '<div class="trip-detail-top">'
                 + '<button class="trip-back-btn" onclick="Trip.backToList()">&larr; 返回</button>'
                 + '<div class="trip-detail-actions">'
-                + (trip.is_owner ? '<button class="trip-action-btn" onclick="Trip.openShareModal()">👥</button>' : '')
-                + (trip.is_owner ? '<button class="trip-action-btn" onclick="Trip.openTripModal(\'' + escapeAttr(trip.id) + '\')">✏️</button>' : '')
+                + (trip.is_owner ? '<button class="trip-action-btn' + (window._userStatus === 'guest' ? ' guest-disabled' : '') + '" onclick="Trip.openShareModal()">👥</button>' : '')
+                + (trip.is_owner ? '<button class="trip-action-btn' + (window._userStatus === 'guest' ? ' guest-disabled' : '') + '" onclick="Trip.openTripModal(\'' + escapeAttr(trip.id) + '\')">✏️</button>' : '')
                 + '<button class="trip-action-btn" onclick="Trip.showExportMenu()" title="下载导出">⬇️</button>'
                 + '</div>'
                 + '</div>'
@@ -491,12 +491,21 @@ var Trip = (function() {
         if (canEditAll) {
             var aiHint = isEdit
                 ? '上传新票据照片后可重新分析，或粘贴补充信息...'
-                : '粘贴行程信息（确认邮件、短信、订单截图文字等），阿宝会自动提取信息...';
-            var aiDividerText = isEdit ? '或 让阿宝重新分析' : '或 让阿宝帮你填';
+                : '粘贴行程信息（确认邮件、短信、订单截图文字等），二狗会自动提取信息...';
+            var aiDividerText = isEdit ? '或 让二狗重新分析' : '或 让二狗帮你填';
+            var tripAiGuestHint = '';
+            var tripAiGuestAttr = '';
+            if (window._userStatus === 'guest') {
+                var _r = window._guestAiRemaining;
+                var _hintText = (_r !== undefined && _r > 0) ? '(剩余' + _r + '次)' : (_r !== undefined ? '(已用完)' : '');
+                var _warnCls = (_r !== undefined && _r <= 3) ? ' guest-ai-warning' : '';
+                tripAiGuestHint = ' <span class="guest-ai-hint' + _warnCls + '">' + _hintText + '</span>';
+                tripAiGuestAttr = ' data-guest-ai-action="1"';
+            }
             aiSection = '<div class="trip-ai-section">'
                 + '<div class="trip-ai-divider"><span>' + aiDividerText + '</span></div>'
                 + '<textarea id="trip-ai-text" class="trip-ai-textarea" rows="3" placeholder="' + aiHint + '"></textarea>'
-                + '<button class="trip-ai-btn" id="trip-ai-btn" onclick="Trip.analyzeText()">阿宝分析 ✨</button>'
+                + '<button class="trip-ai-btn" id="trip-ai-btn" onclick="Trip.analyzeText()"' + tripAiGuestAttr + '>二狗分析 ✨' + tripAiGuestHint + '</button>'
                 + '</div>';
         }
 
@@ -522,7 +531,7 @@ var Trip = (function() {
                 + existingPhotosHtml
                 + '<label class="trip-photo-upload-btn" for="trip-i-photos">📷 添加票据</label>'
                 + '<input type="file" id="trip-i-photos" multiple accept="image/*" onchange="Trip.handlePhotoSelect(this)" style="display:none">'
-                + '<div id="trip-i-photo-preview" class="trip-photo-preview"></div></div>' : '')
+                + '<div id="trip-i-photo-preview" class="pm-grid"></div></div>' : '')
             + aiSection
             + '<div class="trip-modal-actions">'
             + (isEdit && _currentTrip && _currentTrip.is_owner ? '<button class="btn btn-danger-text" onclick="Trip.deleteItem(\'' + escapeAttr(editItemId) + '\')">删除</button>' : '<span></span>')
@@ -533,14 +542,17 @@ var Trip = (function() {
 
         overlay.style.display = 'flex';
         overlay.onclick = function() { closeItemModal(); };
-        _pendingPhotos = [];
+        _itemPhotoManager = new PhotoManager({
+            container: '#trip-i-photo-preview',
+            onChange: function() {}
+        });
     }
 
     function closeItemModal() {
         var overlay = document.getElementById('trip-item-modal-overlay');
         if (overlay) overlay.style.display = 'none';
         _editingItemId = null;
-        _pendingPhotos = [];
+        if (_itemPhotoManager) _itemPhotoManager.clear();
     }
 
     function selectType(el) {
@@ -556,30 +568,16 @@ var Trip = (function() {
     }
 
     function handlePhotoSelect(input) {
-        _pendingPhotos = _pendingPhotos.concat(Array.from(input.files || []));
-        var preview = document.getElementById('trip-i-photo-preview');
-        if (preview) {
-            preview.innerHTML = '';
-            _pendingPhotos.forEach(function(f, idx) {
-                var wrap = document.createElement('div');
-                wrap.className = 'trip-photo-thumb-wrap';
-                var img = document.createElement('img');
-                img.className = 'trip-photo-thumb';
-                img.src = URL.createObjectURL(f);
-                var del = document.createElement('button');
-                del.className = 'trip-photo-del';
-                del.textContent = '×';
-                del.onclick = function(e) {
-                    e.stopPropagation();
-                    _pendingPhotos.splice(idx, 1);
-                    handlePhotoSelect({ files: [] }); // re-render (won't add new files since empty)
-                };
-                wrap.appendChild(img);
-                wrap.appendChild(del);
-                preview.appendChild(wrap);
+        if (!_itemPhotoManager) {
+            _itemPhotoManager = new PhotoManager({
+                container: '#trip-i-photo-preview',
+                onChange: function() {}
             });
         }
-        // Reset input so same file can be re-selected
+        var files = input.files;
+        if (files && files.length > 0) {
+            _itemPhotoManager.addFiles(files);
+        }
         input.value = '';
     }
 
@@ -627,14 +625,25 @@ var Trip = (function() {
             }
 
             if (data.success) {
-                // Upload photos if any
                 var itemId = _editingItemId || (data.item && data.item.id);
-                if (itemId && _pendingPhotos.length > 0) {
-                    await API.uploadTripItemPhotos(itemId, _pendingPhotos);
-                }
+                var pendingFiles = _itemPhotoManager ? _itemPhotoManager.getFiles() : [];
+                var tripId = _currentTrip.id;
+
+                // 立即关弹窗 + 提示，不等照片上传
                 closeItemModal();
                 showToast(_editingItemId ? '条目已更新' : '条目已添加');
-                showDetail(_currentTrip.id);
+
+                // 照片上传 + 刷新在后台进行
+                if (itemId && pendingFiles.length > 0) {
+                    API.uploadTripItemPhotos(itemId, pendingFiles)
+                        .then(function() { showDetail(tripId); })
+                        .catch(function() {
+                            showToast('照片上传失败', 'error');
+                            showDetail(tripId);
+                        });
+                } else {
+                    showDetail(tripId);
+                }
             } else {
                 showToast(data.message || '操作失败', 'error');
             }
@@ -664,21 +673,17 @@ var Trip = (function() {
         var textEl = document.getElementById('trip-ai-text');
         var text = textEl ? textEl.value.trim() : '';
 
-        // 收集待上传的照片，转成 base64（用共享工具压缩后发给 AI）
+        // 收集待上传的照片，转成 base64（通过 PhotoManager 压缩后发给 AI）
         var images = [];
-        var failCount = 0;
-        if (_pendingPhotos.length > 0) {
-            for (var i = 0; i < _pendingPhotos.length; i++) {
-                try {
-                    var img = await imageFileToBase64(_pendingPhotos[i]);
-                    images.push(img);
-                } catch (e) {
-                    failCount++;
-                    console.warn('[Trip] photo to base64 failed', e);
-                }
+        var pendingFiles = _itemPhotoManager ? _itemPhotoManager.getFiles() : [];
+        if (pendingFiles.length > 0) {
+            try {
+                images = await _itemPhotoManager.getBase64();
+            } catch (e) {
+                console.warn('[Trip] photo to base64 failed', e);
             }
-            if (failCount > 0) {
-                showToast('有 ' + failCount + ' 张图片读取失败，已跳过', 'error');
+            if (images.length < pendingFiles.length) {
+                showToast('有图片读取失败，已跳过', 'error');
             }
         }
 
@@ -713,7 +718,7 @@ var Trip = (function() {
             console.error('[Trip] analyzeText error:', e);
             showToast('分析失败', 'error');
         } finally {
-            if (btn) { btn.disabled = false; btn.textContent = '阿宝分析 ✨'; }
+            if (btn) { btn.disabled = false; btn.textContent = '二狗分析 ✨'; }
         }
     }
 
@@ -854,8 +859,14 @@ var Trip = (function() {
             var data = await API.deleteTripPhoto(photoId);
             if (data.success) {
                 showToast('已删除');
-                closeItemModal();
-                showDetail(_currentTrip.id);
+                // Remove photo from DOM inline, stay in edit view
+                var btns = document.querySelectorAll('.trip-photo-del');
+                btns.forEach(function(btn) {
+                    if (btn.getAttribute('onclick') && btn.getAttribute('onclick').indexOf(photoId) !== -1) {
+                        var wrap = btn.closest('.trip-photo-thumb-wrap');
+                        if (wrap) wrap.remove();
+                    }
+                });
             } else {
                 showToast(data.message || '删除失败', 'error');
             }
@@ -913,16 +924,17 @@ var Trip = (function() {
             + '<h3>📥 下载导出</h3>'
             + '<p style="color:var(--text-secondary);font-size:0.9em;margin:0 0 16px">选择要下载的内容：</p>'
             + '<div style="display:flex;flex-direction:column;gap:10px">'
-            + '<button class="btn btn-primary" onclick="Trip.exportXLSX()" style="justify-content:flex-start;gap:10px;padding:12px 16px;text-align:left">'
-            + '📊 <span><strong>报销清单 (.xlsx)</strong><br><small style="opacity:.7;font-weight:normal">Excel 直接打开，按日期分类</small></span>'
+            + '<button class="btn btn-primary" onclick="Trip.exportBundle()" style="justify-content:flex-start;gap:10px;padding:12px 16px;text-align:left">'
+            + '📦 <span><strong>打包下载（Excel + 照片）</strong><br><small style="opacity:.7;font-weight:normal">完整报销材料，按事项分文件夹</small></span>'
+            + '</button>'
+            + '<button class="btn btn-secondary" onclick="Trip.exportXLSX()" style="justify-content:flex-start;gap:10px;padding:12px 16px;text-align:left">'
+            + '📊 <span><strong>仅报销清单 (.xlsx)</strong><br><small style="opacity:.7;font-weight:normal">Excel 直接打开，按日期分类</small></span>'
             + '</button>'
             + (hasPhotos
                 ? '<button class="btn btn-secondary" onclick="Trip.exportPhotos()" style="justify-content:flex-start;gap:10px;padding:12px 16px;text-align:left">'
-                  + '🖼️ <span><strong>全部票据照片 (.zip)</strong><br><small style="opacity:.7;font-weight:normal">按日期分文件夹打包</small></span>'
+                  + '🖼️ <span><strong>仅票据照片 (.zip)</strong><br><small style="opacity:.7;font-weight:normal">按日期分文件夹打包</small></span>'
                   + '</button>'
-                : '<button class="btn btn-secondary" disabled style="justify-content:flex-start;gap:10px;padding:12px 16px;text-align:left;opacity:.5;cursor:not-allowed">'
-                  + '🖼️ <span><strong>全部票据照片 (.zip)</strong><br><small style="font-weight:normal">暂无票据照片</small></span>'
-                  + '</button>')
+                : '')
             + '</div>'
             + '<div class="trip-modal-actions" style="margin-top:16px">'
             + '<span></span><button class="btn btn-secondary" onclick="Trip.closeTripModal()">取消</button>'
@@ -938,6 +950,18 @@ var Trip = (function() {
         closeTripModal();
         var a = document.createElement('a');
         a.href = '/api/trips/' + encodeURIComponent(_currentTrip.id) + '/export/xlsx';
+        a.download = '';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
+
+    function exportBundle() {
+        if (!_currentTrip) return;
+        closeTripModal();
+        showToast('正在打包报销材料，请稍候...');
+        var a = document.createElement('a');
+        a.href = '/api/trips/' + encodeURIComponent(_currentTrip.id) + '/export/bundle';
         a.download = '';
         document.body.appendChild(a);
         a.click();
@@ -980,6 +1004,7 @@ var Trip = (function() {
 
     // ─── FAB handler ───
     function handleFab() {
+        if (isGuestRestricted('创建差旅')) return;
         if (_view === 'detail' && _currentTrip) {
             openItemModal();
         } else {
@@ -1005,6 +1030,7 @@ var Trip = (function() {
         openShareModal: openShareModal,
         closeShareModal: closeShareModal,
         showExportMenu: showExportMenu,
+        exportBundle: exportBundle,
         exportXLSX: exportXLSX,
         exportPhotos: exportPhotos,
         viewPhoto: viewPhoto,

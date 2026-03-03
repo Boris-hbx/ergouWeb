@@ -551,6 +551,7 @@
     overflow-x: auto;
     padding-bottom: 4px;
     -webkit-overflow-scrolling: touch;
+    position: relative;
 }
 
 .learn-category-filters::-webkit-scrollbar {
@@ -561,24 +562,28 @@
     flex-shrink: 0;
     padding: 6px 14px;
     border-radius: 20px;
-    border: 1px solid var(--border-color, #30363d);
+    border: none;
     background: transparent;
     color: var(--text-muted, #8b949e);
     font-size: 0.85rem;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: color 0.2s;
     white-space: nowrap;
+    position: relative;
+    z-index: 1;
 }
 
 .learn-filter-pill:hover {
-    border-color: var(--primary-color, #667eea);
     color: var(--text-primary);
 }
 
 .learn-filter-pill.active {
     background: var(--primary-color, #667eea);
-    border-color: var(--primary-color, #667eea);
     color: #fff;
+    font-weight: 600;
+}
+.jelly-ready .learn-filter-pill.active {
+    background: transparent;
 }
 
 /* Card category badge */
@@ -876,6 +881,7 @@
     border: 1px solid var(--border-color, #30363d);
     border-radius: 8px;
     overflow: hidden;
+    position: relative;
 }
 
 .expense-period-btn {
@@ -885,11 +891,13 @@
     color: var(--text-muted, #8b949e);
     font-size: 0.85rem;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: color 0.2s;
+    position: relative;
+    z-index: 1;
 }
 
 .expense-period-btn.active {
-    background: var(--primary-color, #667eea);
+    background: transparent;
     color: #fff;
 }
 
@@ -2009,7 +2017,7 @@
     }
 
     .trip-fab {
-        bottom: calc(56px + 16px + env(safe-area-inset-bottom, 0px));
+        bottom: 80px;
     }
 
     /* Trip modals: full-screen bottom sheet on mobile */
@@ -2310,25 +2318,26 @@
 .trip-fab {
     position: fixed;
     bottom: 32px;
-    right: 24px;
+    right: 32px;
     width: 56px;
     height: 56px;
     border-radius: 50%;
-    background: var(--primary-color);
+    background: var(--primary-color, #667eea);
     color: #fff;
     border: none;
     font-size: 28px;
     cursor: pointer;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-    z-index: 1001;
+    box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4);
+    z-index: 100;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: transform 0.15s;
+    transition: transform 0.2s, box-shadow 0.2s;
 }
 
 .trip-fab:hover {
     transform: scale(1.08);
+    box-shadow: 0 6px 24px rgba(102, 126, 234, 0.5);
 }
 
 /* Modal overlay */
@@ -2586,4 +2595,102 @@
 .trip-ai-btn:disabled {
     opacity: 0.6;
     cursor: not-allowed;
+}
+
+/* ========== PhotoManager — 公共照片组件 ========== */
+
+.pm-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+}
+
+.pm-grid:empty {
+    display: none;
+}
+
+.pm-thumb {
+    position: relative;
+    aspect-ratio: 1;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--border-color, #30363d);
+}
+
+.pm-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    cursor: pointer;
+}
+
+.pm-remove {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--danger-color, #f85149);
+    color: #fff;
+    border: none;
+    font-size: 14px;
+    line-height: 22px;
+    text-align: center;
+    cursor: pointer;
+    z-index: 1;
+}
+
+.pm-remove:hover {
+    background: #d73a3a;
+}
+
+.pm-lightbox {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.pm-lightbox img {
+    max-width: 90vw;
+    max-height: 90vh;
+    object-fit: contain;
+    border-radius: 8px;
+    cursor: default;
+}
+
+.pm-lightbox-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    color: #fff;
+    border: none;
+    font-size: 20px;
+    line-height: 36px;
+    text-align: center;
+    cursor: pointer;
+}
+
+.pm-lightbox-close:hover {
+    background: rgba(255, 255, 255, 0.4);
+}
+
+/* 记账 footer 双按钮等宽布局 */
+.expense-add-footer .expense-footer-dual {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+}
+
+.expense-add-footer .expense-footer-dual .btn {
+    flex: 1;
 }

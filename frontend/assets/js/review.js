@@ -5,8 +5,29 @@ var reviewModalMode = null; // 'create' | 'edit'
 var editingReviewId = null;
 var selectedFrequency = 'daily';
 var currentReviewFilter = 'daily';
+var _jellyReviewFilter = null;
+
+function _initReviewJelly() {
+    if (_jellyReviewFilter || typeof JellyIndicator === 'undefined') return;
+    _jellyReviewFilter = JellyIndicator.create({
+        container: '#review-filter-buttons',
+        itemSelector: '.review-filter-btn',
+        activeClass: 'active',
+        axis: 'x',
+        padding: 0,
+        pillClass: 'jelly-pill-review'
+    });
+    var activeBtn = document.querySelector('.review-filter-btn.active');
+    if (activeBtn) _jellyReviewFilter.setPositionImmediate(activeBtn);
+}
 
 function loadReviews() {
+    _initReviewJelly();
+    // Re-sync jelly position when tab becomes visible (may have drifted while hidden)
+    if (_jellyReviewFilter) {
+        var activeBtn = document.querySelector('.review-filter-btn.active');
+        if (activeBtn) _jellyReviewFilter.setPositionImmediate(activeBtn);
+    }
     API.getReviews()
         .then(function(data) {
             allReviews = data.items || [];
@@ -21,9 +42,13 @@ function loadReviews() {
 
 function setReviewFilter(value) {
     currentReviewFilter = value;
+    var activeBtn = null;
     document.querySelectorAll('.review-filter-btn').forEach(function(btn) {
-        btn.classList.toggle('active', btn.dataset.filter === value);
+        var isActive = btn.dataset.filter === value;
+        btn.classList.toggle('active', isActive);
+        if (isActive) activeBtn = btn;
     });
+    if (_jellyReviewFilter && activeBtn) _jellyReviewFilter.moveTo(activeBtn);
     renderReviews();
 }
 

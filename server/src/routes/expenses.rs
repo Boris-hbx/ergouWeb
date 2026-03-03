@@ -961,8 +961,8 @@ pub async fn parse_receipts(
         );
     }
 
-    // Call Claude vision API
-    let client = match crate::services::claude::ClaudeClient::new() {
+    // Call LLM vision API
+    let client = match crate::services::llm::LlmClient::for_user(&state.db.lock(), &user_id.0) {
         Some(c) => c,
         None => {
             return (
@@ -1085,7 +1085,7 @@ pub async fn parse_preview(
         );
     }
 
-    let client = match crate::services::claude::ClaudeClient::new() {
+    let client = match crate::services::llm::LlmClient::for_user(&state.db.lock(), &user_id.0) {
         Some(c) => c,
         None => {
             return (
@@ -1265,7 +1265,7 @@ fn parse_ai_receipt_response(text: &str) -> ParsedReceipt {
 
 /// Auto-tag from text (notes) when no photos are available
 async fn auto_tag_from_text(state: &AppState, entry_id: &str, amount: f64, notes: &str) {
-    let client = match crate::services::claude::ClaudeClient::new() {
+    let client = match crate::services::llm::LlmClient::new("auto") {
         Some(c) => c,
         None => return,
     };

@@ -85,7 +85,8 @@ pub async fn list_routines(
 ) -> (StatusCode, Json<RoutinesResponse>) {
     let db = state.db.lock();
     ensure_collab_tables(&db);
-    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+    let tz = chrono::FixedOffset::east_opt(8 * 3600).unwrap(); // UTC+8
+    let today = chrono::Utc::now().with_timezone(&tz).format("%Y-%m-%d").to_string();
 
     let mut items: Vec<Routine> = Vec::new();
 
@@ -194,11 +195,20 @@ pub async fn create_routine(
     let id = uuid::Uuid::new_v4().to_string()[..8].to_string();
     let now = chrono::Utc::now().to_rfc3339();
 
-    db.execute(
+    if let Err(e) = db.execute(
         "INSERT INTO routines (id, user_id, text, completed_today, last_completed_date, created_at) VALUES (?1,?2,?3,0,NULL,?4)",
         rusqlite::params![id, user_id.0, req.text, now],
-    )
-    .unwrap();
+    ) {
+        eprintln!("[routines] create insert failed: {}", e);
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(RoutineResponse {
+                success: false,
+                item: None,
+                message: Some("创建失败".into()),
+            }),
+        );
+    }
 
     let routine = Routine {
         id,
@@ -228,7 +238,8 @@ pub async fn toggle_routine(
 ) -> (StatusCode, Json<RoutineResponse>) {
     let db = state.db.lock();
     ensure_collab_tables(&db);
-    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+    let tz = chrono::FixedOffset::east_opt(8 * 3600).unwrap(); // UTC+8
+    let today = chrono::Utc::now().with_timezone(&tz).format("%Y-%m-%d").to_string();
     let now = chrono::Utc::now().to_rfc3339();
 
     let is_owner: bool = db
@@ -376,15 +387,24 @@ pub async fn toggle_routine(
         routine.last_completed_date = None;
     }
 
-    db.execute(
+    if let Err(e) = db.execute(
         "UPDATE routines SET completed_today = ?1, last_completed_date = ?2 WHERE id = ?3",
         rusqlite::params![
             routine.completed_today as i32,
             routine.last_completed_date,
             id
         ],
-    )
-    .unwrap();
+    ) {
+        eprintln!("[routines] toggle update failed: {}", e);
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(RoutineResponse {
+                success: false,
+                item: None,
+                message: Some("更新失败".into()),
+            }),
+        );
+    }
 
     let message = if routine.completed_today {
         "已完成"

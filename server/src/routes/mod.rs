@@ -8,6 +8,7 @@ pub mod expenses;
 pub mod friends;
 pub mod moment;
 pub mod notifications;
+pub mod observability;
 pub mod push;
 pub mod quotes;
 pub mod reminders;

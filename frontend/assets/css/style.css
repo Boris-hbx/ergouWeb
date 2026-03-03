@@ -850,192 +850,8 @@ body {
     width: 100%;
 }
 
-.main-content.expanded .page-header {
-    max-width: 800px;
-    width: 100%;
-    margin-right: 0;
-}
-
-/* Page Header */
-.page-header {
-    width: 100%;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin: 0 0 1rem 0;
-    padding: 1rem 2rem;
-    box-sizing: border-box;
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.9));
-    border-radius: 16px;
-    backdrop-filter: blur(20px);
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-    position: relative;
-    overflow: hidden;
-}
-
-/* Animated border - traveling dot with gradient tail (fixed 50px length) */
-.page-header::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    border-radius: 16px;
-    padding: 2px;
-    background: conic-gradient(
-        from var(--border-angle, 0deg),
-        transparent 0%,
-        transparent 92%,
-        #ffccbc 93%,
-        #ffab91 94%,
-        #ff8a80 95%,
-        #ff5252 97%,
-        #ff6b6b 98%,
-        transparent 100%
-    );
-    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
-    animation: border-rotate 5s linear infinite;
-    z-index: 0;
-    pointer-events: none;
-}
-
-@property --border-angle {
-    syntax: '<angle>';
-    initial-value: 0deg;
-    inherits: false;
-}
-
-@keyframes border-rotate {
-    0% {
-        --border-angle: 0deg;
-    }
-    100% {
-        --border-angle: 360deg;
-    }
-}
-
-/* Inner content needs to be above the border animation */
-.page-header > * {
-    position: relative;
-    z-index: 1;
-}
-
-.page-header.compact {
-    padding: 0.75rem 1.5rem;
-    margin-bottom: 1rem;
-}
-
 .header-left {
     flex: 1;
-}
-
-.page-title {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    margin: 0;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.quote-text {
-    font-size: 0.9rem;
-    color: var(--text-secondary);
-    margin: 0.3rem 0 0 0;
-    font-style: italic;
-    max-width: 600px;
-    line-height: 1.4;
-}
-
-.btn-shuffle {
-    padding: 0.5rem 1rem;
-    border: 1px solid rgba(var(--primary-color-rgb), 0.3);
-    background: rgba(var(--primary-color-rgb), 0.15);
-    color: var(--primary-color);
-    font-size: 0.8rem;
-    font-weight: 500;
-    cursor: pointer;
-    border-radius: 20px;
-    transition: all 0.3s ease;
-    white-space: nowrap;
-    position: relative;
-    overflow: hidden;
-    box-shadow: none;
-}
-
-.btn-shuffle::before {
-    content: '🔄';
-    margin-right: 6px;
-    display: inline-block;
-    transition: transform 0.3s ease;
-}
-
-.btn-shuffle::after {
-    content: '';
-    position: absolute;
-    top: -50%;
-    left: -50%;
-    width: 200%;
-    height: 200%;
-    background: linear-gradient(
-        45deg,
-        transparent 30%,
-        rgba(255, 255, 255, 0.3) 50%,
-        transparent 70%
-    );
-    transform: translateX(-100%) rotate(45deg);
-    transition: none;
-}
-
-.btn-shuffle:hover {
-    transform: scale(1.02);
-    background: rgba(var(--primary-color-rgb), 0.25);
-    border-color: rgba(var(--primary-color-rgb), 0.5);
-}
-
-.btn-shuffle:hover::before {
-    animation: diceRoll 0.6s ease-in-out infinite;
-}
-
-.btn-shuffle:hover::after {
-    animation: shimmer 1.5s ease-in-out infinite;
-}
-
-.btn-shuffle:active {
-    transform: scale(0.95);
-}
-
-.btn-shuffle.rolling::before {
-    animation: diceRollFast 0.15s linear infinite;
-}
-
-@keyframes diceRoll {
-    0%, 100% {
-        transform: rotate(0deg) scale(1);
-    }
-    25% {
-        transform: rotate(-15deg) scale(1.1);
-    }
-    75% {
-        transform: rotate(15deg) scale(1.1);
-    }
-}
-
-@keyframes diceRollFast {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-
-@keyframes shimmer {
-    0% {
-        transform: translateX(-100%) rotate(45deg);
-    }
-    100% {
-        transform: translateX(100%) rotate(45deg);
-    }
 }
 
 .toast-container {
@@ -1649,6 +1465,7 @@ body {
     gap: 0.5rem;
     position: relative;
     z-index: 1;
+    white-space: nowrap;
 }
 
 .matrix-tab:hover {
@@ -4866,10 +4683,6 @@ body {
         padding: calc(48px + 1.5rem) 1.5rem 1.5rem 1.5rem;
     }
     
-    .page-title {
-        font-size: 1.75rem;
-    }
-    
     .tab-btn {
         padding: 1rem 1.5rem;
         font-size: 1rem;
@@ -4890,17 +4703,6 @@ body {
     .nav-link {
         padding: 0.8rem 1rem;
         font-size: 1rem;
-    }
-    
-    .page-header {
-        flex-direction: column;
-        gap: 1rem;
-        text-align: center;
-        padding: 1rem;
-    }
-    
-    .page-title {
-        font-size: 1.5rem;
     }
     
     .tab-nav {
@@ -4958,14 +4760,6 @@ body {
         padding: calc(48px + 1rem) 1rem 1rem 1rem;
     }
 
-    .page-header {
-        padding: 1rem;
-    }
-
-    .page-title {
-        font-size: 1.3rem;
-    }
-    
     .btn {
         padding: 0.6rem 1rem;
         font-size: 0.9rem;
@@ -6852,6 +6646,45 @@ textarea.ocr-text:focus {
 
 .settings-section .setting-group:last-child {
     margin-bottom: 0;
+}
+
+/* Toggle switch */
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+    flex-shrink: 0;
+}
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: var(--border-color);
+    border-radius: 24px;
+    transition: background 0.2s;
+}
+.toggle-slider::before {
+    content: '';
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    left: 3px;
+    bottom: 3px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.2s;
+}
+.toggle-switch input:checked + .toggle-slider {
+    background: var(--primary-color);
+}
+.toggle-switch input:checked + .toggle-slider::before {
+    transform: translateX(20px);
 }
 
 .setting-group input[type="text"] {
@@ -8999,12 +8832,32 @@ body.dark-mode .action-sheet-cancel {
     border-color: var(--primary-color);
 }
 
-/* 只读信息展示 */
+/* 只读信息展示 — 标签和值同行 */
+.setting-group-inline {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.setting-group-inline label {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    margin-bottom: 0;
+}
+
 .settings-value {
     font-size: 0.95rem;
     color: var(--text-primary);
-    padding: 8px 0;
     font-weight: 500;
+}
+
+.settings-copyright {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    line-height: 1.6;
+    padding: 4px 0 0;
 }
 
 /* 密码 Modal */
@@ -9296,10 +9149,6 @@ body.dark-mode .action-sheet-cancel {
         padding: calc(48px + 0.5rem) 0.75rem 0.5rem 0.75rem;
     }
 
-    .page-header.compact {
-        display: none;
-    }
-
     .matrix-tabs {
         padding: 0.25rem 0.5rem;
         margin-bottom: 0.25rem;
@@ -9584,6 +9433,22 @@ body.dark-mode .action-sheet-cancel {
     color: var(--text-muted, #8b949e);
     padding: 20px 0;
     font-size: 0.9rem;
+}
+
+.share-loading::before {
+    content: '';
+    display: block;
+    width: 24px;
+    height: 24px;
+    margin: 0 auto 8px;
+    border: 2.5px solid var(--border-color, #d0d7de);
+    border-top-color: var(--primary-color, #667eea);
+    border-radius: 50%;
+    animation: share-spin 0.6s linear infinite;
+}
+
+@keyframes share-spin {
+    to { transform: rotate(360deg); }
 }
 
 /* Collaborate mode */
@@ -9915,6 +9780,48 @@ body.dark-mode .action-sheet-cancel {
     white-space: nowrap;
 }
 .guest-register-btn:hover { background: rgba(255,255,255,0.3); }
+
+/* ========== Mobile Install Banner ========== */
+.install-banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 8px 16px;
+    background: linear-gradient(135deg, #667eea, #5a6fd6);
+    color: #fff;
+    font-size: 13px;
+    text-align: center;
+    position: relative;
+    z-index: 100;
+}
+.install-banner-btn {
+    padding: 4px 14px;
+    border: 1px solid rgba(255,255,255,0.5);
+    border-radius: 6px;
+    background: rgba(255,255,255,0.15);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.install-banner-btn:hover { background: rgba(255,255,255,0.3); }
+.install-banner-close {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: rgba(255,255,255,0.7);
+    font-size: 18px;
+    cursor: pointer;
+    padding: 4px 8px;
+    line-height: 1;
+}
+.install-banner-close:hover { color: #fff; }
+
 /* Guest AI remaining badge inline */
 .guest-ai-badge {
     display: inline-block;
@@ -9938,4 +9845,84 @@ body.dark-mode .action-sheet-cancel {
 .guest-ai-warning {
     color: #e67e22;
     font-weight: 600;
+}
+
+/* ─── Memory management ─── */
+.memory-list {
+    margin-top: 8px;
+}
+.memory-item {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border-color, #30363d);
+}
+.memory-item:last-child {
+    border-bottom: none;
+}
+.memory-content {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 6px;
+}
+.memory-category {
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.memory-cat-habit {
+    background: rgba(72, 187, 120, 0.15);
+    color: #48bb78;
+}
+.memory-cat-fact {
+    background: rgba(102, 126, 234, 0.15);
+    color: #667eea;
+}
+.memory-cat-personality {
+    background: rgba(237, 137, 54, 0.15);
+    color: #ed8936;
+}
+.memory-cat-intent {
+    background: rgba(159, 122, 234, 0.15);
+    color: #9f7aea;
+}
+.memory-text {
+    font-size: 13px;
+    color: var(--text-primary, #e6edf3);
+    word-break: break-word;
+}
+.memory-delete-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted, #666);
+    font-size: 18px;
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+    flex-shrink: 0;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+}
+.memory-delete-btn:hover {
+    opacity: 1;
+    color: #f85149;
+}
+.memory-empty {
+    text-align: center;
+    color: var(--text-muted, #666);
+    font-size: 13px;
+    padding: 16px 0;
+}
+.memory-loading {
+    text-align: center;
+    color: var(--text-muted, #666);
+    font-size: 13px;
+    padding: 16px 0;
 }

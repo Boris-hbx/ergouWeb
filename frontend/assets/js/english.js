@@ -13,6 +13,7 @@ var English = (function() {
         { key: '生活', icon: '🌱', label: '生活' },
         { key: '其他', icon: '📝', label: '其他' }
     ];
+    var _jellyLearnFilter = null;
 
     function init() {
         if (!initialized) {
@@ -48,7 +49,18 @@ var English = (function() {
         if (editBtn) editBtn.onclick = enterEditMode;
 
         var aiBtn = document.getElementById('english-ai-btn');
-        if (aiBtn) aiBtn.onclick = aiOrganize;
+        if (aiBtn) {
+            aiBtn.onclick = aiOrganize;
+            if (window._userStatus === 'guest') {
+                aiBtn.setAttribute('data-guest-ai-action', '1');
+                var hintSpan = document.createElement('span');
+                hintSpan.className = 'guest-ai-hint';
+                aiBtn.appendChild(hintSpan);
+                setTimeout(function() {
+                    if (typeof updateAllGuestAiHints === 'function') updateAllGuestAiHints();
+                }, 600);
+            }
+        }
 
         var shareBtn = document.getElementById('english-share-btn');
         if (shareBtn) shareBtn.onclick = shareCurrentScenario;
@@ -146,16 +158,58 @@ var English = (function() {
         var container = document.getElementById('learn-category-filters');
         if (!container) return;
 
-        var html = '<button class="learn-filter-pill' + (!currentCategory ? ' active' : '') + '" onclick="English.filterCategory(null)">全部</button>';
-        CATEGORIES.forEach(function(cat) {
-            var isActive = currentCategory === cat.key;
-            html += '<button class="learn-filter-pill' + (isActive ? ' active' : '') + '" onclick="English.filterCategory(\'' + cat.key + '\')">' + cat.icon + ' ' + cat.label + '</button>';
+        // Only build DOM on first render; subsequent calls just update active class
+        var existing = container.querySelectorAll('.learn-filter-pill');
+        if (existing.length === 0) {
+            var html = '<button class="learn-filter-pill" data-cat="" onclick="English.filterCategory(null)">全部</button>';
+            CATEGORIES.forEach(function(cat) {
+                html += '<button class="learn-filter-pill" data-cat="' + cat.key + '" onclick="English.filterCategory(\'' + cat.key + '\')">' + cat.icon + ' ' + cat.label + '</button>';
+            });
+            container.innerHTML = html;
+
+            // Create jelly indicator once
+            if (typeof JellyIndicator !== 'undefined') {
+                _jellyLearnFilter = JellyIndicator.create({
+                    container: container,
+                    itemSelector: '.learn-filter-pill',
+                    activeClass: 'active',
+                    axis: 'x',
+                    padding: 0,
+                    pillClass: 'jelly-pill-learn',
+                    bounce: false
+                });
+            }
+        }
+
+        // Update active state
+        var activeBtn = null;
+        container.querySelectorAll('.learn-filter-pill').forEach(function(btn) {
+            var isActive = (btn.dataset.cat || '') === (currentCategory || '');
+            btn.classList.toggle('active', isActive);
+            if (isActive) activeBtn = btn;
         });
-        container.innerHTML = html;
+
+        // Position pill
+        if (_jellyLearnFilter && activeBtn) {
+            if (_jellyLearnFilter._hidden) {
+                _jellyLearnFilter.setPositionImmediate(activeBtn);
+            }
+        }
     }
 
     function filterCategory(cat) {
         currentCategory = cat;
+        // Animate pill to new position
+        var container = document.getElementById('learn-category-filters');
+        if (container && _jellyLearnFilter) {
+            var activeBtn = null;
+            container.querySelectorAll('.learn-filter-pill').forEach(function(btn) {
+                var isActive = (btn.dataset.cat || '') === (cat || '');
+                btn.classList.toggle('active', isActive);
+                if (isActive) activeBtn = btn;
+            });
+            if (activeBtn) _jellyLearnFilter.moveTo(activeBtn);
+        }
         loadScenarios();
     }
 
@@ -463,7 +517,7 @@ var English = (function() {
             if (!ok) return;
         }
 
-        showToast('阿宝正在整理内容...', 'info');
+        showToast('二狗正在整理内容...', 'info');
         try {
             var resp = await API.generateScenario(currentScenario.id);
             if (resp.success && resp.item) {

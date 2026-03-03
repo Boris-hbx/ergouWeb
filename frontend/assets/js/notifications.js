@@ -107,7 +107,9 @@ var Notifications = (function() {
             if (sub) {
                 var endpoint = sub.endpoint;
                 await sub.unsubscribe();
-                await API.unsubscribePush(endpoint).catch(function(){});
+                await API.unsubscribePush(endpoint).catch(function(e) {
+                    console.error('[notifications] unsubscribePush:', e);
+                });
             }
             pushSubscribed = false;
             updatePushStatus();
@@ -174,7 +176,7 @@ var Notifications = (function() {
             // Show banners for new triggered reminders
             showBannersForNew(lastItems);
         } catch(e) {
-            // silent
+            console.error('[notifications] poll:', e);
         }
     }
 
@@ -331,7 +333,9 @@ var Notifications = (function() {
 
     async function ackBanner(reminderId, notifId, btn) {
         if (reminderId) {
-            await API.acknowledgeReminder(reminderId).catch(function(){});
+            await API.acknowledgeReminder(reminderId).catch(function(e) {
+                console.error('[notifications] ackBanner:', e);
+            });
         }
         dismissBanner(btn);
         poll();
@@ -339,7 +343,9 @@ var Notifications = (function() {
 
     async function snoozeBanner(reminderId, notifId, btn) {
         if (reminderId) {
-            await API.snoozeReminder(reminderId, 5).catch(function(){});
+            await API.snoozeReminder(reminderId, 5).catch(function(e) {
+                console.error('[notifications] snoozeBanner:', e);
+            });
         }
         dismissBanner(btn);
         poll();
@@ -349,30 +355,39 @@ var Notifications = (function() {
     function openTodo(todoId, btn) {
         dismissBanner(btn);
         closePanel();
-        // Open todo detail modal
-        if (typeof openTaskDetail === 'function') {
-            openTaskDetail(todoId);
-        }
+        // Switch to todo page and open task card
+        if (typeof switchPage === 'function') switchPage('todo');
+        setTimeout(function() {
+            if (typeof showTaskCard === 'function') showTaskCard(todoId);
+        }, 300);
     }
 
     async function acknowledgeFromPanel(reminderId, notifId) {
-        await API.acknowledgeReminder(reminderId).catch(function(){});
+        await API.acknowledgeReminder(reminderId).catch(function(e) {
+            console.error('[notifications] acknowledgeFromPanel:', e);
+        });
         poll();
     }
 
     async function snoozeFromPanel(reminderId, notifId) {
-        await API.snoozeReminder(reminderId, 5).catch(function(){});
+        await API.snoozeReminder(reminderId, 5).catch(function(e) {
+            console.error('[notifications] snoozeFromPanel:', e);
+        });
         poll();
         if (typeof showToast === 'function') showToast('5分钟后再提醒你');
     }
 
     async function dismissNotif(notifId) {
-        await API.markNotificationRead(notifId).catch(function(){});
+        await API.markNotificationRead(notifId).catch(function(e) {
+            console.error('[notifications] dismissNotif:', e);
+        });
         poll();
     }
 
     async function readAll() {
-        await API.markAllNotificationsRead().catch(function(){});
+        await API.markAllNotificationsRead().catch(function(e) {
+            console.error('[notifications] readAll:', e);
+        });
         // Clear all banners
         var container = document.getElementById('notif-banner-container');
         if (container) container.innerHTML = '';

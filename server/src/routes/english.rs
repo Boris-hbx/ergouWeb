@@ -1,6 +1,7 @@
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
+    response::IntoResponse,
     Json,
 };
 use serde::{Deserialize, Serialize};
@@ -8,7 +9,7 @@ use serde_json::json;
 
 use crate::auth::{check_guest_ai_quota, ActiveUserId, UserId};
 use crate::models::english::*;
-use crate::services::claude::ClaudeClient;
+use crate::services::llm::LlmClient;
 use crate::state::AppState;
 
 #[derive(Debug, Serialize)]
@@ -392,10 +393,10 @@ pub async fn generate_scenario(
     State(state): State<AppState>,
     user_id: ActiveUserId,
     Path(id): Path<String>,
-) -> (StatusCode, Json<ScenarioResponse>) {
+) -> impl IntoResponse {
     // Guest AI quota check
-    match check_guest_ai_quota(&state, &user_id.0) {
-        Ok(_) => {}
+    let ai_remaining = match check_guest_ai_quota(&state, &user_id.0) {
+        Ok(remaining) => remaining,
         Err(_) => {
             return (
                 StatusCode::FORBIDDEN,
@@ -404,9 +405,10 @@ pub async fn generate_scenario(
                     item: None,
                     message: Some("AI 体验次数已用完，注册解锁无限使用".into()),
                 }),
-            );
+            )
+                .into_response();
         }
-    }
+    };
 
     // Rate limit: 1 generation per 30 seconds per user
     {
@@ -420,7 +422,8 @@ pub async fn generate_scenario(
                         item: None,
                         message: Some("生成过于频繁，请 30 秒后再试".into()),
                     }),
-                );
+                )
+                    .into_response();
             }
         }
         limits.insert(user_id.0.clone(), std::time::Instant::now());
@@ -451,6 +454,7 @@ pub async fn generate_scenario(
                         message: Some("场景不存在".into()),
                     }),
                 )
+                    .into_response()
             }
         }
     };
@@ -465,8 +469,8 @@ pub async fn generate_scenario(
         .ok();
     }
 
-    // Call Claude API
-    let claude = match ClaudeClient::new() {
+    // Call LLM API
+    let llm = match LlmClient::for_user(&state.db.lock(), &user_id.0) {
         Some(c) => c,
         None => {
             let db = state.db.lock();
@@ -482,7 +486,8 @@ pub async fn generate_scenario(
                     item: None,
                     message: Some("AI 服务未配置".into()),
                 }),
-            );
+            )
+                .into_response();
         }
     };
 
@@ -497,7 +502,7 @@ pub async fn generate_scenario(
     let messages =
         vec![json!({"role": "user", "content": format!("请生成关于「{}」的学习内容。", title)})];
 
-    let result = claude
+    let result = llm
         .chat(&system_prompt, messages, &[], |_, _| json!({}))
         .await;
 
@@ -522,14 +527,15 @@ pub async fn generate_scenario(
                 )
                 .ok();
 
-            (
-                StatusCode::OK,
-                Json(ScenarioResponse {
-                    success: true,
-                    item,
-                    message: Some("内容生成完成".into()),
-                }),
-            )
+            let mut resp = json!({
+                "success": true,
+                "item": item,
+                "message": "内容生成完成",
+            });
+            if ai_remaining < 999 {
+                resp["ai_remaining"] = json!(ai_remaining);
+            }
+            (StatusCode::OK, Json(resp)).into_response()
         }
         Err(err) => {
             let db = state.db.lock();
@@ -550,6 +556,7 @@ pub async fn generate_scenario(
                     }),
                 }),
             )
+                .into_response()
         }
     }
 }

@@ -40,18 +40,25 @@ var _collabAPI = {
 
 // ========== 任务渲染、CRUD、象限逻辑 ==========
 
+var _loadingItems = false;
+
 function loadItems() {
+    if (_loadingItems) return;
+    _loadingItems = true;
     API.getTodos()
         .then(data => {
             allItems = data.items || [];
             updateCounts();
             renderItems();
             loadPendingConfirmations();
-            if (typeof Moment !== 'undefined') Moment.refreshIfStale();
+            // Moment pool is loaded once per day; no need to refresh on task load
         })
         .catch(err => {
             console.error('[loadItems] error:', err);
             showToast('加载任务失败: ' + err.message, 'error');
+        })
+        .finally(() => {
+            _loadingItems = false;
         });
 }
 
@@ -255,6 +262,7 @@ function renderFlatList() {
     document.getElementById('completed-list').innerHTML = completedHtml || '<div class="empty-hint">暂无已完成任务</div>';
     document.getElementById('deleted-list').innerHTML = deletedHtml || '<div class="empty-hint">暂无已删除任务</div>';
 
+    updateButtonAnimations();
     renderAssigneeFilter();
     renderPendingItems();
 }
@@ -339,10 +347,14 @@ function renderAssigneeFilter() {
         var isActive = currentAssigneeFilter === name;
         html += '<button class="assignee-chip assignee-chip-auto' + (isActive ? ' active' : '') +
                 '" data-name="' + escapeHtml(name) +
-                '" onclick="filterByAssignee(\'' + escapeHtml(name) + '\')">' +
-                escapeHtml(name) + ' <span class="chip-count">' + assignees[name] + '</span></button>';
+                '" onclick="filterByAssignee(this.getAttribute(\'data-name\'))">' +
+                '<span class="chip-name"></span> <span class="chip-count">' + assignees[name] + '</span></button>';
     });
     chipsEl.innerHTML = html;
+    // Safely set chip text via textContent to avoid XSS from assignee names
+    chipsEl.querySelectorAll('.assignee-chip-auto .chip-name').forEach(function(el) {
+        el.textContent = el.closest('.assignee-chip-auto').getAttribute('data-name');
+    });
 
     // Collapse chips to fit available width
     collapseAssigneeChips();
@@ -566,17 +578,40 @@ function createDeletedItemHtml(item) {
     '</div>';
 }
 
-// 核心移动函数 — 统一处理象限/Tab 移动
+// Snapshot helper for optimistic update rollback
+function _cloneItems() {
+    return allItems.map(function(i) { return Object.assign({}, i); });
+}
+
+// 核心移动函数 — 统一处理象限/Tab 移动（乐观更新 + 失败回滚）
 function moveTask(itemId, updates, message) {
+    var snapshot = _cloneItems();
+    // Optimistic: apply locally first
+    allItems = allItems.map(function(i) {
+        return i.id === itemId ? Object.assign({}, i, updates) : i;
+    });
+    updateCounts();
+    renderItems();
+
     API.updateTodo(itemId, updates).then(function(data) {
         if (data.success) {
-            allItems = allItems.map(function(i) {
-                return i.id === itemId ? (data.item || Object.assign(i, updates)) : i;
-            });
+            if (data.item) {
+                allItems = allItems.map(function(i) {
+                    return i.id === itemId ? data.item : i;
+                });
+            }
+            showToast(message, 'success');
+        } else {
+            allItems = snapshot;
             updateCounts();
             renderItems();
-            showToast(message, 'success');
+            showToast('移动失败', 'error');
         }
+    }).catch(function() {
+        allItems = snapshot;
+        updateCounts();
+        renderItems();
+        showToast('移动失败，请重试', 'error');
     });
 }
 
@@ -616,16 +651,35 @@ function toggleComplete(itemId) {
     if (!item) return;
 
     if (item.completed) {
+        var snapshot = _cloneItems();
+        // Optimistic: mark uncompleted locally
+        allItems = allItems.map(function(i) {
+            return i.id === itemId ? Object.assign({}, i, { completed: false, progress: 0 }) : i;
+        });
+        updateCounts();
+        renderItems();
+
         API.updateTodo(itemId, { completed: false, progress: 0 })
             .then(data => {
                 if (data.success) {
-                    allItems = allItems.map(function(i) {
-                        return i.id === itemId ? data.item : i;
-                    });
+                    if (data.item) {
+                        allItems = allItems.map(function(i) {
+                            return i.id === itemId ? data.item : i;
+                        });
+                    }
+                    showToast('已恢复', 'success');
+                } else {
+                    allItems = snapshot;
                     updateCounts();
                     renderItems();
-                    showToast('已恢复', 'success');
+                    showToast('恢复失败', 'error');
                 }
+            })
+            .catch(function() {
+                allItems = snapshot;
+                updateCounts();
+                renderItems();
+                showToast('恢复失败，请重试', 'error');
             });
         return;
     }
@@ -735,25 +789,68 @@ function showProgressDialog(item) {
 }
 
 function saveProgress(itemId, progress, completed) {
+    var snapshot = _cloneItems();
+
+    // Capture card position BEFORE optimistic render (for patrol interaction)
+    var patrolDetail = null;
+    if (completed) {
+        var item = allItems.find(function(i) { return i.id === itemId; });
+        if (item) {
+            var cardEl = document.querySelector('.task-item[data-id="' + itemId + '"]');
+            var cardRect = cardEl ? cardEl.getBoundingClientRect() : null;
+            var quadrant = item.quadrant;
+            // Check if this is the last incomplete task in the quadrant
+            var othersInQuadrant = allItems.filter(function(i) {
+                return i.id !== itemId && i.quadrant === quadrant && i.tab === item.tab &&
+                       !i.completed && !i.deleted;
+            });
+            patrolDetail = {
+                itemId: itemId,
+                quadrant: quadrant,
+                isLastInQuadrant: othersInQuadrant.length === 0,
+                cardRect: cardRect
+            };
+        }
+    }
+
+    // Optimistic: update progress/completed locally
+    allItems = allItems.map(function(i) {
+        return i.id === itemId ? Object.assign({}, i, { progress: progress, completed: completed }) : i;
+    });
+    updateCounts();
+    renderItems();
+
     API.updateTodo(itemId, { progress: progress, completed: completed })
         .then(data => {
             if (data.success) {
-                allItems = allItems.map(function(i) {
-                    return i.id === itemId ? data.item : i;
-                });
-                updateCounts();
-                renderItems();
+                if (data.item) {
+                    allItems = allItems.map(function(i) {
+                        return i.id === itemId ? data.item : i;
+                    });
+                }
                 showToast(completed ? '已完成' : '进度已更新', 'success');
                 if (window.triggerLinePulse) {
                     window.triggerLinePulse('success');
                 }
+                // Notify patrol system of task completion
+                if (patrolDetail) {
+                    document.dispatchEvent(new CustomEvent('patrol:taskComplete', { detail: patrolDetail }));
+                }
             } else {
+                allItems = snapshot;
+                updateCounts();
+                renderItems();
+                showToast('操作失败', 'error');
                 if (window.triggerLinePulse) {
                     window.triggerLinePulse('error');
                 }
             }
         })
         .catch(function() {
+            allItems = snapshot;
+            updateCounts();
+            renderItems();
+            showToast('操作失败，请重试', 'error');
             if (window.triggerLinePulse) {
                 window.triggerLinePulse('error');
             }
@@ -763,35 +860,63 @@ function saveProgress(itemId, progress, completed) {
 // 任务删除/恢复
 function deleteTask(itemId) {
     window.AppUtils.showConfirm('确定要删除这个任务吗？', function() {
+        var snapshot = _cloneItems();
+        // Optimistic: mark deleted locally
+        var item = allItems.find(function(i) { return i.id === itemId; });
+        if (item) {
+            item.deleted = true;
+            item.deleted_at = new Date().toISOString();
+        }
+        updateCounts();
+        renderItems();
+
         API.deleteTodo(itemId)
             .then(data => {
                 if (data.success) {
-                    var item = allItems.find(function(i) { return i.id === itemId; });
-                    if (item) {
-                        item.deleted = true;
-                        item.deleted_at = new Date().toISOString();
-                    }
+                    showToast('已移入回收站', 'success');
+                } else {
+                    allItems = snapshot;
                     updateCounts();
                     renderItems();
-                    showToast('已移入回收站', 'success');
+                    showToast('删除失败', 'error');
                 }
+            })
+            .catch(function() {
+                allItems = snapshot;
+                updateCounts();
+                renderItems();
+                showToast('删除失败，请重试', 'error');
             });
     }, { confirmText: '删除', danger: true });
 }
 
 function restoreTask(itemId) {
+    var snapshot = _cloneItems();
+    // Optimistic: restore locally
+    var item = allItems.find(function(i) { return i.id === itemId; });
+    if (item) {
+        item.deleted = false;
+        delete item.deleted_at;
+    }
+    updateCounts();
+    renderItems();
+
     API.restoreTodo(itemId)
         .then(data => {
             if (data.success) {
-                var item = allItems.find(function(i) { return i.id === itemId; });
-                if (item) {
-                    item.deleted = false;
-                    delete item.deleted_at;
-                }
+                showToast('已恢复', 'success');
+            } else {
+                allItems = snapshot;
                 updateCounts();
                 renderItems();
-                showToast('已恢复', 'success');
+                showToast('恢复失败', 'error');
             }
+        })
+        .catch(function() {
+            allItems = snapshot;
+            updateCounts();
+            renderItems();
+            showToast('恢复失败，请重试', 'error');
         });
 }
 
@@ -965,7 +1090,7 @@ function loadPendingConfirmations() {
             _pendingConfirmations = data.items || [];
             renderConfirmationBanners();
         }
-    }).catch(function() {});
+    }).catch(function(e) { console.error('[tasks] loadConfirmations:', e); });
 }
 
 var sq = String.fromCharCode(39); // single quote helper

@@ -92,16 +92,33 @@ fn run_migrations(conn: &Connection) {
     if !has_role {
         conn.execute_batch("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user';")
             .ok();
-        // Set first registered user as admin
+        // Set first registered user as owner
         conn.execute(
-            "UPDATE users SET role = 'admin' WHERE id = (SELECT id FROM users ORDER BY created_at ASC LIMIT 1)",
+            "UPDATE users SET role = 'owner' WHERE id = (SELECT id FROM users ORDER BY created_at ASC LIMIT 1)",
             [],
         )
         .ok();
     }
-    // Ensure boris_dev is always admin
+    // Migrate: ensure exactly one owner exists (promote first admin by created_at)
+    let has_owner: bool = conn
+        .query_row(
+            "SELECT COUNT(*) FROM users WHERE role = 'owner'",
+            [],
+            |r| r.get::<_, i64>(0),
+        )
+        .unwrap_or(0)
+        > 0;
+    if !has_owner {
+        // Promote first admin to owner
+        conn.execute(
+            "UPDATE users SET role = 'owner' WHERE id = (SELECT id FROM users WHERE role = 'admin' ORDER BY created_at ASC LIMIT 1)",
+            [],
+        )
+        .ok();
+    }
+    // Ensure boris_dev is always owner
     conn.execute(
-        "UPDATE users SET role = 'admin' WHERE username = 'boris_dev'",
+        "UPDATE users SET role = 'owner' WHERE username = 'boris_dev'",
         [],
     )
     .ok();
@@ -120,6 +137,43 @@ fn run_migrations(conn: &Connection) {
     if !has_ai_remaining {
         conn.execute_batch("ALTER TABLE users ADD COLUMN ai_calls_remaining INTEGER DEFAULT NULL;")
             .ok();
+    }
+
+    // Add ai_model preference to user_settings
+    let has_ai_model: bool = conn
+        .prepare("SELECT ai_model FROM user_settings LIMIT 1")
+        .is_ok();
+    if !has_ai_model {
+        conn.execute_batch("ALTER TABLE user_settings ADD COLUMN ai_model TEXT DEFAULT 'auto';")
+            .ok();
+    }
+
+    // Add timezone preference to user_settings
+    let has_timezone: bool = conn
+        .prepare("SELECT timezone FROM user_settings LIMIT 1")
+        .is_ok();
+    if !has_timezone {
+        conn.execute_batch(
+            "ALTER TABLE user_settings ADD COLUMN timezone TEXT DEFAULT 'America/Toronto';",
+        )
+        .ok();
+    }
+
+    // Migrate ergou_memories categories: user_fact→fact, preference→habit, delete old categories
+    let has_old_categories: bool = conn
+        .query_row(
+            "SELECT COUNT(*) > 0 FROM ergou_memories WHERE category IN ('user_fact', 'preference', 'behavioral_pattern', 'conversation_highlight')",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or(false);
+    if has_old_categories {
+        conn.execute_batch(
+            "UPDATE ergou_memories SET category = 'fact' WHERE category = 'user_fact';
+             UPDATE ergou_memories SET category = 'habit' WHERE category = 'preference';
+             DELETE FROM ergou_memories WHERE category IN ('behavioral_pattern', 'conversation_highlight');",
+        )
+        .ok();
     }
 }
 
@@ -526,6 +580,60 @@ fn create_tables(conn: &Connection) {
             PRIMARY KEY (trip_id, user_id)
         );
         CREATE INDEX IF NOT EXISTS idx_trip_collab_user ON trip_collaborators(user_id);
+
+        -- Ergou memories (二狗记忆)
+        CREATE TABLE IF NOT EXISTS ergou_memories (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL REFERENCES users(id),
+            category TEXT NOT NULL DEFAULT 'user_fact',
+            content TEXT NOT NULL,
+            source_conversation_id TEXT,
+            created_at TEXT NOT NULL,
+            last_accessed_at TEXT NOT NULL,
+            access_count INTEGER DEFAULT 0
+        );
+        CREATE INDEX IF NOT EXISTS idx_ergou_memories_user ON ergou_memories(user_id, last_accessed_at DESC);
+
+        -- Security events (安全事件)
+        CREATE TABLE IF NOT EXISTS security_events (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL REFERENCES users(id),
+            event_type TEXT NOT NULL,
+            severity TEXT NOT NULL,
+            description TEXT NOT NULL,
+            conversation_id TEXT,
+            admin_notified INTEGER DEFAULT 0,
+            created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_security_events_user ON security_events(user_id, created_at DESC);
+
+        -- Admin audit log (管理员操作审计)
+        CREATE TABLE IF NOT EXISTS admin_audit_log (
+            id TEXT PRIMARY KEY,
+            admin_user_id TEXT NOT NULL REFERENCES users(id),
+            action_type TEXT NOT NULL,
+            target_user_id TEXT,
+            target_resource TEXT,
+            details TEXT,
+            created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_audit_log_admin ON admin_audit_log(admin_user_id, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_audit_log_action ON admin_audit_log(action_type, created_at DESC);
+
+        CREATE TABLE IF NOT EXISTS client_errors (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            error_message TEXT NOT NULL,
+            stack TEXT,
+            app_version TEXT,
+            url TEXT,
+            user_agent TEXT,
+            screen_size TEXT,
+            network_online INTEGER DEFAULT 1,
+            user_id TEXT,
+            breadcrumbs TEXT,
+            created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_client_errors_created ON client_errors(created_at);
         ",
     )
     .expect("Failed to create tables");
@@ -537,8 +645,26 @@ pub fn daily_backup(conn: &Connection, backup_dir: &str) {
     let today = chrono::Local::now().format("%Y-%m-%d").to_string();
     let backup_path = format!("{}/next-{}.db", backup_dir, today);
 
+    // Validate backup path stays within the designated directory
+    let canonical_dir = match fs::canonicalize(backup_dir) {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("[backup] Cannot resolve backup dir {}: {}", backup_dir, e);
+            return;
+        }
+    };
+    let full_path = canonical_dir.join(format!("next-{}.db", today));
+    if !full_path.starts_with(&canonical_dir) {
+        eprintln!(
+            "[backup] Path traversal blocked: {:?} escapes {:?}",
+            full_path, canonical_dir
+        );
+        return;
+    }
+
     if !Path::new(&backup_path).exists() {
-        let sql = format!("VACUUM INTO '{}'", backup_path);
+        let safe_path = full_path.to_string_lossy().replace('\'', "''");
+        let sql = format!("VACUUM INTO '{}'", safe_path);
         if let Err(e) = conn.execute_batch(&sql) {
             eprintln!("Backup failed: {}", e);
         } else {

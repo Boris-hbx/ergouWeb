@@ -219,18 +219,3 @@ function updateButtonAnimations() {
         }
     }
 }
-
-// 名言刷新
-function shuffleQuote() {
-    var btn = document.querySelector('.btn-shuffle');
-    btn.classList.add('rolling');
-
-    API.getRandomQuote()
-        .then(data => {
-            document.getElementById('quote-text').textContent = data.quote;
-            btn.classList.remove('rolling');
-        })
-        .catch(() => {
-            btn.classList.remove('rolling');
-        });
-}

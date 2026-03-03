@@ -39,19 +39,107 @@ fn seed_todos(db: &rusqlite::Connection, user_id: &str, now: &str, today: &str) 
     #[allow(clippy::type_complexity)]
     let todos: Vec<(&str, &str, &str, i32, i32, f64, Option<&str>)> = vec![
         // ── Today ──
-        ("完成项目报告", "today", "important-urgent", 40, 0, 1.0, Some(today)),
-        ("回复客户邮件", "today", "important-urgent", 0, 0, 2.0, Some(today)),
-        ("准备周报", "today", "important-not-urgent", 100, 1, 1.0, Some(today)),
-        ("修复登录页面 bug", "today", "not-important-urgent", 60, 0, 1.0, Some(today)),
+        (
+            "完成项目报告",
+            "today",
+            "important-urgent",
+            40,
+            0,
+            1.0,
+            Some(today),
+        ),
+        (
+            "回复客户邮件",
+            "today",
+            "important-urgent",
+            0,
+            0,
+            2.0,
+            Some(today),
+        ),
+        (
+            "准备周报",
+            "today",
+            "important-not-urgent",
+            100,
+            1,
+            1.0,
+            Some(today),
+        ),
+        (
+            "修复登录页面 bug",
+            "today",
+            "not-important-urgent",
+            60,
+            0,
+            1.0,
+            Some(today),
+        ),
         // ── This Week ──
-        ("学习 Rust 异步编程", "week", "important-not-urgent", 20, 0, 1.0, Some(&week_date)),
-        ("Code Review 新功能分支", "week", "important-urgent", 0, 0, 1.0, Some(&week_date)),
-        ("整理技术文档", "week", "important-not-urgent", 0, 0, 2.0, Some(&week_date)),
-        ("团队周会准备 PPT", "week", "not-important-urgent", 0, 0, 1.0, Some(&week_date)),
+        (
+            "学习 Rust 异步编程",
+            "week",
+            "important-not-urgent",
+            20,
+            0,
+            1.0,
+            Some(&week_date),
+        ),
+        (
+            "Code Review 新功能分支",
+            "week",
+            "important-urgent",
+            0,
+            0,
+            1.0,
+            Some(&week_date),
+        ),
+        (
+            "整理技术文档",
+            "week",
+            "important-not-urgent",
+            0,
+            0,
+            2.0,
+            Some(&week_date),
+        ),
+        (
+            "团队周会准备 PPT",
+            "week",
+            "not-important-urgent",
+            0,
+            0,
+            1.0,
+            Some(&week_date),
+        ),
         // ── Next 30 Days ──
-        ("更新个人简历", "month", "important-not-urgent", 10, 0, 1.0, Some(&month_date)),
-        ("预约体检", "month", "not-important-not-urgent", 0, 0, 1.0, Some(&month_date)),
-        ("完成在线课程第三章", "month", "important-not-urgent", 0, 0, 2.0, Some(&month_date)),
+        (
+            "更新个人简历",
+            "month",
+            "important-not-urgent",
+            10,
+            0,
+            1.0,
+            Some(&month_date),
+        ),
+        (
+            "预约体检",
+            "month",
+            "not-important-not-urgent",
+            0,
+            0,
+            1.0,
+            Some(&month_date),
+        ),
+        (
+            "完成在线课程第三章",
+            "month",
+            "important-not-urgent",
+            0,
+            0,
+            2.0,
+            Some(&month_date),
+        ),
     ];
 
     for (text, tab, quadrant, progress, completed, sort_order, due) in &todos {
@@ -134,7 +222,7 @@ fn seed_expenses(db: &rusqlite::Connection, user_id: &str, now: &str, today: &st
     let entry_a_id = uuid::Uuid::new_v4().to_string();
     db.execute(
         "INSERT INTO expense_entries (id, user_id, amount, date, notes, tags, ai_processed, created_at, updated_at) \
-         VALUES (?1, ?2, 0, ?3, 'T&T 大统华超市 - 4张收据照片，试试阿宝分析', '[\"超市\"]', 0, ?4, ?5)",
+         VALUES (?1, ?2, 0, ?3, 'T&T 大统华超市 - 4张收据照片，试试二狗分析', '[\"超市\"]', 0, ?4, ?5)",
         rusqlite::params![entry_a_id, user_id, today, now, now],
     )
     .ok();
@@ -159,7 +247,7 @@ fn seed_expenses(db: &rusqlite::Connection, user_id: &str, now: &str, today: &st
     let entry_b_id = uuid::Uuid::new_v4().to_string();
     db.execute(
         "INSERT INTO expense_entries (id, user_id, amount, date, notes, tags, ai_processed, created_at, updated_at) \
-         VALUES (?1, ?2, 0, ?3, 'Costco 加油 - 试试阿宝分析', '[\"加油\"]', 0, ?4, ?5)",
+         VALUES (?1, ?2, 0, ?3, 'Costco 加油 - 试试二狗分析', '[\"加油\"]', 0, ?4, ?5)",
         rusqlite::params![entry_b_id, user_id, today, now, now],
     )
     .ok();
@@ -179,7 +267,7 @@ fn seed_expenses(db: &rusqlite::Connection, user_id: &str, now: &str, today: &st
     let entry_c_id = uuid::Uuid::new_v4().to_string();
     db.execute(
         "INSERT INTO expense_entries (id, user_id, amount, date, notes, tags, ai_processed, created_at, updated_at) \
-         VALUES (?1, ?2, 0, ?3, '多店混合票据 - 4张不同收据，试试阿宝分析', '[]', 0, ?4, ?5)",
+         VALUES (?1, ?2, 0, ?3, '多店混合票据 - 4张不同收据，试试二狗分析', '[]', 0, ?4, ?5)",
         rusqlite::params![entry_c_id, user_id, today, now, now],
     )
     .ok();
@@ -248,8 +336,12 @@ fn seed_trip(db: &rusqlite::Connection, user_id: &str, now: &str) {
     let trip_id = uuid::Uuid::new_v4().to_string();
     let day0 = chrono::Local::now();
     let date_from = day0.format("%Y-%m-%d").to_string();
-    let day1 = (day0 + chrono::Duration::days(1)).format("%Y-%m-%d").to_string();
-    let day2 = (day0 + chrono::Duration::days(2)).format("%Y-%m-%d").to_string();
+    let day1 = (day0 + chrono::Duration::days(1))
+        .format("%Y-%m-%d")
+        .to_string();
+    let day2 = (day0 + chrono::Duration::days(2))
+        .format("%Y-%m-%d")
+        .to_string();
     let date_to = day2.clone();
 
     db.execute(
@@ -262,9 +354,23 @@ fn seed_trip(db: &rusqlite::Connection, user_id: &str, now: &str) {
     // Trip items: (type, date, description, amount, notes, sort_order)
     let items: Vec<(&str, &str, &str, f64, &str, i32)> = vec![
         // Day 1
-        ("flight", &date_from, "MU5101 北京首都T2 → 上海虹桥T2 08:00-10:20", 1280.0, "经济舱", 0),
+        (
+            "flight",
+            &date_from,
+            "MU5101 北京首都T2 → 上海虹桥T2 08:00-10:20",
+            1280.0,
+            "经济舱",
+            0,
+        ),
         ("taxi", &date_from, "虹桥机场 → 万豪酒店", 45.0, "", 1),
-        ("hotel", &date_from, "上海万豪虹桥酒店（3晚）", 2040.0, "¥680/晚 × 3", 2),
+        (
+            "hotel",
+            &date_from,
+            "上海万豪虹桥酒店（3晚）",
+            2040.0,
+            "¥680/晚 × 3",
+            2,
+        ),
         ("meal", &date_from, "午餐", 86.0, "", 3),
         // Day 2
         ("taxi", &day1, "酒店 → 客户公司", 32.0, "", 0),
@@ -272,7 +378,14 @@ fn seed_trip(db: &rusqlite::Connection, user_id: &str, now: &str) {
         ("meal", &day1, "晚餐 团队聚餐", 256.0, "", 2),
         // Day 3
         ("taxi", &day2, "酒店 → 虹桥机场", 45.0, "", 0),
-        ("flight", &day2, "MU5108 上海虹桥T2 → 北京首都T2 19:00-21:20", 1350.0, "经济舱", 1),
+        (
+            "flight",
+            &day2,
+            "MU5108 上海虹桥T2 → 北京首都T2 19:00-21:20",
+            1350.0,
+            "经济舱",
+            1,
+        ),
     ];
 
     for (item_type, date, desc, amount, notes, sort_order) in &items {
@@ -356,7 +469,7 @@ fn seed_english(db: &rusqlite::Connection, user_id: &str, now: &str) {
 
     db.execute(
         "INSERT INTO english_scenarios (id, user_id, title, title_en, description, icon, content, status, category, notes, created_at, updated_at) \
-         VALUES (?1, ?2, '机场失物招领', 'Airport Lost Baggage', '在机场用英语处理行李丢失、描述物品、填写表格', '✈️', ?3, 'ready', '英语', '阿宝预生成的示例场景', ?4, ?5)",
+         VALUES (?1, ?2, '机场失物招领', 'Airport Lost Baggage', '在机场用英语处理行李丢失、描述物品、填写表格', '✈️', ?3, 'ready', '英语', '二狗预生成的示例场景', ?4, ?5)",
         rusqlite::params![id, user_id, content, now, now],
     )
     .ok();

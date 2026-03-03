@@ -182,9 +182,9 @@ function createUserAvatarContent() {
 
 ---
 
-## 四、修复建议
+## 四、修复建议（已全部修复 2026-03-02）
 
-### 修复 BUG-1（推荐方案）：在 settings.js 末尾添加自启动
+### ~~修复 BUG-1~~（已修复）：在 settings.js 末尾添加自启动
 
 在 `settings.js` 文件末尾（`applyAvatar()` 定义之后），立即执行一次头像应用：
 
@@ -196,7 +196,7 @@ applyAvatar();
 
 这样无论 `checkAuth()` 是否赶上时机，`settings.js` 加载后都会立即应用头像。
 
-### 修复 BUG-2：登录页保存 avatar
+### ~~修复 BUG-2~~（已修复）：登录页保存 avatar
 
 ```javascript
 // login.html 中补充
@@ -205,7 +205,7 @@ if (data.user.avatar) {
 }
 ```
 
-### 修复 BUG-3：API 保存失败给用户反馈
+### ~~修复 BUG-3~~（已修复）：API 保存失败给用户反馈
 
 ```javascript
 API.updateAvatar(value).catch(function() {
@@ -213,7 +213,7 @@ API.updateAvatar(value).catch(function() {
 });
 ```
 
-### 修复 BUG-4：补充双向同步
+### ~~修复 BUG-4~~（已修复）：补充双向同步
 
 ```javascript
 if (data.user.avatar) {

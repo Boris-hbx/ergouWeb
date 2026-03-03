@@ -167,3 +167,79 @@ showToast('提示信息', 'info');     // 蓝色
 | `english` | 英语场景学习 | `switchPage('english')` |
 | `inbox` | 收件箱（协作确认 + 分享） | `switchPage('inbox')` |
 | `settings` | 设置（账户 + 好友 + 联系人） | `switchPage('settings')` |
+
+## 公共组件
+
+### PhotoManager（照片处理）
+
+位置: `frontend/assets/js/utils.js`
+
+统一处理照片选择、自动压缩、缩略图预览、删除、放大查看、Base64 转换。所有涉及照片上传的模块（记账、差旅等）必须使用此组件。
+
+**初始化:**
+```javascript
+var pm = new PhotoManager({
+    container: '#my-photo-grid',        // 缩略图渲染容器（CSS 选择器）
+    onChange: function(files) {          // 照片列表变化回调
+        // files 是当前照片 File 数组的副本
+        updateMyButtons(files.length);
+    }
+});
+```
+
+**方法:**
+
+| 方法 | 说明 |
+|------|------|
+| `pm.addFiles(fileList)` | 添加文件，自动过滤非图片并提示，触发渲染和回调 |
+| `pm.remove(index)` | 删除指定位置的照片，局部更新网格 |
+| `pm.clear()` | 清空所有照片 |
+| `pm.getFiles()` | 获取当前 File 数组（用于 FormData 上传） |
+| `pm.getBase64()` | 返回 Promise\<Array\>，压缩后的 Base64 数据（用于 AI 识别） |
+
+**HTML 结构:**
+```html
+<div class="pm-grid" id="my-photo-grid"></div>
+<label>
+    <span>+ 添加照片</span>
+    <input type="file" multiple accept="image/*" style="display:none"
+           onchange="MyModule.handlePhotos(this.files)">
+</label>
+```
+
+**CSS 类名:** `pm-grid`、`pm-thumb`、`pm-remove`、`pm-lightbox`、`pm-lightbox-close`
+
+**按钮模式规范:**
+- 保存按钮始终可见可用
+- AI 分析/识别按钮作为独立的可选操作，不替换保存按钮
+- 有照片时：保存(secondary) + AI识别(primary) 并排显示
+
+## 错误处理与可观测性
+
+### 全局错误拦截
+
+`observability.js`（在所有 JS 之前加载）提供：
+
+- `window.onerror` + `unhandledrejection` 全局拦截
+- Breadcrumb 环形缓冲区（20 条）：记录 API 调用和导航
+- 错误上报到 `POST /api/client-errors`，每会话最多 10 条，同一 error_message 去重
+- 离线缓冲：上报失败存 localStorage（最多 5 条），下次加载补发
+
+### Breadcrumb 注入点
+
+| 位置 | 类别 | 内容 |
+|------|------|------|
+| `api.js` `request()` | `api` | `METHOD /path → STATUS (duration_ms)` |
+| `app.js` `switchPage()` | `nav` | tab 标识符 |
+
+### 规则
+
+- catch 块**禁止为空**，至少 `console.error('[模块名]', error)`
+- 新模块无需额外代码，全局拦截自动覆盖
+
+### Eruda 手机端调试
+
+`assets/vendor/eruda.min.js` 自托管，不入 SW 缓存。触发方式：
+- URL 参数 `?debug=1`（需已登录）
+- 设置页版本号连续点击 5 次
+- 状态存 `localStorage('eruda_enabled')`，`?debug=0` 关闭

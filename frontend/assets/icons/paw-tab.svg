@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <!-- Left paw -->
+  <g class="paw-fill" fill="currentColor">
+    <ellipse cx="3.8" cy="4.5" rx="1.2" ry="1.5"/>
+    <ellipse cx="6.5" cy="3.5" rx="1.1" ry="1.4"/>
+    <ellipse cx="9" cy="4.8" rx="1" ry="1.4"/>
+    <ellipse cx="10.5" cy="7.2" rx="0.9" ry="1.2" transform="rotate(20 10.5 7.2)"/>
+    <ellipse cx="6.6" cy="9.2" rx="3" ry="2.6" transform="rotate(-5 6.6 9.2)"/>
+  </g>
+  <!-- Right paw (mirrored, offset) -->
+  <g class="paw-fill" fill="currentColor" transform="translate(24 2) scale(-1 1)">
+    <ellipse cx="3.8" cy="4.5" rx="1.2" ry="1.5"/>
+    <ellipse cx="6.5" cy="3.5" rx="1.1" ry="1.4"/>
+    <ellipse cx="9" cy="4.8" rx="1" ry="1.4"/>
+    <ellipse cx="10.5" cy="7.2" rx="0.9" ry="1.2" transform="rotate(20 10.5 7.2)"/>
+    <ellipse cx="6.6" cy="9.2" rx="3" ry="2.6" transform="rotate(-5 6.6 9.2)"/>
+  </g>
+  <!-- Stroke outlines (hidden by default, shown when patrol-out) -->
+  <g class="paw-stroke" fill="none" stroke="currentColor" stroke-width="0.5" opacity="0">
+    <ellipse cx="3.8" cy="4.5" rx="1.2" ry="1.5"/>
+    <ellipse cx="6.5" cy="3.5" rx="1.1" ry="1.4"/>
+    <ellipse cx="9" cy="4.8" rx="1" ry="1.4"/>
+    <ellipse cx="10.5" cy="7.2" rx="0.9" ry="1.2" transform="rotate(20 10.5 7.2)"/>
+    <ellipse cx="6.6" cy="9.2" rx="3" ry="2.6" transform="rotate(-5 6.6 9.2)"/>
+  </g>
+  <g class="paw-stroke" fill="none" stroke="currentColor" stroke-width="0.5" opacity="0" transform="translate(24 2) scale(-1 1)">
+    <ellipse cx="3.8" cy="4.5" rx="1.2" ry="1.5"/>
+    <ellipse cx="6.5" cy="3.5" rx="1.1" ry="1.4"/>
+    <ellipse cx="9" cy="4.8" rx="1" ry="1.4"/>
+    <ellipse cx="10.5" cy="7.2" rx="0.9" ry="1.2" transform="rotate(20 10.5 7.2)"/>
+    <ellipse cx="6.6" cy="9.2" rx="3" ry="2.6" transform="rotate(-5 6.6 9.2)"/>
+  </g>
+</svg>

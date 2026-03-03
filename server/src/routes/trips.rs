@@ -10,7 +10,7 @@ use serde_json::json;
 
 use crate::auth::{check_guest_ai_quota, ActiveUserId, UserId};
 use crate::models::trip::*;
-use crate::services::claude::ClaudeClient;
+use crate::services::llm::LlmClient;
 use crate::state::AppState;
 
 // ===== Permission helpers =====
@@ -293,30 +293,45 @@ pub async fn get_trip(
         })
         .unwrap_or_default();
 
-    // Get photos for each item
+    // Get all photos for this trip's items in one query (avoids N+1)
+    let all_photos: Vec<TripPhoto> = db
+        .prepare(
+            "SELECT p.id, p.item_id, p.filename, p.file_size, p.mime_type, p.created_at, p.storage_path
+             FROM trip_photos p
+             JOIN trip_items ti ON ti.id = p.item_id
+             WHERE ti.trip_id = ?1
+             ORDER BY p.item_id, p.created_at",
+        )
+        .and_then(|mut stmt| {
+            stmt.query_map(rusqlite::params![id], |row| {
+                Ok(TripPhoto {
+                    id: row.get(0)?,
+                    item_id: row.get(1)?,
+                    filename: row.get(2)?,
+                    file_size: row.get(3)?,
+                    mime_type: row.get(4)?,
+                    created_at: row.get(5)?,
+                    storage_path: row.get(6)?,
+                })
+            })
+            .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        })
+        .unwrap_or_default();
+
+    // Group photos by item_id
+    let mut photos_map: std::collections::HashMap<String, Vec<TripPhoto>> =
+        std::collections::HashMap::new();
+    for photo in all_photos {
+        photos_map
+            .entry(photo.item_id.clone())
+            .or_default()
+            .push(photo);
+    }
+
     let items_with_photos: Vec<TripItemWithPhotos> = items
         .into_iter()
         .map(|item| {
-            let photos: Vec<TripPhoto> = db
-                .prepare(
-                    "SELECT id, item_id, filename, file_size, mime_type, created_at, storage_path
-                     FROM trip_photos WHERE item_id = ?1 ORDER BY created_at",
-                )
-                .and_then(|mut stmt| {
-                    stmt.query_map(rusqlite::params![item.id], |row| {
-                        Ok(TripPhoto {
-                            id: row.get(0)?,
-                            item_id: row.get(1)?,
-                            filename: row.get(2)?,
-                            file_size: row.get(3)?,
-                            mime_type: row.get(4)?,
-                            created_at: row.get(5)?,
-                            storage_path: row.get(6)?,
-                        })
-                    })
-                    .map(|rows| rows.filter_map(|r| r.ok()).collect())
-                })
-                .unwrap_or_default();
+            let photos = photos_map.remove(&item.id).unwrap_or_default();
             TripItemWithPhotos { item, photos }
         })
         .collect();
@@ -990,40 +1005,20 @@ pub async fn remove_collaborator(
     }
 }
 
-// ===== Export XLSX =====
-pub async fn export_xlsx(
-    State(state): State<AppState>,
-    user_id: UserId,
-    Path(id): Path<String>,
-) -> impl axum::response::IntoResponse {
+// ===== Shared xlsx builder =====
+fn build_xlsx_buffer(
+    db: &rusqlite::Connection,
+    trip_id: &str,
+) -> Result<Vec<u8>, String> {
     use rust_xlsxwriter::{Format, Workbook};
 
-    let db = state.db.lock();
-
-    let (has_access, _, _) = check_trip_access(&db, &id, &user_id.0);
-    if !has_access {
-        return axum::response::Response::builder()
-            .status(StatusCode::NOT_FOUND)
-            .body(axum::body::Body::from("行程不存在"))
-            .unwrap();
-    }
-
-    let title: String = db
-        .query_row(
-            "SELECT title FROM trips WHERE id = ?1",
-            rusqlite::params![id],
-            |row| row.get(0),
-        )
-        .unwrap_or_else(|_| "trip".to_string());
-
-    // Collect rows (only items with amount > 0)
     let rows: Vec<(String, String, String, f64, String, String, String)> = db
         .prepare(
             "SELECT date, type, description, amount, currency, reimburse_status, notes
              FROM trip_items WHERE trip_id = ?1 AND amount > 0 ORDER BY date, sort_order",
         )
         .and_then(|mut stmt| {
-            stmt.query_map(rusqlite::params![id], |row| {
+            stmt.query_map(rusqlite::params![trip_id], |row| {
                 Ok((
                     row.get::<_, String>(0)?,
                     row.get::<_, String>(1)?,
@@ -1041,14 +1036,12 @@ pub async fn export_xlsx(
     let mut workbook = Workbook::new();
     let sheet = workbook.add_worksheet();
 
-    // Header row with bold format
     let bold = Format::new().set_bold();
     let headers = ["日期", "类型", "描述", "金额", "币种", "报销状态", "备注"];
     for (col, h) in headers.iter().enumerate() {
         sheet.write_with_format(0, col as u16, *h, &bold).ok();
     }
 
-    // Set column widths
     sheet.set_column_width(0, 12).ok();
     sheet.set_column_width(2, 32).ok();
     sheet.set_column_width(6, 20).ok();
@@ -1082,10 +1075,39 @@ pub async fn export_xlsx(
         sheet.write(row, 6, r.6.as_str()).ok();
     }
 
-    let xlsx_data = match workbook.save_to_buffer() {
+    workbook
+        .save_to_buffer()
+        .map_err(|e| format!("xlsx error: {}", e))
+}
+
+// ===== Export XLSX =====
+pub async fn export_xlsx(
+    State(state): State<AppState>,
+    user_id: UserId,
+    Path(id): Path<String>,
+) -> impl axum::response::IntoResponse {
+    let db = state.db.lock();
+
+    let (has_access, _, _) = check_trip_access(&db, &id, &user_id.0);
+    if !has_access {
+        return axum::response::Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .body(axum::body::Body::from("行程不存在"))
+            .unwrap();
+    }
+
+    let title: String = db
+        .query_row(
+            "SELECT title FROM trips WHERE id = ?1",
+            rusqlite::params![id],
+            |row| row.get(0),
+        )
+        .unwrap_or_else(|_| "trip".to_string());
+
+    let xlsx_data = match build_xlsx_buffer(&db, &id) {
         Ok(d) => d,
         Err(e) => {
-            eprintln!("[Trip] xlsx error: {}", e);
+            eprintln!("[Trip] {}", e);
             return axum::response::Response::builder()
                 .status(StatusCode::INTERNAL_SERVER_ERROR)
                 .body(axum::body::Body::from("生成失败"))
@@ -1218,6 +1240,161 @@ pub async fn export_photos(
         .into_response()
 }
 
+// ===== Export bundle (xlsx + photos zip) =====
+
+/// Sanitize a folder name for cross-platform zip compatibility
+fn sanitize_folder_name(date: &str, description: &str) -> String {
+    let desc = if description.trim().is_empty() {
+        "未命名".to_string()
+    } else {
+        description
+            .chars()
+            .map(|c| match c {
+                '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' => '-',
+                _ => c,
+            })
+            .collect::<String>()
+            .trim()
+            .to_string()
+    };
+    let raw = format!("{} - {}", date, desc);
+    raw.chars().take(80).collect()
+}
+
+pub async fn export_bundle(
+    State(state): State<AppState>,
+    user_id: UserId,
+    Path(id): Path<String>,
+) -> impl axum::response::IntoResponse {
+    let db = state.db.lock();
+
+    let (has_access, _, _) = check_trip_access(&db, &id, &user_id.0);
+    if !has_access {
+        return (StatusCode::NOT_FOUND, "行程不存在").into_response();
+    }
+
+    let title: String = db
+        .query_row(
+            "SELECT title FROM trips WHERE id = ?1",
+            rusqlite::params![id],
+            |row| row.get(0),
+        )
+        .unwrap_or_else(|_| "trip".to_string());
+
+    // Build xlsx
+    let xlsx_data = match build_xlsx_buffer(&db, &id) {
+        Ok(d) => d,
+        Err(e) => {
+            eprintln!("[Trip] bundle: {}", e);
+            return (StatusCode::INTERNAL_SERVER_ERROR, "生成失败").into_response();
+        }
+    };
+
+    // Collect photos grouped by item: (item_id, date, description, storage_path, filename)
+    let photos: Vec<(String, String, String, String, String)> = db
+        .prepare(
+            "SELECT ti.id, ti.date, COALESCE(ti.description, ''), tp.storage_path, tp.filename
+             FROM trip_photos tp
+             JOIN trip_items ti ON ti.id = tp.item_id
+             WHERE ti.trip_id = ?1 ORDER BY ti.date, ti.sort_order, tp.created_at",
+        )
+        .and_then(|mut stmt| {
+            stmt.query_map(rusqlite::params![id], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, String>(4)?,
+                ))
+            })
+            .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        })
+        .unwrap_or_default();
+
+    // Build zip
+    let mut buf = std::io::Cursor::new(Vec::new());
+    {
+        let mut zip = zip::ZipWriter::new(&mut buf);
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Deflated);
+
+        // 1. Add xlsx at root
+        let xlsx_name = format!("{}-报销清单.xlsx", title);
+        zip.start_file(&xlsx_name, options).ok();
+        use std::io::Write;
+        zip.write_all(&xlsx_data).ok();
+
+        // 2. Add photos grouped by item
+        if !photos.is_empty() {
+            // Build folder names, handling duplicates
+            let mut folder_map: std::collections::HashMap<String, String> =
+                std::collections::HashMap::new(); // item_id -> folder_name
+            let mut used_names: std::collections::HashMap<String, usize> =
+                std::collections::HashMap::new();
+
+            // Collect unique items in order
+            let mut item_order: Vec<String> = Vec::new();
+            let mut item_info: std::collections::HashMap<String, (String, String)> =
+                std::collections::HashMap::new(); // item_id -> (date, desc)
+
+            for (item_id, date, desc, _, _) in &photos {
+                if !item_info.contains_key(item_id) {
+                    item_order.push(item_id.clone());
+                    item_info.insert(item_id.clone(), (date.clone(), desc.clone()));
+                }
+            }
+
+            for item_id in &item_order {
+                let (date, desc) = &item_info[item_id];
+                let base = sanitize_folder_name(date, desc);
+                let count = used_names.entry(base.clone()).or_insert(0);
+                *count += 1;
+                let folder = if *count == 1 {
+                    base
+                } else {
+                    format!("{} ({})", base, count)
+                };
+                folder_map.insert(item_id.clone(), folder);
+            }
+
+            // Track per-item photo counters
+            let mut item_counters: std::collections::HashMap<String, usize> =
+                std::collections::HashMap::new();
+
+            for (item_id, _, _, path, orig_filename) in &photos {
+                if let Ok(data) = std::fs::read(path) {
+                    let ext = orig_filename.rsplit('.').next().unwrap_or("jpg");
+                    let counter = item_counters.entry(item_id.clone()).or_insert(0);
+                    *counter += 1;
+                    let folder = &folder_map[item_id];
+                    let name_in_zip = format!("{}/{:02}.{}", folder, counter, ext);
+                    zip.start_file(&name_in_zip, options).ok();
+                    zip.write_all(&data).ok();
+                }
+            }
+        }
+
+        zip.finish().ok();
+    }
+
+    let filename = format!("{}-报销材料.zip", title);
+    let encoded = urlencoding::encode(&filename);
+
+    (
+        StatusCode::OK,
+        [
+            (http::header::CONTENT_TYPE, "application/zip"),
+            (
+                http::header::CONTENT_DISPOSITION,
+                &format!("attachment; filename*=UTF-8''{}", encoded),
+            ),
+        ],
+        axum::body::Body::from(buf.into_inner()),
+    )
+        .into_response()
+}
+
 // ===== AI Item Analysis =====
 
 #[derive(Deserialize)]
@@ -1258,7 +1435,7 @@ pub async fn analyze_item(
         );
     }
 
-    let client = match ClaudeClient::new() {
+    let client = match LlmClient::for_user(&state.db.lock(), &user_id.0) {
         Some(c) => c,
         None => {
             return (
@@ -1298,10 +1475,12 @@ pub async fn analyze_item(
         .map(|img| (img.data.clone(), img.mime_type.clone()))
         .collect();
 
-    match client
-        .vision_generate(system, images, &user_message, 4096)
-        .await
-    {
+    let result = if has_images {
+        client.vision_generate(system, images, &user_message, 4096).await
+    } else {
+        client.simple_generate(system, &user_message, 4096).await
+    };
+    match result {
         Ok(raw) => {
             // Try array first, then single object wrapped in array
             let json_str = if let (Some(s), Some(e)) = (raw.find('['), raw.rfind(']')) {
