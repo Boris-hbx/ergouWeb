@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Telegram Tab Animation</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #efeff4;
+            color: #222;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            min-height: 100vh;
+            padding: 40px 16px 50px;
+            gap: 44px;
+        }
+        h2 {
+            font-weight: 500;
+            opacity: 0.4;
+            font-size: 11px;
+            margin-bottom: 8px;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .section {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* ===== Telegram-accurate Tab Bar ===== */
+        .tab-bar {
+            display: flex;
+            background: rgba(220, 220, 225, 0.65);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 3px;
+            position: relative;
+            gap: 2px;
+            width: min(340px, 88vw);
+            box-shadow: 0 0.5px 0 rgba(0,0,0,0.06),
+                        0 4px 16px rgba(0,0,0,0.08);
+        }
+        .tab-bar .indicator {
+            position: absolute;
+            background: #fff;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.08),
+                        0 3px 10px rgba(0,0,0,0.06);
+            pointer-events: none;
+            will-change: left, width, height, border-radius;
+        }
+        .tab-bar .tab-item {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1px;
+            padding: 7px 4px 5px;
+            border: none;
+            background: none;
+            color: #99a2ad;
+            font-size: 10px;
+            font-weight: 500;
+            cursor: pointer;
+            position: relative;
+            z-index: 1;
+            transition: color 0.2s ease;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .tab-bar .tab-item.active { color: #2AABEE; }
+        .tab-bar .tab-item .ico {
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .tab-bar .tab-item .ico svg {
+            width: 22px;
+            height: 22px;
+            fill: currentColor;
+        }
+
+        /* ===== Dark theme ===== */
+        .dark-wrap {
+            background: #1c1c1e;
+            width: 100vw;
+            padding: 24px 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .dark-wrap h2 { color: rgba(255,255,255,0.4); }
+        .dark-wrap .tab-bar {
+            background: rgba(44, 44, 46, 0.85);
+            box-shadow: 0 0.5px 0 rgba(255,255,255,0.04),
+                        0 4px 16px rgba(0,0,0,0.3);
+        }
+        .dark-wrap .tab-bar .indicator {
+            background: rgba(255,255,255,0.1);
+            box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+        }
+        .dark-wrap .tab-bar .tab-item { color: rgba(255,255,255,0.3); }
+        .dark-wrap .tab-bar .tab-item.active { color: #667eea; }
+    </style>
+</head>
+<body>
+
+    <a href="/" style="position:fixed;top:12px;left:12px;color:#2AABEE;text-decoration:none;font-size:14px;z-index:10;">&larr; Back</a>
+
+    <div style="text-align:center;margin-top:20px;">
+        <h1 style="font-size:17px;font-weight:600;">Telegram Tab Animation</h1>
+        <p style="opacity:0.35;font-size:12px;margin-top:4px;">Tap to switch tabs</p>
+    </div>
+
+    <!-- Telegram Light -->
+    <div class="section">
+        <h2>Light Theme</h2>
+        <div class="tab-bar" id="demo1">
+            <div class="indicator"></div>
+            <button class="tab-item active" data-idx="0">
+                <span class="ico"><svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg></span>
+                <span>Contacts</span>
+            </button>
+            <button class="tab-item" data-idx="1">
+                <span class="ico"><svg viewBox="0 0 24 24"><path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 0 0-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z"/></svg></span>
+                <span>Calls</span>
+            </button>
+            <button class="tab-item" data-idx="2">
+                <span class="ico"><svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/></svg></span>
+                <span>Chats</span>
+            </button>
+            <button class="tab-item" data-idx="3">
+                <span class="ico"><svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg></span>
+                <span>Settings</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Telegram Light (5 tabs, tighter) -->
+    <div class="section">
+        <h2>5 Tabs</h2>
+        <div class="tab-bar" id="demo2" style="width:min(370px,92vw)">
+            <div class="indicator"></div>
+            <button class="tab-item active" data-idx="0">
+                <span class="ico"><svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg></span>
+                <span>Contacts</span>
+            </button>
+            <button class="tab-item" data-idx="1">
+                <span class="ico"><svg viewBox="0 0 24 24"><path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 0 0-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z"/></svg></span>
+                <span>Calls</span>
+            </button>
+            <button class="tab-item" data-idx="2">
+                <span class="ico"><svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg></span>
+                <span>Chats</span>
+            </button>
+            <button class="tab-item" data-idx="3">
+                <span class="ico"><svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg></span>
+                <span>Settings</span>
+            </button>
+            <button class="tab-item" data-idx="4">
+                <span class="ico"><svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg></span>
+                <span>Search</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Dark theme -->
+    <div class="dark-wrap">
+        <h2>Dark Theme (for Next)</h2>
+        <div class="tab-bar" id="demo3">
+            <div class="indicator"></div>
+            <button class="tab-item active" data-idx="0">
+                <span class="ico"><svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg></span>
+                <span>Contacts</span>
+            </button>
+            <button class="tab-item" data-idx="1">
+                <span class="ico"><svg viewBox="0 0 24 24"><path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 0 0-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z"/></svg></span>
+                <span>Calls</span>
+            </button>
+            <button class="tab-item" data-idx="2">
+                <span class="ico"><svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/></svg></span>
+                <span>Chats</span>
+            </button>
+            <button class="tab-item" data-idx="3">
+                <span class="ico"><svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg></span>
+                <span>Settings</span>
+            </button>
+        </div>
+    </div>
+
+<script>
+function spring(pos, vel, target, stiffness, damping, dt) {
+    var f = -stiffness * (pos - target) - damping * vel;
+    vel += f * dt;
+    pos += vel * dt;
+    return { p: pos, v: vel };
+}
+function settled(p, v, t, th) {
+    return Math.abs(p - t) < (th || 0.3) && Math.abs(v) < (th || 0.3);
+}
+
+function initBar(id) {
+    var bar = document.getElementById(id);
+    var ind = bar.querySelector('.indicator');
+    var tabs = bar.querySelectorAll('.tab-item');
+    var anim = null;
+
+    var fullH = bar.offsetHeight - 6;
+    var circleSize = fullH;
+
+    function setPill(cx, w) {
+        ind.style.width = w + 'px';
+        ind.style.height = fullH + 'px';
+        ind.style.left = (cx - w / 2) + 'px';
+        ind.style.top = '3px';
+        ind.style.borderRadius = (w <= fullH * 1.2) ? '50%' : (fullH / 2) + 'px';
+    }
+
+    var first = tabs[0];
+    var fullW = first.offsetWidth;
+    setPill(first.offsetLeft + fullW / 2, fullW);
+
+    tabs.forEach(function(tab) {
+        tab.addEventListener('click', function() {
+            var prev = bar.querySelector('.tab-item.active');
+            if (prev === tab) return;
+            tabs.forEach(function(t) { t.classList.remove('active'); });
+            tab.classList.add('active');
+            if (anim) cancelAnimationFrame(anim);
+
+            var fromCx = prev.offsetLeft + prev.offsetWidth / 2;
+            var toCx = tab.offsetLeft + tab.offsetWidth / 2;
+            var targetW = tab.offsetWidth;
+
+            // Bouncy C-style animation
+            var cx = fromCx, vCx = 0;
+            var w = parseFloat(ind.style.width) || targetW, vW = 0;
+            var phase = 0;
+            var last = performance.now();
+
+            function step(now) {
+                var dt = Math.min((now - last) / 1000, 0.03);
+                last = now;
+
+                // Position always slides toward target
+                var rp = spring(cx, vCx, toCx, 350, 26, dt);
+                cx = rp.p; vCx = rp.v;
+
+                if (phase === 0) {
+                    // Shrink while sliding
+                    var rw = spring(w, vW, circleSize * 0.9, 600, 32, dt);
+                    w = rw.p; vW = rw.v;
+                    // Switch to expand when near target
+                    if (Math.abs(cx - toCx) < 8) {
+                        phase = 1;
+                        vW = 15; // outward impulse
+                    }
+                } else {
+                    // Expand with bouncy spring
+                    var rw = spring(w, vW, targetW, 280, 10, dt);
+                    w = rw.p; vW = rw.v;
+                }
+
+                setPill(cx, Math.max(w, circleSize * 0.8));
+
+                if (phase === 1 && settled(cx, vCx, toCx, 0.3) && settled(w, vW, targetW, 0.4)) {
+                    setPill(toCx, targetW);
+                    anim = null; return;
+                }
+                anim = requestAnimationFrame(step);
+            }
+            anim = requestAnimationFrame(step);
+        });
+    });
+}
+
+initBar('demo1');
+initBar('demo2');
+initBar('demo3');
+</script>
+</body>
+</html>

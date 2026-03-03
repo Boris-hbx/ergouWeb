@@ -49,6 +49,7 @@ var API = (function() {
         window._guestAiRemaining = remaining;
         var el = document.getElementById('guest-ai-count');
         if (el) el.textContent = remaining;
+        if (typeof updateAllGuestAiHints === 'function') updateAllGuestAiHints();
     }
 
     return {
@@ -85,6 +86,23 @@ var API = (function() {
 
         updateAvatar: async function(avatar) {
             return await request('PUT', '/auth/avatar', { avatar: avatar });
+        },
+
+        // ===== Settings APIs =====
+        getAiModel: async function() {
+            return await request('GET', '/settings/ai-model');
+        },
+
+        setAiModel: async function(model) {
+            return await request('PUT', '/settings/ai-model', { model: model });
+        },
+
+        getTimezone: async function() {
+            return await request('GET', '/settings/timezone');
+        },
+
+        setTimezone: async function(tz) {
+            return await request('PUT', '/settings/timezone', { timezone: tz });
         },
 
         // ===== Todo APIs =====
@@ -456,6 +474,10 @@ var API = (function() {
             return await request('POST', '/expenses/parse-preview', { images: images });
         },
 
+        deleteExpensePhoto: async function(photoId) {
+            return await request('DELETE', '/expenses/photos/' + encodeURIComponent(photoId));
+        },
+
         // ===== Trip APIs (差旅) =====
         getTrips: async function() {
             return await request('GET', '/trips');
@@ -534,6 +556,23 @@ var API = (function() {
         },
         rejectUser: async function(id) {
             return await request('POST', '/admin/users/' + encodeURIComponent(id) + '/reject');
+        },
+        getSecurityEvents: async function() {
+            return await request('GET', '/admin/security-events');
+        },
+        restoreUser: async function(id) {
+            return await request('POST', '/admin/users/' + encodeURIComponent(id) + '/restore');
+        },
+
+        // ===== Memory APIs =====
+        getMemories: async function() {
+            return await request('GET', '/settings/memories');
+        },
+        deleteMemory: async function(id) {
+            return await request('DELETE', '/settings/memories/' + encodeURIComponent(id));
+        },
+        deleteAllMemories: async function() {
+            return await request('DELETE', '/settings/memories');
         },
 
         // 环境检测 (always web now)

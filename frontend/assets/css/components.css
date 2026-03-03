@@ -1614,12 +1614,15 @@ html.sidebar-will-collapse .sidebar-hint {
     0% { --btn-angle: 0deg; }
     100% { --btn-angle: 360deg; }
 }
-.btn-routine.has-pending,
-.matrix-tab[data-tab="today"].has-pending {
+.btn-routine.has-pending {
     position: relative;
     overflow: visible;
     isolation: isolate;
     background: transparent !important;
+}
+.matrix-tab[data-tab="today"].has-pending {
+    position: relative;
+    overflow: visible;
 }
 .btn-routine.has-pending::after {
     content: '';
@@ -1627,14 +1630,6 @@ html.sidebar-will-collapse .sidebar-hint {
     inset: 0;
     border-radius: inherit;
     background: linear-gradient(135deg, var(--primary-color), var(--primary-color));
-    z-index: -1;
-}
-.matrix-tab[data-tab="today"].has-pending::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    background: var(--primary-gradient);
     z-index: -1;
 }
 .btn-routine.has-pending::before,
@@ -2458,6 +2453,7 @@ html.sidebar-will-collapse .sidebar-hint {
     display: flex;
     gap: 4px;
     align-items: center;
+    position: relative;
 }
 .review-filter-btn {
     padding: 5px 14px;
@@ -2468,19 +2464,22 @@ html.sidebar-will-collapse .sidebar-hint {
     font-size: 13px;
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: color 0.2s;
     white-space: nowrap;
+    position: relative;
+    z-index: 1;
 }
 .review-filter-btn:hover {
-    background: rgba(var(--primary-color-rgb), 0.08);
     color: var(--primary-color);
-    border-color: var(--primary-color);
 }
 .review-filter-btn.active {
-    background: var(--primary-gradient);
-    color: white;
+    background: rgba(var(--primary-color-rgb), 0.15);
+    color: var(--primary-color);
     border-color: transparent;
     font-weight: 600;
+}
+.jelly-ready .review-filter-btn.active {
+    background: transparent;
 }
 .btn-add-review {
     padding: 8px 16px;

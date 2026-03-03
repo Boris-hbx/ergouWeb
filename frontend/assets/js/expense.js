@@ -1,11 +1,11 @@
 // ========== Expense Module ==========
 var Expense = (function() {
-    var _period = 'day'; // 'day' | 'week' | 'month'
+    var _period = 'month'; // 'day' | 'week' | 'month'
     var _currentDate = new Date();
     var _entries = [];
     var _selectedTags = [];
     var _allTags = [];
-    var _pendingPhotos = []; // files waiting to upload
+    var _photoManager = null; // PhotoManager instance
     var _currentDetailId = null;
     var _currentDetail = null; // full detail object for current entry
     var _editingId = null; // when editing an existing entry
@@ -20,6 +20,7 @@ var Expense = (function() {
     var _currency = 'CAD'; // 'CAD' | 'CNY'
     var _rates = null; // { CNY: number }
     var _ratesTimestamp = 0;
+    var _periodIndicator = null;
 
     function log(action, detail) {
         var ts = new Date().toTimeString().slice(0, 8);
@@ -36,8 +37,19 @@ var Expense = (function() {
 
     function init() {
         _currentDate = new Date();
-        _period = 'day';
+        _period = 'month';
         log('init');
+        // Init jelly indicator for period tabs
+        if (!_periodIndicator && typeof JellyIndicator !== 'undefined') {
+            _periodIndicator = JellyIndicator.create({
+                container: '.expense-period-tabs',
+                itemSelector: '.expense-period-btn',
+                activeClass: 'active',
+                axis: 'x',
+                padding: 0,
+                pillClass: 'jelly-pill-expense'
+            });
+        }
         updatePeriodButtons();
         loadRates();
         loadEntries();
@@ -54,9 +66,19 @@ var Expense = (function() {
     }
 
     function updatePeriodButtons() {
+        var activeBtn = null;
         document.querySelectorAll('.expense-period-btn').forEach(function(btn) {
-            btn.classList.toggle('active', btn.dataset.period === _period);
+            var isActive = btn.dataset.period === _period;
+            btn.classList.toggle('active', isActive);
+            if (isActive) activeBtn = btn;
         });
+        if (_periodIndicator && activeBtn) {
+            if (_periodIndicator._hidden) {
+                _periodIndicator.setPositionImmediate(activeBtn);
+            } else {
+                _periodIndicator.moveTo(activeBtn);
+            }
+        }
     }
 
     function navigateDate(dir) {
@@ -327,18 +349,17 @@ var Expense = (function() {
         }
 
         // input state
-        if (_editingId) {
-            // Editing mode — always show save
+        var hasPhotos = _photoManager && _photoManager.getFiles().length > 0;
+        if (hasPhotos) {
+            // Has photos — show save + AI recognize side by side
             footer.innerHTML =
                 '<button class="btn btn-secondary" onclick="Expense.closeAddModal()">取消</button>' +
-                '<button class="btn btn-primary" onclick="Expense.submitEntry()">保存</button>';
-        } else if (_pendingPhotos.length > 0) {
-            // Has photos — show parse button
-            footer.innerHTML =
-                '<button class="btn btn-secondary" onclick="Expense.closeAddModal()">取消</button>' +
-                '<button class="btn btn-primary" onclick="Expense.startParse()" style="background:linear-gradient(135deg,#667eea,#764ba2)">识别账单 &#10024;</button>';
+                '<div class="expense-footer-dual">' +
+                    '<button class="btn btn-secondary" onclick="Expense.submitEntry()">保存</button>' +
+                    '<button class="btn btn-primary" onclick="Expense.startParse()" style="background:linear-gradient(135deg,#667eea,#764ba2)">识别账单 &#10024;</button>' +
+                '</div>';
         } else {
-            // No photos — normal save (only if amount entered)
+            // No photos — normal save
             footer.innerHTML =
                 '<button class="btn btn-secondary" onclick="Expense.closeAddModal()">取消</button>' +
                 '<button class="btn btn-primary" onclick="Expense.submitEntry()">保存</button>';
@@ -347,9 +368,15 @@ var Expense = (function() {
 
     // ===== Add Entry =====
 
+    function _initPhotoManager() {
+        _photoManager = new PhotoManager({
+            container: '#expense-photo-grid',
+            onChange: function() { updateFooterButtons(); }
+        });
+    }
+
     function openAddModal() {
         if (isGuestRestricted('添加记账')) return;
-        _pendingPhotos = [];
         _editingId = null;
         _previewData = null;
         _splitMode = false;
@@ -358,17 +385,17 @@ var Expense = (function() {
         _currency = 'CAD';
         log('openAddModal');
 
+        _initPhotoManager();
+
         var overlay = document.getElementById('expense-add-overlay');
         var amountInput = document.getElementById('expense-amount-input');
         var dateInput = document.getElementById('expense-date-input');
         var notesInput = document.getElementById('expense-notes-input');
-        var photoGrid = document.getElementById('expense-photo-grid');
         var fileInput = document.getElementById('expense-photo-input');
 
         if (amountInput) amountInput.value = '';
         if (dateInput) dateInput.value = formatDate(new Date());
         if (notesInput) notesInput.value = '';
-        if (photoGrid) photoGrid.innerHTML = '';
         if (fileInput) fileInput.value = '';
 
         setModalState('input');
@@ -384,7 +411,7 @@ var Expense = (function() {
         log('closeAddModal');
         var overlay = document.getElementById('expense-add-overlay');
         if (overlay) overlay.style.display = 'none';
-        _pendingPhotos = [];
+        if (_photoManager) _photoManager.clear();
         _previewData = null;
         _splitMode = false;
         _dateGroups = {};
@@ -392,98 +419,31 @@ var Expense = (function() {
     }
 
     function handlePhotoSelect(event) {
+        if (!_photoManager) _initPhotoManager();
         var files = event.target.files;
-        if (!files || files.length === 0) return;
-
-        var added = 0;
-        for (var i = 0; i < files.length; i++) {
-            if (files[i].size > 10 * 1024 * 1024) {
-                showToast('照片不能超过 10MB', 'error');
-                continue;
-            }
-            _pendingPhotos.push(files[i]);
-            added++;
+        if (files && files.length > 0) {
+            _photoManager.addFiles(files);
         }
-        log('handlePhotoSelect', { added: added, total: _pendingPhotos.length, sizes: _pendingPhotos.map(function(f) { return (f.size / 1024).toFixed(0) + 'KB'; }) });
-        renderPhotoGrid();
-        // Reset file input so same file can be selected again
         event.target.value = '';
-    }
-
-    function renderPhotoGrid() {
-        var grid = document.getElementById('expense-photo-grid');
-        if (!grid) return;
-        grid.innerHTML = '';
-
-        _pendingPhotos.forEach(function(file, idx) {
-            var thumb = document.createElement('div');
-            thumb.className = 'expense-photo-thumb';
-            var img = document.createElement('img');
-            img.src = URL.createObjectURL(file);
-            var removeBtn = document.createElement('button');
-            removeBtn.className = 'expense-photo-remove';
-            removeBtn.textContent = '\u00d7';
-            removeBtn.onclick = function(e) {
-                e.stopPropagation();
-                _pendingPhotos.splice(idx, 1);
-                log('removePhoto', { idx: idx, remaining: _pendingPhotos.length });
-                renderPhotoGrid();
-            };
-            thumb.appendChild(img);
-            thumb.appendChild(removeBtn);
-            grid.appendChild(thumb);
-        });
-
-        updateFooterButtons();
     }
 
     // ===== Parse Preview Flow =====
 
-    function fileToBase64(file) {
-        var MAX_DIM = 2048;
-        var QUALITY = 0.82;
-        return new Promise(function(resolve, reject) {
-            var img = new Image();
-            img.onload = function() {
-                var w = img.width, h = img.height;
-                // Downscale if larger than MAX_DIM
-                if (w > MAX_DIM || h > MAX_DIM) {
-                    var ratio = Math.min(MAX_DIM / w, MAX_DIM / h);
-                    w = Math.round(w * ratio);
-                    h = Math.round(h * ratio);
-                }
-                var canvas = document.createElement('canvas');
-                canvas.width = w;
-                canvas.height = h;
-                var ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, w, h);
-                var dataUrl = canvas.toDataURL('image/jpeg', QUALITY);
-                var base64 = dataUrl.split(',')[1];
-                log('fileToBase64', { orig: img.width + 'x' + img.height, scaled: w + 'x' + h, b64Len: base64.length });
-                resolve({ data: base64, mime_type: 'image/jpeg' });
-            };
-            img.onerror = reject;
-            img.src = URL.createObjectURL(file);
-        });
-    }
+    // fileToBase64 removed — use _photoManager.getBase64() instead
 
     async function startParse() {
-        if (_pendingPhotos.length === 0) {
+        var photos = _photoManager ? _photoManager.getFiles() : [];
+        if (photos.length === 0) {
             showToast('请先添加照片', 'error');
             return;
         }
 
-        log('startParse', { photoCount: _pendingPhotos.length });
+        log('startParse', { photoCount: photos.length });
         setModalState('analyzing');
         startFakeProgress();
 
         try {
-            // Convert all photos to base64
-            var images = [];
-            for (var i = 0; i < _pendingPhotos.length; i++) {
-                var img = await fileToBase64(_pendingPhotos[i]);
-                images.push(img);
-            }
+            var images = await _photoManager.getBase64();
             log('startParse base64Ready', { count: images.length, totalBytes: images.reduce(function(s, i) { return s + i.data.length; }, 0) });
 
             var result = await API.parseExpensePreview(images);
@@ -679,12 +639,12 @@ var Expense = (function() {
 
         // Split mode: save one entry per date
         if (_splitMode && isMultiDate) {
-            log('savePreview SPLIT', { dates: dateKeys });
+            log('savePreview SPLIT', { dates: dateKeys, editingId: _editingId });
 
             var subtotal = p.subtotal || 0;
             var extraTax = p.tax || 0;
             var extraTip = p.tip || 0;
-            var firstEntryId = null;
+            var firstEntryId = _editingId || null;
 
             for (var di = 0; di < dateKeys.length; di++) {
                 var dateKey = dateKeys[di];
@@ -715,10 +675,17 @@ var Expense = (function() {
                     })
                 };
 
-                log('savePreview SPLIT create', { date: dateKey, amount: data.amount, items: data.items.length });
-
                 try {
-                    var result = await API.createExpense(data);
+                    var result;
+                    if (di === 0 && _editingId) {
+                        // Edit mode: update current record with first group
+                        log('savePreview SPLIT update', { id: _editingId, date: dateKey, amount: data.amount });
+                        result = await API.updateExpense(_editingId, data);
+                    } else {
+                        // Create new records for remaining groups (or all if not editing)
+                        log('savePreview SPLIT create', { date: dateKey, amount: data.amount, items: data.items.length });
+                        result = await API.createExpense(data);
+                    }
                     if (!result.success) {
                         showToast(result.message || '保存失败', 'error');
                         return;
@@ -731,14 +698,18 @@ var Expense = (function() {
                 }
             }
 
-            // Attach photos to first entry
-            if (_pendingPhotos.length > 0 && firstEntryId) {
-                log('savePreview uploadPhotos', { entryId: firstEntryId, count: _pendingPhotos.length });
-                await uploadPhotos(firstEntryId, _pendingPhotos);
+            // Attach photos to first entry (current or newly created)
+            if (_photoManager.getFiles().length > 0 && firstEntryId) {
+                log('savePreview uploadPhotos', { entryId: firstEntryId, count: _photoManager.getFiles().length });
+                await uploadPhotos(firstEntryId, _photoManager.getFiles());
             }
 
             closeAddModal();
-            showToast('已拆分保存 ' + dateKeys.length + ' 条记录', 'success');
+            var splitMsg = _editingId
+                ? '已更新当前记录，另拆分新增 ' + (dateKeys.length - 1) + ' 条'
+                : '已拆分保存 ' + dateKeys.length + ' 条记录';
+            showToast(splitMsg, 'success');
+            _editingId = null;
 
             _currentDate = new Date(dateKeys[0] + 'T12:00:00');
             _period = 'day';
@@ -778,34 +749,44 @@ var Expense = (function() {
             })
         };
 
-        log('savePreview', { amount: amount, date: entryDate, notes: notes, tags: data.tags, itemCount: data.items.length });
-
-        // Check for potential duplicates on the same date
-        var isDuplicate = await checkDuplicate(amount, entryDate);
-        if (isDuplicate) {
-            log('savePreview ABORT', 'user cancelled duplicate');
-            return;
-        }
+        log('savePreview', { amount: amount, date: entryDate, notes: notes, tags: data.tags, itemCount: data.items.length, editingId: _editingId });
 
         try {
-            var result = await API.createExpense(data);
-            log('savePreview createExpense response', { success: result.success, entryId: result.entry ? result.entry.id : null, message: result.message || null });
+            var result;
+            var entryId;
+
+            if (_editingId) {
+                // Edit mode: update current record with AI-parsed data
+                result = await API.updateExpense(_editingId, data);
+                log('savePreview updateExpense response', { success: result.success, message: result.message || null });
+                entryId = _editingId;
+            } else {
+                // New mode: check duplicate then create
+                var isDuplicate = await checkDuplicate(amount, entryDate);
+                if (isDuplicate) {
+                    log('savePreview ABORT', 'user cancelled duplicate');
+                    return;
+                }
+                result = await API.createExpense(data);
+                log('savePreview createExpense response', { success: result.success, entryId: result.entry ? result.entry.id : null, message: result.message || null });
+                entryId = result.entry ? result.entry.id : null;
+            }
+
             if (!result.success) {
                 showToast(result.message || '保存失败', 'error');
                 return;
             }
 
-            var entryId = result.entry.id;
-
             // Upload photos so they're attached to this entry
-            if (_pendingPhotos.length > 0) {
-                log('savePreview uploadPhotos', { entryId: entryId, count: _pendingPhotos.length });
-                var uploadResult = await uploadPhotos(entryId, _pendingPhotos);
+            if (_photoManager.getFiles().length > 0 && entryId) {
+                log('savePreview uploadPhotos', { entryId: entryId, count: _photoManager.getFiles().length });
+                var uploadResult = await uploadPhotos(entryId, _photoManager.getFiles());
                 log('savePreview uploadPhotos result', uploadResult);
             }
 
             closeAddModal();
-            showToast('已记录', 'success');
+            showToast(_editingId ? '已更新' : '已记录', 'success');
+            _editingId = null;
 
             // Navigate to the entry's date so user can see it
             _currentDate = new Date(entryDate + 'T12:00:00');
@@ -869,7 +850,7 @@ var Expense = (function() {
         var entryDate = dateInput ? dateInput.value : formatDate(new Date());
         var notes = notesInput ? notesInput.value.trim() : '';
 
-        log('submitEntry', { amount: amount, date: entryDate, notes: notes, photoCount: _pendingPhotos.length });
+        log('submitEntry', { amount: amount, date: entryDate, notes: notes, photoCount: _photoManager.getFiles().length });
 
         // Check for potential duplicates
         var isDuplicate = await checkDuplicate(amount, entryDate);
@@ -896,8 +877,8 @@ var Expense = (function() {
             var entryId = result.entry.id;
 
             // Upload photos if any
-            if (_pendingPhotos.length > 0) {
-                var uploadResult = await uploadPhotos(entryId, _pendingPhotos);
+            if (_photoManager.getFiles().length > 0) {
+                var uploadResult = await uploadPhotos(entryId, _photoManager.getFiles());
                 log('submitEntry uploadPhotos result', uploadResult);
                 // Trigger AI parse in background
                 API.parseExpenseReceipts(entryId).catch(function(e) {
@@ -939,12 +920,9 @@ var Expense = (function() {
             var result = await API.updateExpense(_editingId, data);
             log('submitEdit response', { success: result.success, message: result.message || null });
             if (result.success) {
-                // Upload new photos if any
-                if (_pendingPhotos.length > 0) {
-                    await uploadPhotos(_editingId, _pendingPhotos);
-                    API.parseExpenseReceipts(_editingId).catch(function(e) {
-                        console.error('[expense] parseReceipts:', e);
-                    });
+                // Upload new photos if any (save only, no AI parse)
+                if (_photoManager.getFiles().length > 0) {
+                    await uploadPhotos(_editingId, _photoManager.getFiles());
                 }
                 closeAddModal();
                 showToast('已更新', 'success');
@@ -1090,7 +1068,7 @@ var Expense = (function() {
             }
             footer.innerHTML =
                 '<button class="btn btn-danger-text" onclick="Expense.deleteEntry()">删除</button>' +
-                '<button class="btn btn-primary" onclick="Expense.analyzeExisting()"' + aiGuestAttr + ' style="background:linear-gradient(135deg,#667eea,#764ba2)">阿宝分析 ✨' + aiHint + '</button>' +
+                '<button class="btn btn-primary" onclick="Expense.analyzeExisting()"' + aiGuestAttr + ' style="background:linear-gradient(135deg,#667eea,#764ba2)">二狗分析 ✨' + aiHint + '</button>' +
                 '<button class="btn btn-secondary" onclick="Expense.shareCurrentEntry()">📤</button>' +
                 '<button class="btn btn-secondary" onclick="Expense.editEntry()">编辑</button>';
         } else {
@@ -1106,7 +1084,7 @@ var Expense = (function() {
         log('analyzeExisting', _currentDetailId);
         var body = document.getElementById('expense-detail-body');
         if (body) {
-            body.innerHTML = '<div class="expense-analyzing"><div class="expense-analyzing-icon">✨</div><p class="expense-analyzing-text">阿宝正在分析照片...</p></div>';
+            body.innerHTML = '<div class="expense-analyzing"><div class="expense-analyzing-icon">✨</div><p class="expense-analyzing-text">二狗正在分析照片...</p></div>';
         }
         var footer = document.getElementById('expense-detail-footer');
         if (footer) footer.innerHTML = '';
@@ -1169,6 +1147,21 @@ var Expense = (function() {
         }
     }
 
+    async function deleteExistingPhoto(photoId, thumbEl) {
+        if (!confirm('删除这张照片？')) return;
+        try {
+            var data = await API.deleteExpensePhoto(photoId);
+            if (data.success) {
+                showToast('已删除');
+                thumbEl.remove();
+            } else {
+                showToast(data.message || '删除失败', 'error');
+            }
+        } catch (e) {
+            showToast('删除失败', 'error');
+        }
+    }
+
     function editEntry() {
         if (!_currentDetailId) return;
         // Find entry
@@ -1177,35 +1170,60 @@ var Expense = (function() {
 
         log('editEntry', _currentDetailId);
         var detail = _currentDetail; // save detail before closeDetail clears it
+        var editId = _currentDetailId; // save before closeDetail clears it
         closeDetail();
-        _editingId = _currentDetailId;
+        _editingId = editId;
         _currency = entry.currency || 'CAD';
-        _pendingPhotos = [];
+        _initPhotoManager();
         _previewData = null;
 
         var overlay = document.getElementById('expense-add-overlay');
         var amountInput = document.getElementById('expense-amount-input');
         var dateInput = document.getElementById('expense-date-input');
         var notesInput = document.getElementById('expense-notes-input');
-        var photoGrid = document.getElementById('expense-photo-grid');
 
         if (amountInput) amountInput.value = entry.amount;
         if (dateInput) dateInput.value = entry.date;
         if (notesInput) notesInput.value = entry.notes || '';
 
-        // Show existing photos as read-only thumbnails
-        if (photoGrid) {
-            photoGrid.innerHTML = '';
+        // Show existing photos with delete buttons (separate from PhotoManager)
+        var existingGrid = document.getElementById('expense-existing-photos');
+        if (existingGrid) {
+            existingGrid.innerHTML = '';
             if (detail && detail.photos && detail.photos.length > 0) {
                 detail.photos.forEach(function(photo) {
                     var photoUrl = photo.storage_path ? '/api/uploads/' + photo.storage_path.split('/uploads/').pop() : '';
                     if (photoUrl) {
                         var thumb = document.createElement('div');
-                        thumb.className = 'expense-photo-thumb expense-photo-existing';
+                        thumb.className = 'pm-thumb';
                         var img = document.createElement('img');
                         img.src = photoUrl;
+                        img.onclick = function() {
+                            var lb = document.createElement('div');
+                            lb.className = 'pm-lightbox';
+                            var lbImg = document.createElement('img');
+                            lbImg.src = photoUrl;
+                            var closeBtn = document.createElement('button');
+                            closeBtn.className = 'pm-lightbox-close';
+                            closeBtn.textContent = '\u00d7';
+                            closeBtn.onclick = function() { lb.remove(); };
+                            lb.onclick = function(e) { if (e.target === lb) lb.remove(); };
+                            lb.appendChild(lbImg);
+                            lb.appendChild(closeBtn);
+                            document.body.appendChild(lb);
+                        };
+                        var removeBtn = document.createElement('button');
+                        removeBtn.className = 'pm-remove';
+                        removeBtn.textContent = '\u00d7';
+                        removeBtn.onclick = (function(pid, el) {
+                            return function(e) {
+                                e.stopPropagation();
+                                deleteExistingPhoto(pid, el);
+                            };
+                        })(photo.id, thumb);
                         thumb.appendChild(img);
-                        photoGrid.appendChild(thumb);
+                        thumb.appendChild(removeBtn);
+                        existingGrid.appendChild(thumb);
                     }
                 });
             }

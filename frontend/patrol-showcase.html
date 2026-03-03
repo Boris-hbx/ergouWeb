@@ -1,0 +1,1268 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>二狗巡游 — 动画展台</title>
+    <link rel="stylesheet" href="assets/css/patrol.css">
+    <style>
+        :root {
+            --primary-color: #6366f1;
+            --bg: #f8f9fa;
+            --card-bg: #fff;
+            --text: #333;
+            --border: #e0e0e0;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            padding: 12px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            text-align: center;
+        }
+
+        .showcase-section {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+            border: 1px solid var(--border);
+        }
+
+        .showcase-section h2 {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: var(--primary-color);
+        }
+
+        .showcase-stage {
+            position: relative;
+            min-height: 120px;
+            border: 1px dashed var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+
+        .showcase-controls {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .showcase-btn {
+            padding: 6px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--card-bg);
+            cursor: pointer;
+            font-size: 12px;
+            color: var(--text);
+            transition: background 0.15s;
+        }
+
+        .showcase-btn:active {
+            background: var(--bg);
+        }
+
+        .showcase-btn.active {
+            background: var(--primary-color);
+            color: #fff;
+            border-color: var(--primary-color);
+        }
+
+        /* Paw rendering backgrounds */
+        .bg-white { background: #fff; }
+        .bg-text { background: #fff; padding: 12px; font-size: 14px; line-height: 1.6; }
+        .bg-color { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .bg-card {
+            background: #fff;
+            margin: 12px;
+            padding: 12px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            font-size: 13px;
+        }
+
+        /* Gait preview lanes */
+        .gait-lane {
+            position: relative;
+            height: 80px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .gait-lane:last-child { border-bottom: none; }
+
+        .gait-label {
+            position: absolute;
+            top: 4px;
+            left: 8px;
+            font-size: 11px;
+            color: #999;
+        }
+
+        /* Tab icon demo */
+        .tab-demo {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 12px;
+        }
+
+        .tab-demo-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .tab-demo-item .label {
+            font-size: 10px;
+            color: #999;
+        }
+
+        .tab-demo-icon {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            background: var(--bg);
+        }
+
+        /* Slider controls */
+        .param-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            font-size: 12px;
+        }
+
+        .param-row label {
+            min-width: 80px;
+            color: #666;
+        }
+
+        .param-row input[type="range"] {
+            flex: 1;
+        }
+
+        .param-row .param-value {
+            min-width: 40px;
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* FPS counter */
+        #fps-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0,0,0,0.85);
+            color: #0f0;
+            font-family: monospace;
+            font-size: 12px;
+            padding: 4px 16px;
+            display: flex;
+            gap: 16px;
+            z-index: 9999;
+        }
+
+        /* Device mode toggle */
+        .device-toggle {
+            display: flex;
+            gap: 0;
+            border-radius: 6px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+
+        .device-toggle button {
+            padding: 6px 16px;
+            border: none;
+            background: var(--card-bg);
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .device-toggle button.active {
+            background: var(--primary-color);
+            color: #fff;
+        }
+
+        /* State machine visualizer */
+        .state-diagram {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: center;
+        }
+
+        .state-node {
+            padding: 6px 12px;
+            border-radius: 16px;
+            border: 2px solid var(--border);
+            font-size: 12px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .state-node.current {
+            border-color: var(--primary-color);
+            background: var(--primary-color);
+            color: #fff;
+        }
+
+        /* ---- Responsive: mobile-first, single column ---- */
+
+        /* Mobile: full width, compact */
+        @media (max-width: 540px) {
+            body { padding: 8px; }
+            h1 { font-size: 18px; margin-bottom: 12px; }
+            .showcase-section { padding: 12px; margin-bottom: 12px; }
+            .showcase-stage { min-height: 100px; }
+            .param-row label { min-width: 64px; font-size: 11px; }
+        }
+
+        /* Desktop: two-column grid for side-by-side comparison */
+        @media (min-width: 768px) {
+            body { max-width: 960px; padding: 24px; }
+            .showcase-grid {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 16px;
+            }
+            .showcase-grid .full-width {
+                grid-column: 1 / -1;
+            }
+        }
+
+        /* Desktop hint banner */
+        .desktop-hint {
+            display: none;
+            background: #fffbe6;
+            border: 1px solid #ffe58f;
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: 12px;
+            color: #8c6d1f;
+            margin-bottom: 16px;
+            text-align: center;
+        }
+
+        @media (min-width: 768px) {
+            .desktop-hint { display: block; }
+        }
+    </style>
+</head>
+<body>
+
+<h1>二狗巡游动画展台</h1>
+
+<div class="desktop-hint">
+    桌面端预览模式 — 巡游系统仅移动端生效，此处用于调参和动画验证。建议用手机浏览器或 DevTools 移动模拟查看。
+</div>
+
+<!-- Section 1: Paw Rendering -->
+<div class="showcase-section">
+    <h2>1. 爪印渲染</h2>
+    <div class="showcase-stage bg-white" id="stage-render" style="height:150px">
+        <div style="position:absolute;top:8px;left:8px;font-size:11px;color:#999">白底</div>
+    </div>
+    <div class="showcase-stage bg-color" id="stage-render-color" style="height:100px">
+        <div style="position:absolute;top:8px;left:8px;font-size:11px;color:rgba(255,255,255,0.7)">彩色背景</div>
+    </div>
+    <div class="showcase-controls">
+        <button class="showcase-btn" onclick="demoPawRender()">放置爪印</button>
+        <button class="showcase-btn" onclick="clearStages()">清除</button>
+    </div>
+</div>
+
+<!-- Section 2: Landing Animation -->
+<div class="showcase-section">
+    <h2>2. 落地动画（弹性 + 涟漪）</h2>
+    <div class="showcase-stage" id="stage-land" style="height:120px"></div>
+    <div class="showcase-controls">
+        <button class="showcase-btn" onclick="demoLanding()">播放落地</button>
+    </div>
+    <div class="param-row">
+        <label>弹性时长</label>
+        <input type="range" min="50" max="500" value="150" id="param-land-dur"
+               oninput="document.getElementById('val-land-dur').textContent=this.value+'ms'">
+        <span class="param-value" id="val-land-dur">150ms</span>
+    </div>
+</div>
+
+<!-- Section 3: Evaporate Animation -->
+<div class="showcase-section">
+    <h2>3. 蒸发动画</h2>
+    <div class="showcase-stage" id="stage-evap" style="height:120px"></div>
+    <div class="showcase-controls">
+        <button class="showcase-btn" onclick="demoEvaporate()">播放蒸发</button>
+    </div>
+    <div class="param-row">
+        <label>蒸发时长</label>
+        <input type="range" min="500" max="3000" value="1500" step="100" id="param-evap-dur"
+               oninput="document.getElementById('val-evap-dur').textContent=this.value+'ms'">
+        <span class="param-value" id="val-evap-dur">1500ms</span>
+    </div>
+</div>
+
+<!-- Section 4: Gait Preview -->
+<div class="showcase-section">
+    <h2>4. 步态预览</h2>
+    <div class="showcase-stage" id="stage-gait" style="height:240px">
+        <div class="gait-lane" id="gait-slow">
+            <span class="gait-label">慢走</span>
+        </div>
+        <div class="gait-lane" id="gait-normal">
+            <span class="gait-label">快走</span>
+        </div>
+        <div class="gait-lane" id="gait-trot">
+            <span class="gait-label">小跑</span>
+        </div>
+    </div>
+    <div class="showcase-controls">
+        <button class="showcase-btn" onclick="demoGait()">播放步态</button>
+        <button class="showcase-btn" onclick="clearGait()">清除</button>
+    </div>
+    <div class="param-row">
+        <label>步幅间距</label>
+        <input type="range" min="20" max="80" value="40" id="param-stride"
+               oninput="document.getElementById('val-stride').textContent=this.value+'px'">
+        <span class="param-value" id="val-stride">40px</span>
+    </div>
+    <div class="param-row">
+        <label>左右偏移</label>
+        <input type="range" min="2" max="20" value="8" id="param-offset"
+               oninput="document.getElementById('val-offset').textContent=this.value+'px'">
+        <span class="param-value" id="val-offset">8px</span>
+    </div>
+    <div class="param-row">
+        <label>外旋角度</label>
+        <input type="range" min="0" max="20" value="10" id="param-rotate"
+               oninput="document.getElementById('val-rotate').textContent=this.value+'°'">
+        <span class="param-value" id="val-rotate">10°</span>
+    </div>
+</div>
+
+<!-- Section 5: Path & Direction Tests -->
+<div class="showcase-section">
+    <h2>5. 路径测试</h2>
+    <div class="showcase-stage" id="stage-path" style="height:300px"></div>
+    <div class="showcase-controls">
+        <button class="showcase-btn" onclick="demoPathStraight()">直线</button>
+        <button class="showcase-btn" onclick="demoPathTurn()">直角转弯</button>
+        <button class="showcase-btn" onclick="demoPathArc()">弧线</button>
+        <button class="showcase-btn" onclick="demoPathCircle()">绕圈</button>
+    </div>
+    <div class="showcase-controls" style="margin-top:6px">
+        <button class="showcase-btn" onclick="demoPathSCurve()">S 弯</button>
+        <button class="showcase-btn" onclick="demoPathZigzag()">折返</button>
+        <button class="showcase-btn" onclick="demoPathSpiral()">螺旋</button>
+        <button class="showcase-btn" onclick="clearPath()">清除</button>
+    </div>
+    <p style="font-size:11px;color:#999;margin-top:8px">灰色虚线 = 理想路径 / 爪印趾头应始终指向行进方向</p>
+</div>
+
+<!-- Section 6: Exit Animations -->
+<div class="showcase-section">
+    <h2>6. 退场动画</h2>
+    <div class="showcase-stage" id="stage-exit" style="height:150px"></div>
+    <div class="showcase-controls">
+        <button class="showcase-btn" onclick="demoExitWave()">波浪淡出</button>
+        <button class="showcase-btn" onclick="demoExitModal()">Modal 躲闪</button>
+        <button class="showcase-btn" onclick="demoExitConverge()">光弧收敛</button>
+    </div>
+</div>
+
+<!-- Section 7: Blend Mode Comparison -->
+<div class="showcase-section">
+    <h2>7. Blend Mode 对比</h2>
+    <div style="display:flex;gap:8px">
+        <div class="showcase-stage" id="stage-blend-off" style="flex:1;height:100px;background:linear-gradient(135deg,#fbc2eb,#a6c1ee)">
+            <div style="position:absolute;bottom:4px;left:8px;font-size:10px;color:#666">固定透明度</div>
+        </div>
+        <div class="showcase-stage patrol-enhanced" id="stage-blend-on" style="flex:1;height:100px;background:linear-gradient(135deg,#fbc2eb,#a6c1ee)">
+            <div style="position:absolute;bottom:4px;left:8px;font-size:10px;color:#666">soft-light</div>
+        </div>
+    </div>
+    <div class="showcase-controls" style="margin-top:8px">
+        <button class="showcase-btn" onclick="demoBlend()">放置爪印</button>
+    </div>
+</div>
+
+<!-- Section 8: Tab Icon Transition -->
+<div class="showcase-section">
+    <h2>8. Tab Icon 过渡</h2>
+    <div class="tab-demo" id="tab-demo">
+        <div class="tab-demo-item">
+            <div class="tab-demo-icon">
+                <svg class="tab-icon-patrol" id="tab-demo-icon" width="24" height="24" viewBox="0 0 24 24">
+                    <g class="paw-fill" fill="currentColor">
+                        <ellipse cx="3.8" cy="4.5" rx="1.2" ry="1.5"/><ellipse cx="6.5" cy="3.5" rx="1.1" ry="1.4"/>
+                        <ellipse cx="9" cy="4.8" rx="1" ry="1.4"/><ellipse cx="10.5" cy="7.2" rx="0.9" ry="1.2" transform="rotate(20 10.5 7.2)"/>
+                        <ellipse cx="6.6" cy="9.2" rx="3" ry="2.6" transform="rotate(-5 6.6 9.2)"/>
+                    </g>
+                    <g class="paw-fill" fill="currentColor" transform="translate(24 2) scale(-1 1)">
+                        <ellipse cx="3.8" cy="4.5" rx="1.2" ry="1.5"/><ellipse cx="6.5" cy="3.5" rx="1.1" ry="1.4"/>
+                        <ellipse cx="9" cy="4.8" rx="1" ry="1.4"/><ellipse cx="10.5" cy="7.2" rx="0.9" ry="1.2" transform="rotate(20 10.5 7.2)"/>
+                        <ellipse cx="6.6" cy="9.2" rx="3" ry="2.6" transform="rotate(-5 6.6 9.2)"/>
+                    </g>
+                    <g class="paw-stroke" fill="none" stroke="currentColor" stroke-width="0.5">
+                        <ellipse cx="3.8" cy="4.5" rx="1.2" ry="1.5"/><ellipse cx="6.5" cy="3.5" rx="1.1" ry="1.4"/>
+                        <ellipse cx="9" cy="4.8" rx="1" ry="1.4"/><ellipse cx="10.5" cy="7.2" rx="0.9" ry="1.2" transform="rotate(20 10.5 7.2)"/>
+                        <ellipse cx="6.6" cy="9.2" rx="3" ry="2.6" transform="rotate(-5 6.6 9.2)"/>
+                    </g>
+                    <g class="paw-stroke" fill="none" stroke="currentColor" stroke-width="0.5" transform="translate(24 2) scale(-1 1)">
+                        <ellipse cx="3.8" cy="4.5" rx="1.2" ry="1.5"/><ellipse cx="6.5" cy="3.5" rx="1.1" ry="1.4"/>
+                        <ellipse cx="9" cy="4.8" rx="1" ry="1.4"/><ellipse cx="10.5" cy="7.2" rx="0.9" ry="1.2" transform="rotate(20 10.5 7.2)"/>
+                        <ellipse cx="6.6" cy="9.2" rx="3" ry="2.6" transform="rotate(-5 6.6 9.2)"/>
+                    </g>
+                </svg>
+            </div>
+            <span class="label" id="tab-state-label">在家</span>
+        </div>
+    </div>
+    <div class="showcase-controls">
+        <button class="showcase-btn" onclick="tabTransition('home')">在家(实心)</button>
+        <button class="showcase-btn" onclick="tabTransition('out')">巡游(空心)</button>
+        <button class="showcase-btn" onclick="tabTransition('return')">回家中</button>
+        <button class="showcase-btn" onclick="tabTransition('pulse')">落定脉冲</button>
+    </div>
+</div>
+
+<!-- Section 8: Device Simulation -->
+<div class="showcase-section">
+    <h2>9. 设备模拟</h2>
+    <div class="device-toggle" id="device-toggle">
+        <button class="active" onclick="setDeviceMode('high')">High</button>
+        <button onclick="setDeviceMode('low')">Low</button>
+    </div>
+    <p style="font-size:12px;color:#999;margin-top:8px" id="device-info">
+        当前: high — mix-blend-mode: soft-light 启用
+    </p>
+</div>
+
+<!-- Section 9: State Machine -->
+<div class="showcase-section">
+    <h2>10. 状态机</h2>
+    <div class="state-diagram" id="state-diagram">
+        <span class="state-node current" data-state="home">home</span>
+        <span class="state-node" data-state="peek">peek</span>
+        <span class="state-node" data-state="walk">walk</span>
+        <span class="state-node" data-state="pause">pause</span>
+        <span class="state-node" data-state="rest">rest</span>
+        <span class="state-node" data-state="converge">converge</span>
+    </div>
+    <div class="showcase-controls" style="margin-top:12px">
+        <button class="showcase-btn" onclick="smEvent('idle')">idle</button>
+        <button class="showcase-btn" onclick="smEvent('peekDone')">peekDone</button>
+        <button class="showcase-btn" onclick="smEvent('click')">click</button>
+        <button class="showcase-btn" onclick="smEvent('scroll')">scroll</button>
+        <button class="showcase-btn" onclick="smEvent('modal')">modal</button>
+        <button class="showcase-btn" onclick="smEvent('abaoTab')">abaoTab</button>
+        <button class="showcase-btn" onclick="smEvent('convergeDone')">convergeDone</button>
+        <button class="showcase-btn" onclick="smEvent('walkEnd')">walkEnd</button>
+    </div>
+    <p style="font-size:12px;color:#999;margin-top:8px" id="sm-log"></p>
+</div>
+
+<!-- Section 10: Performance Benchmark -->
+<div class="showcase-section">
+    <h2>11. 性能基准</h2>
+    <p style="font-size:12px;color:#666;margin-bottom:8px">
+        自动触发 10 秒巡游（出场→行走 20 步→退场），记录帧耗时。
+    </p>
+    <div class="showcase-controls">
+        <button class="showcase-btn" onclick="runBenchmark('high')" id="bench-btn-high">Run (High)</button>
+        <button class="showcase-btn" onclick="runBenchmark('low')" id="bench-btn-low">Run (Low)</button>
+    </div>
+    <pre style="font-size:11px;color:#0f0;background:#111;padding:8px;border-radius:6px;margin-top:8px;min-height:60px;white-space:pre-wrap" id="bench-output">Ready...</pre>
+</div>
+
+<!-- Section 11: State Machine Tests -->
+<div class="showcase-section">
+    <h2>12. 状态机单元测试</h2>
+    <div class="showcase-controls">
+        <button class="showcase-btn" onclick="runStateMachineTests()">Run Tests</button>
+    </div>
+    <pre style="font-size:11px;color:#0f0;background:#111;padding:8px;border-radius:6px;margin-top:8px;min-height:60px;white-space:pre-wrap" id="test-output">Ready...</pre>
+</div>
+
+<!-- FPS Bar -->
+<div id="fps-bar">
+    <span>FPS: <span id="fps-val">--</span></span>
+    <span>Frame: <span id="frame-val">--</span>ms</span>
+    <span>Paws: <span id="paw-count">0</span>/8</span>
+</div>
+
+<div style="height:40px"></div><!-- spacer for FPS bar -->
+
+<script src="assets/js/patrol-utils.js"></script>
+<script>
+// ============================================================
+// Showcase Logic
+// ============================================================
+
+var pawSvgInline =
+    '<svg viewBox="0 0 16 16" fill="currentColor" width="100%" height="100%">' +
+    '<ellipse cx="4.2" cy="3.4" rx="1.6" ry="2"/>' +
+    '<ellipse cx="8" cy="2.2" rx="1.5" ry="1.9"/>' +
+    '<ellipse cx="11.6" cy="3.8" rx="1.4" ry="1.9"/>' +
+    '<ellipse cx="14" cy="6.8" rx="1.2" ry="1.7" transform="rotate(20 14 6.8)"/>' +
+    '<ellipse cx="8.2" cy="9" rx="4" ry="3.5" transform="rotate(-5 8.2 9)"/>' +
+    '</svg>';
+
+// Helper: create a paw element in a stage
+// heading: degrees (0=up, 90=right, 180=down, 270=left)
+function placePaw(stage, x, y, isLeft, color, extraClass, heading) {
+    var el = document.createElement('div');
+    var rot = heading || 0;
+    el.className = 'patrol-paw ' + (isLeft ? 'left' : 'right') + (extraClass ? ' ' + extraClass : '');
+    el.innerHTML = pawSvgInline;
+    el.style.position = 'absolute';
+    el.style.left = (x - 16) + 'px';
+    el.style.top = (y - 16) + 'px';
+    el.style.setProperty('--paw-mirror', isLeft ? '1' : '-1');
+    el.style.setProperty('--paw-heading', (isLeft ? rot : -rot) + 'deg');
+    if (color) el.style.color = color;
+    stage.appendChild(el);
+    return el;
+}
+
+// Section 1: Paw Rendering (walking right → heading=90)
+function demoPawRender() {
+    var s1 = document.getElementById('stage-render');
+    placePaw(s1, 60, 60, true, '#333', 'landing', 90);
+    placePaw(s1, 110, 70, false, '#333', 'landing', 90);
+    placePaw(s1, 160, 55, true, '#333', 'landing', 90);
+    placePaw(s1, 210, 65, false, '#333', 'landing', 90);
+
+    var s2 = document.getElementById('stage-render-color');
+    placePaw(s2, 60, 50, true, 'rgba(255,255,255,0.8)', 'landing', 90);
+    placePaw(s2, 120, 55, false, 'rgba(255,255,255,0.8)', 'landing', 90);
+    placePaw(s2, 180, 45, true, 'rgba(255,255,255,0.8)', 'landing', 90);
+}
+
+function clearStages() {
+    ['stage-render', 'stage-render-color'].forEach(function(id) {
+        var s = document.getElementById(id);
+        s.querySelectorAll('.patrol-paw').forEach(function(el) { el.remove(); });
+    });
+}
+
+// Section 2: Landing
+function demoLanding() {
+    var stage = document.getElementById('stage-land');
+    stage.querySelectorAll('.patrol-paw').forEach(function(el) { el.remove(); });
+
+    var dur = document.getElementById('param-land-dur').value;
+    var el = placePaw(stage, stage.offsetWidth / 2, 60, true, '#333', null, 90);
+    // Override animation duration
+    el.style.animationDuration = dur + 'ms';
+    el.classList.add('landing');
+}
+
+// Section 3: Evaporate
+function demoEvaporate() {
+    var stage = document.getElementById('stage-evap');
+    stage.querySelectorAll('.patrol-paw').forEach(function(el) { el.remove(); });
+
+    var dur = document.getElementById('param-evap-dur').value;
+    var el = placePaw(stage, stage.offsetWidth / 2, 60, true, '#333', null, 90);
+    el.style.opacity = '0.5';
+    // Start evaporate immediately
+    el.classList.add('evaporate');
+    el.style.animationDuration = dur + 'ms';
+}
+
+// Section 4: Gait
+function demoGait() {
+    clearGait();
+
+    var stride = parseInt(document.getElementById('param-stride').value);
+    var offsetY = parseInt(document.getElementById('param-offset').value);
+    var rotate = parseInt(document.getElementById('param-rotate').value);
+
+    var gaits = [
+        { id: 'gait-slow', strideMul: 0.7, offsetMul: 1.5, rotateMul: 1 },
+        { id: 'gait-normal', strideMul: 1, offsetMul: 1, rotateMul: 0.8 },
+        { id: 'gait-trot', strideMul: 1.5, offsetMul: 0.5, rotateMul: 0.5 }
+    ];
+
+    gaits.forEach(function(g) {
+        var lane = document.getElementById(g.id);
+        var laneH = lane.offsetHeight;
+        var centerY = laneH / 2;
+        var actualStride = stride * g.strideMul;
+        var actualOffset = offsetY * g.offsetMul;
+        var actualRotate = rotate * g.rotateMul;
+
+        for (var i = 0; i < 8; i++) {
+            var isLeft = i % 2 === 0;
+            var x = 50 + i * actualStride;
+            var y = centerY + (isLeft ? -actualOffset : actualOffset);
+            // heading=90 (walking right) + outward splay
+            var splay = isLeft ? -actualRotate : actualRotate;
+            var el = placePaw(lane, x, y, isLeft, '#333', 'landing', 90 + splay);
+            el.style.animationDelay = (i * 120) + 'ms';
+        }
+    });
+}
+
+function clearGait() {
+    ['gait-slow', 'gait-normal', 'gait-trot'].forEach(function(id) {
+        var lane = document.getElementById(id);
+        lane.querySelectorAll('.patrol-paw').forEach(function(el) { el.remove(); });
+    });
+}
+
+// ============================================================
+// Section 5: Path & Direction Tests
+// ============================================================
+
+// Generate points along a path, return [{x, y, heading}]
+function samplePath(pathFn, steps) {
+    var points = [];
+    for (var i = 0; i <= steps; i++) {
+        var t = i / steps;
+        var p = pathFn(t);
+        points.push(p);
+    }
+    // Compute headings from point-to-point direction
+    for (var j = 0; j < points.length; j++) {
+        if (j < points.length - 1) {
+            var dx = points[j + 1].x - points[j].x;
+            var dy = points[j + 1].y - points[j].y;
+            // atan2 gives angle from +X axis; our SVG 0° = up, so adjust
+            // heading: 0=up(-Y), 90=right(+X), 180=down(+Y), 270=left(-X)
+            points[j].heading = (Math.atan2(dy, dx) * 180 / Math.PI + 90);
+        } else {
+            points[j].heading = points[j - 1].heading;
+        }
+    }
+    return points;
+}
+
+// Draw the ideal path line as an SVG overlay
+function drawPathLine(stage, points) {
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', 'path-guide');
+    svg.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none';
+    var d = 'M ' + points.map(function(p) { return p.x + ' ' + p.y; }).join(' L ');
+    var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', d);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', '#ccc');
+    path.setAttribute('stroke-width', '1.5');
+    path.setAttribute('stroke-dasharray', '4 3');
+    svg.appendChild(path);
+    // Arrow at end
+    var last = points[points.length - 1];
+    var prev = points[points.length - 2];
+    var angle = Math.atan2(last.y - prev.y, last.x - prev.x);
+    var arrowSize = 6;
+    var ax1 = last.x - arrowSize * Math.cos(angle - 0.4);
+    var ay1 = last.y - arrowSize * Math.sin(angle - 0.4);
+    var ax2 = last.x - arrowSize * Math.cos(angle + 0.4);
+    var ay2 = last.y - arrowSize * Math.sin(angle + 0.4);
+    var arrow = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+    arrow.setAttribute('points', last.x+','+last.y+' '+ax1+','+ay1+' '+ax2+','+ay2);
+    arrow.setAttribute('fill', '#bbb');
+    svg.appendChild(arrow);
+    stage.appendChild(svg);
+}
+
+// Place paws along sampled path with stagger animation
+function walkPath(stage, points, opts) {
+    var stride = (opts && opts.stride) || 3;  // sample every N points
+    var splay = (opts && opts.splay) || 8;
+    var delay = (opts && opts.delay) || 100;
+
+    var stepIdx = 0;
+    for (var i = 0; i < points.length; i += stride) {
+        var p = points[i];
+        var isLeft = stepIdx % 2 === 0;
+        // Lateral offset perpendicular to heading
+        var offAngle = (p.heading - 90) * Math.PI / 180;
+        var lateralDist = isLeft ? -5 : 5;
+        var px = p.x + lateralDist * Math.cos(offAngle);
+        var py = p.y + lateralDist * Math.sin(offAngle);
+        var footSplay = isLeft ? -splay : splay;
+        var el = placePaw(stage, px, py, isLeft, '#333', 'landing', p.heading + footSplay);
+        el.style.animationDelay = (stepIdx * delay) + 'ms';
+        stepIdx++;
+    }
+}
+
+function clearPath() {
+    var stage = document.getElementById('stage-path');
+    stage.querySelectorAll('.patrol-paw, .path-guide').forEach(function(el) { el.remove(); });
+}
+
+// Path definitions
+function demoPathStraight() {
+    clearPath();
+    var stage = document.getElementById('stage-path');
+    var w = stage.offsetWidth, h = stage.offsetHeight;
+    var points = samplePath(function(t) {
+        return { x: 30 + t * (w - 60), y: h / 2 };
+    }, 40);
+    drawPathLine(stage, points);
+    walkPath(stage, points);
+}
+
+function demoPathTurn() {
+    clearPath();
+    var stage = document.getElementById('stage-path');
+    var w = stage.offsetWidth, h = stage.offsetHeight;
+    // Walk right, then turn down-right
+    var points = samplePath(function(t) {
+        if (t < 0.45) {
+            // Horizontal segment
+            var tt = t / 0.45;
+            return { x: 30 + tt * (w * 0.5), y: h * 0.3 };
+        } else if (t < 0.55) {
+            // Corner arc (quarter circle)
+            var ct = (t - 0.45) / 0.1;
+            var angle = -Math.PI / 2 + ct * Math.PI / 2;
+            var cx = 30 + w * 0.5, cy = h * 0.3 + 50;
+            return { x: cx + 50 * Math.cos(angle), y: cy + 50 * Math.sin(angle) };
+        } else {
+            // Vertical segment going down
+            var vt = (t - 0.55) / 0.45;
+            return { x: 30 + w * 0.5 + 50, y: h * 0.3 + 50 + vt * (h * 0.4) };
+        }
+    }, 60);
+    drawPathLine(stage, points);
+    walkPath(stage, points);
+}
+
+function demoPathArc() {
+    clearPath();
+    var stage = document.getElementById('stage-path');
+    var w = stage.offsetWidth, h = stage.offsetHeight;
+    var cx = w / 2, cy = h / 2;
+    var rx = w * 0.35, ry = h * 0.3;
+    // Half ellipse arc
+    var points = samplePath(function(t) {
+        var angle = Math.PI + t * Math.PI; // bottom half, left to right
+        return { x: cx + rx * Math.cos(angle), y: cy + ry * Math.sin(angle) };
+    }, 50);
+    drawPathLine(stage, points);
+    walkPath(stage, points);
+}
+
+function demoPathCircle() {
+    clearPath();
+    var stage = document.getElementById('stage-path');
+    var w = stage.offsetWidth, h = stage.offsetHeight;
+    var cx = w / 2, cy = h / 2;
+    var r = Math.min(w, h) * 0.3;
+    var points = samplePath(function(t) {
+        var angle = -Math.PI / 2 + t * Math.PI * 2; // full circle from top
+        return { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) };
+    }, 60);
+    drawPathLine(stage, points);
+    walkPath(stage, points, { stride: 2 });
+}
+
+function demoPathSCurve() {
+    clearPath();
+    var stage = document.getElementById('stage-path');
+    var w = stage.offsetWidth, h = stage.offsetHeight;
+    var points = samplePath(function(t) {
+        return {
+            x: 30 + t * (w - 60),
+            y: h / 2 + Math.sin(t * Math.PI * 2) * (h * 0.25)
+        };
+    }, 60);
+    drawPathLine(stage, points);
+    walkPath(stage, points);
+}
+
+function demoPathZigzag() {
+    clearPath();
+    var stage = document.getElementById('stage-path');
+    var w = stage.offsetWidth, h = stage.offsetHeight;
+    var segs = 4;
+    var points = samplePath(function(t) {
+        var seg = Math.floor(t * segs);
+        var st = (t * segs) - seg;
+        var goingRight = seg % 2 === 0;
+        var xStart = goingRight ? 30 : w - 30;
+        var xEnd = goingRight ? w - 30 : 30;
+        var yBase = 40 + (seg / segs) * (h - 80);
+        var yNext = 40 + ((seg + 1) / segs) * (h - 80);
+        return {
+            x: xStart + st * (xEnd - xStart),
+            y: yBase + st * (yNext - yBase)
+        };
+    }, 80);
+    drawPathLine(stage, points);
+    walkPath(stage, points, { stride: 2, delay: 60 });
+}
+
+function demoPathSpiral() {
+    clearPath();
+    var stage = document.getElementById('stage-path');
+    var w = stage.offsetWidth, h = stage.offsetHeight;
+    var cx = w / 2, cy = h / 2;
+    var maxR = Math.min(w, h) * 0.38;
+    var turns = 2.5;
+    var points = samplePath(function(t) {
+        var angle = t * Math.PI * 2 * turns - Math.PI / 2;
+        var r = maxR * (1 - t * 0.8);
+        return { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) };
+    }, 80);
+    drawPathLine(stage, points);
+    walkPath(stage, points, { stride: 2, delay: 50 });
+}
+
+// Section 6: Exit Animations
+function demoExitWave() {
+    var stage = document.getElementById('stage-exit');
+    stage.querySelectorAll('.patrol-paw').forEach(function(el) { el.remove(); });
+
+    // Place some paws first (walking right → heading=90)
+    var paws = [];
+    for (var i = 0; i < 5; i++) {
+        var el = placePaw(stage, 40 + i * 55, 60 + (i % 2) * 20, i % 2 === 0, '#333', 'landing', 90);
+        paws.push(el);
+    }
+
+    // Wave fade after a moment
+    setTimeout(function() {
+        paws.reverse().forEach(function(el, idx) {
+            setTimeout(function() {
+                el.style.transition = 'opacity 0.15s ease-out, transform 0.15s ease-out';
+                el.style.opacity = '0';
+                el.style.transform = el.style.transform + ' scale(0.8)';
+            }, idx * 50);
+        });
+    }, 600);
+}
+
+function demoExitModal() {
+    var stage = document.getElementById('stage-exit');
+    stage.querySelectorAll('.patrol-paw').forEach(function(el) { el.remove(); });
+
+    var paws = [];
+    for (var i = 0; i < 3; i++) {
+        var el = placePaw(stage, 80 + i * 60, 60 + (i % 2) * 15, i % 2 === 0, '#333', 'landing', 90);
+        paws.push(el);
+    }
+
+    setTimeout(function() {
+        paws.forEach(function(el) {
+            el.style.transition = 'opacity 0.2s ease-out, transform 0.2s ease-out';
+            el.style.transform = el.style.transform + ' translateX(-8px)';
+            el.style.opacity = '0';
+        });
+    }, 600);
+}
+
+function demoExitConverge() {
+    var stage = document.getElementById('stage-exit');
+    stage.querySelectorAll('.patrol-paw, .patrol-arc').forEach(function(el) { el.remove(); });
+
+    var paws = [];
+    for (var i = 0; i < 4; i++) {
+        var el = placePaw(stage, 40 + i * 60, 50 + (i % 2) * 20, i % 2 === 0, '#333', 'landing', 90);
+        paws.push(el);
+    }
+
+    var targetX = stage.offsetWidth - 30;
+    var targetY = stage.offsetHeight - 20;
+
+    setTimeout(function() {
+        // Fade paws
+        paws.forEach(function(el) {
+            el.style.transition = 'opacity 0.15s ease-out';
+            el.style.opacity = '0';
+        });
+
+        // Light arc
+        var arc = document.createElement('div');
+        arc.className = 'patrol-arc';
+        arc.style.left = paws[paws.length - 1].style.left;
+        arc.style.top = paws[paws.length - 1].style.top;
+        arc.style.width = '6px';
+        arc.style.height = '6px';
+        arc.style.background = '#6366f1';
+        arc.style.opacity = '0.8';
+        stage.appendChild(arc);
+
+        // Animate arc to target
+        arc.style.transition = 'all 0.4s cubic-bezier(0.2, 0, 0, 1)';
+        requestAnimationFrame(function() {
+            arc.style.left = targetX + 'px';
+            arc.style.top = targetY + 'px';
+            arc.style.opacity = '0';
+            arc.style.transform = 'scale(0)';
+        });
+    }, 600);
+}
+
+// Section 6: Blend
+function demoBlend() {
+    ['stage-blend-off', 'stage-blend-on'].forEach(function(id) {
+        var stage = document.getElementById(id);
+        stage.querySelectorAll('.patrol-paw').forEach(function(el) { el.remove(); });
+        placePaw(stage, 40, 50, true, 'rgba(0,0,0,0.6)', 'landing', 90);
+        placePaw(stage, 85, 55, false, 'rgba(0,0,0,0.6)', 'landing', 90);
+    });
+}
+
+// Section 7: Tab Icon
+function tabTransition(state) {
+    var icon = document.getElementById('tab-demo-icon');
+    var label = document.getElementById('tab-state-label');
+
+    // Clear all state classes
+    icon.classList.remove('patrol-out', 'patrol-returning', 'patrol-pulse', 'patrol-breathing', 'patrol-bounce');
+
+    switch (state) {
+        case 'home':
+            label.textContent = '在家 (实心)';
+            break;
+        case 'out':
+            icon.classList.add('patrol-out');
+            label.textContent = '巡游中 (空心)';
+            break;
+        case 'return':
+            icon.classList.add('patrol-returning');
+            label.textContent = '回家中';
+            break;
+        case 'pulse':
+            icon.classList.add('patrol-pulse');
+            label.textContent = '落定脉冲';
+            break;
+    }
+}
+
+// Section 8: Device Mode
+var currentDeviceMode = 'high';
+
+function setDeviceMode(mode) {
+    currentDeviceMode = mode;
+    var btns = document.querySelectorAll('#device-toggle button');
+    btns.forEach(function(b) { b.classList.remove('active'); });
+    btns[mode === 'high' ? 0 : 1].classList.add('active');
+
+    var info = document.getElementById('device-info');
+    if (mode === 'high') {
+        info.textContent = '当前: high — mix-blend-mode: soft-light 启用';
+        document.body.classList.remove('patrol-low-device');
+    } else {
+        info.textContent = '当前: low — 固定透明度，无 blend mode';
+        document.body.classList.add('patrol-low-device');
+    }
+}
+
+// Section 9: State Machine
+var sm = PatrolStateMachine.create({
+    onStateChange: function(from, to, event) {
+        // Update diagram
+        document.querySelectorAll('#state-diagram .state-node').forEach(function(n) {
+            n.classList.toggle('current', n.dataset.state === to);
+        });
+        // Log
+        document.getElementById('sm-log').textContent =
+            from + ' → ' + to + ' (event: ' + event + ')';
+    }
+});
+
+function smEvent(event) {
+    var ok = sm.transition(event);
+    if (!ok) {
+        document.getElementById('sm-log').textContent =
+            '无效: ' + sm.state + ' + ' + event + ' → 无转换';
+    }
+}
+
+// ============================================================
+// FPS Counter
+// ============================================================
+var fpsSamples = [];
+var lastFrameTime = performance.now();
+
+function updateFPS(now) {
+    var delta = now - lastFrameTime;
+    lastFrameTime = now;
+    fpsSamples.push(delta);
+    if (fpsSamples.length > 60) fpsSamples.shift();
+
+    if (fpsSamples.length >= 10) {
+        var avg = fpsSamples.reduce(function(a, b) { return a + b; }, 0) / fpsSamples.length;
+        document.getElementById('fps-val').textContent = Math.round(1000 / avg);
+        document.getElementById('frame-val').textContent = avg.toFixed(1);
+    }
+
+    requestAnimationFrame(updateFPS);
+}
+
+requestAnimationFrame(updateFPS);
+
+// ============================================================
+// Section 10: Performance Benchmark
+// ============================================================
+
+function runBenchmark(mode) {
+    var out = document.getElementById('bench-output');
+    out.textContent = 'Running benchmark (' + mode + ')...\n';
+
+    // Create a temporary stage
+    var benchLayer = document.createElement('div');
+    benchLayer.id = 'patrol-layer';
+    if (mode === 'high') benchLayer.classList.add('patrol-enhanced');
+    document.body.appendChild(benchLayer);
+
+    var pool = PawPool.create({
+        container: benchLayer,
+        size: 8
+    });
+
+    var samples = [];
+    var stepCount = 0;
+    var maxSteps = 20;
+    var startTime = performance.now();
+
+    function benchStep(now) {
+        var frameStart = performance.now();
+
+        if (stepCount < maxSteps) {
+            var x = 30 + (stepCount * 20) % 350;
+            var y = 100 + (stepCount % 2) * 15 + Math.random() * 50;
+            var isLeft = stepCount % 2 === 0;
+            pool.step(x, y, isLeft, mode === 'high' ? null : '#333', 90);
+            stepCount++;
+        }
+
+        var frameEnd = performance.now();
+        samples.push(frameEnd - frameStart);
+
+        if (performance.now() - startTime < 10000) {
+            requestAnimationFrame(benchStep);
+        } else {
+            // Done — compute results
+            pool.destroy();
+            benchLayer.remove();
+            showBenchResults(mode, samples, out);
+        }
+    }
+
+    requestAnimationFrame(benchStep);
+}
+
+function showBenchResults(mode, samples, out) {
+    samples.sort(function(a, b) { return a - b; });
+    var total = samples.length;
+    var sum = samples.reduce(function(a, b) { return a + b; }, 0);
+    var avg = sum / total;
+    var p95 = samples[Math.floor(total * 0.95)];
+    var p99 = samples[Math.floor(total * 0.99)];
+    var overBudget = samples.filter(function(s) { return s > 1; }).length;
+    var overPct = ((overBudget / total) * 100).toFixed(1);
+
+    var pass = p99 < 2 && parseFloat(overPct) < 5;
+
+    out.textContent =
+        'Mode: ' + mode + '\n' +
+        'Frames: ' + total + '\n' +
+        'Avg: ' + avg.toFixed(3) + 'ms\n' +
+        'P95: ' + p95.toFixed(3) + 'ms\n' +
+        'P99: ' + p99.toFixed(3) + 'ms\n' +
+        'Over 1ms: ' + overBudget + ' (' + overPct + '%)\n' +
+        '---\n' +
+        'Result: ' + (pass ? 'PASS' : 'FAIL') + '\n' +
+        '  p99 < 2ms: ' + (p99 < 2 ? 'YES' : 'NO (' + p99.toFixed(3) + 'ms)') + '\n' +
+        '  over-budget < 5%: ' + (parseFloat(overPct) < 5 ? 'YES' : 'NO (' + overPct + '%)');
+
+    out.style.color = pass ? '#0f0' : '#f44';
+}
+
+// ============================================================
+// Section 11: State Machine Unit Tests
+// ============================================================
+
+function runStateMachineTests() {
+    var out = document.getElementById('test-output');
+    var results = [];
+    var passed = 0;
+    var failed = 0;
+
+    function assert(name, condition) {
+        if (condition) {
+            results.push('  PASS  ' + name);
+            passed++;
+        } else {
+            results.push('  FAIL  ' + name);
+            failed++;
+        }
+    }
+
+    // Test 1: Normal cycle — home → peek → walk → home
+    (function() {
+        var log = [];
+        var s = PatrolStateMachine.create({
+            onStateChange: function(from, to, evt) { log.push(from + '→' + to); }
+        });
+        assert('initial state is home', s.state === 'home');
+        s.transition('idle');
+        assert('home + idle → peek', s.state === 'peek');
+        s.transition('peekDone');
+        assert('peek + peekDone → walk', s.state === 'walk');
+        s.transition('click');
+        assert('walk + click → home', s.state === 'home');
+    })();
+
+    // Test 2: Walk + scroll → home
+    (function() {
+        var s = PatrolStateMachine.create({ onStateChange: function() {} });
+        s.transition('idle');
+        s.transition('peekDone');
+        assert('walk state reached', s.state === 'walk');
+        s.transition('scroll');
+        assert('walk + scroll → home', s.state === 'home');
+    })();
+
+    // Test 3: Walk + modal → home
+    (function() {
+        var s = PatrolStateMachine.create({ onStateChange: function() {} });
+        s.transition('idle');
+        s.transition('peekDone');
+        s.transition('modal');
+        assert('walk + modal → home', s.state === 'home');
+    })();
+
+    // Test 4: Walk + abaoTab → converge → home
+    (function() {
+        var s = PatrolStateMachine.create({ onStateChange: function() {} });
+        s.transition('idle');
+        s.transition('peekDone');
+        s.transition('abaoTab');
+        assert('walk + abaoTab → converge', s.state === 'converge');
+        s.transition('convergeDone');
+        assert('converge + convergeDone → home', s.state === 'home');
+    })();
+
+    // Test 5: Peek + click → home
+    (function() {
+        var s = PatrolStateMachine.create({ onStateChange: function() {} });
+        s.transition('idle');
+        assert('peek reached', s.state === 'peek');
+        s.transition('click');
+        assert('peek + click → home', s.state === 'home');
+    })();
+
+    // Test 6: Peek + scroll → home
+    (function() {
+        var s = PatrolStateMachine.create({ onStateChange: function() {} });
+        s.transition('idle');
+        s.transition('scroll');
+        assert('peek + scroll → home', s.state === 'home');
+    })();
+
+    // Test 7: Walk → pause → walk
+    (function() {
+        var s = PatrolStateMachine.create({ onStateChange: function() {} });
+        s.transition('idle');
+        s.transition('peekDone');
+        s.transition('walkEnd');
+        assert('walk + walkEnd → pause', s.state === 'pause');
+        s.transition('pauseTimeout');
+        assert('pause + pauseTimeout → walk', s.state === 'walk');
+    })();
+
+    // Test 8: Pause → rest → walk
+    (function() {
+        var s = PatrolStateMachine.create({ onStateChange: function() {} });
+        s.transition('idle');
+        s.transition('peekDone');
+        s.transition('walkEnd');
+        s.transition('restTimeout');
+        assert('pause + restTimeout → rest', s.state === 'rest');
+        s.transition('idle');
+        assert('rest + idle → walk', s.state === 'walk');
+    })();
+
+    // Test 9: Rest + click → home
+    (function() {
+        var s = PatrolStateMachine.create({ onStateChange: function() {} });
+        s.transition('idle');
+        s.transition('peekDone');
+        s.transition('walkEnd');
+        s.transition('restTimeout');
+        assert('rest reached', s.state === 'rest');
+        s.transition('click');
+        assert('rest + click → home', s.state === 'home');
+    })();
+
+    // Test 10: Invalid transitions return false
+    (function() {
+        var s = PatrolStateMachine.create({ onStateChange: function() {} });
+        var r = s.transition('peekDone');
+        assert('home + peekDone → invalid (false)', r === false);
+        assert('state unchanged after invalid', s.state === 'home');
+    })();
+
+    // Test 11: canPatrol
+    (function() {
+        var s = PatrolStateMachine.create({ onStateChange: function() {} });
+        assert('home → canPatrol=false', s.canPatrol === false);
+        s.transition('idle');
+        assert('peek → canPatrol=true', s.canPatrol === true);
+        s.transition('peekDone');
+        assert('walk → canPatrol=true', s.canPatrol === true);
+        s.transition('abaoTab');
+        assert('converge → canPatrol=false', s.canPatrol === false);
+    })();
+
+    // Test 12: forceState
+    (function() {
+        var log = [];
+        var s = PatrolStateMachine.create({
+            onStateChange: function(from, to, evt) { log.push(evt); }
+        });
+        s.forceState('walk');
+        assert('forceState to walk', s.state === 'walk');
+        assert('forceState event is "force"', log[0] === 'force');
+    })();
+
+    // Test 13: reset
+    (function() {
+        var log = [];
+        var s = PatrolStateMachine.create({
+            onStateChange: function(from, to, evt) { log.push(evt); }
+        });
+        s.forceState('walk');
+        s.reset();
+        assert('reset → home', s.state === 'home');
+        assert('reset event is "reset"', log[1] === 'reset');
+    })();
+
+    // Summary
+    var summary = '\nState Machine Tests: ' + passed + '/' + (passed + failed) + ' passed';
+    out.textContent = results.join('\n') + '\n' + summary;
+    out.style.color = failed === 0 ? '#0f0' : '#f44';
+}
+</script>
+
+</body>
+</html>

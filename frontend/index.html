@@ -8,13 +8,14 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Next">
     <title>Next - Focus on the Right Thing</title>
-    <link rel="stylesheet" href="assets/css/base.css?v=20260302h">
-    <link rel="stylesheet" href="assets/css/style.css?v=20260302h">
-    <link rel="stylesheet" href="assets/css/components.css?v=20260302h">
-    <link rel="stylesheet" href="assets/css/mobile.css?v=20260302h">
-    <link rel="stylesheet" href="assets/css/abao.css?v=20260302h">
-    <link rel="stylesheet" href="assets/css/english.css?v=20260302h">
-    <link rel="stylesheet" href="assets/css/health.css?v=20260302h">
+    <link rel="stylesheet" href="assets/css/base.css?v=20260302s">
+    <link rel="stylesheet" href="assets/css/style.css?v=20260302s">
+    <link rel="stylesheet" href="assets/css/components.css?v=20260302s">
+    <link rel="stylesheet" href="assets/css/mobile.css?v=20260302s">
+    <link rel="stylesheet" href="assets/css/abao.css?v=20260302s">
+    <link rel="stylesheet" href="assets/css/english.css?v=20260302s">
+    <link rel="stylesheet" href="assets/css/health.css?v=20260302s">
+    <link rel="stylesheet" href="assets/css/patrol.css?v=20260302s">
     <link rel="manifest" href="assets/manifest.json">
     <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
     <script>
@@ -65,7 +66,7 @@
                 </div>
                 <div class="avatar-menu" id="avatar-menu">
                     <a class="avatar-menu-item avatar-menu-desktop-only" onclick="Abao.toggle(); closeAvatarMenu()">
-                        <span>🐾</span> 问二狗
+                        <span><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="vertical-align:-2px"><ellipse cx="4.2" cy="3.4" rx="1.6" ry="2"/><ellipse cx="8" cy="2.2" rx="1.5" ry="1.9"/><ellipse cx="11.6" cy="3.8" rx="1.4" ry="1.9"/><ellipse cx="14" cy="6.8" rx="1.2" ry="1.7" transform="rotate(20 14 6.8)"/><ellipse cx="8.2" cy="9" rx="4" ry="3.5" transform="rotate(-5 8.2 9)"/></svg></span> 问二狗
                     </a>
                     <a class="avatar-menu-item" onclick="switchPage('settings'); closeAvatarMenu()">
                         <span>⚙</span> 设置
@@ -172,7 +173,7 @@
             <span class="about-version" onclick="copyVersion()" title="点击复制版本号">
                 Version 1.2.0 · 2026.2.10
             </span>
-            <div class="about-copyright">© 2026 Baoxing Huai 00827228<br>Huaibaoxing@huawei.com</div>
+            <div class="about-copyright">&copy; 2026 Baoxing Huai<br>baoxing2391@163.com</div>
         </div>
     </div>
 
@@ -421,6 +422,63 @@
                         <div class="avatar-preset" data-avatar="preset:panda" onclick="selectPresetAvatar(this)">
                             <img src="assets/images/preset-panda.png" alt="Panda">
                         </div>
+                        <div class="avatar-preset" data-avatar="preset:boris" onclick="selectPresetAvatar(this)">
+                            <img src="assets/images/preset-boris.png" alt="Boris">
+                        </div>
+                        <div class="avatar-preset" data-avatar="preset:shiba" onclick="selectPresetAvatar(this)">
+                            <img src="assets/images/preset-shiba.png" alt="Shiba">
+                        </div>
+                        <div class="avatar-preset" data-avatar="preset:catpaw" onclick="selectPresetAvatar(this)">
+                            <img src="assets/images/preset-catpaw.png" alt="Cat Paw">
+                        </div>
+                        <div class="avatar-preset" data-avatar="preset:whitecat" onclick="selectPresetAvatar(this)">
+                            <img src="assets/images/preset-whitecat.png" alt="White Cat">
+                        </div>
+                        <div class="avatar-preset" data-avatar="preset:emoji-ball" onclick="selectPresetAvatar(this)">
+                            <img src="assets/images/preset-emoji-ball.png" alt="Emoji Ball">
+                        </div>
+                        <div class="avatar-preset" data-avatar="preset:pandaman" onclick="selectPresetAvatar(this)">
+                            <img src="assets/images/preset-pandaman.png" alt="Panda Man">
+                        </div>
+                        <div class="avatar-preset" data-avatar="preset:samoyed" onclick="selectPresetAvatar(this)">
+                            <img src="assets/images/preset-samoyed.png" alt="Samoyed">
+                        </div>
+                        <div class="avatar-preset" data-avatar="preset:cartooncat" onclick="selectPresetAvatar(this)">
+                            <img src="assets/images/preset-cartooncat.png" alt="Cartoon Cat">
+                        </div>
+                        <div class="avatar-preset" data-avatar="preset:pandatea" onclick="selectPresetAvatar(this)">
+                            <img src="assets/images/preset-pandatea.png" alt="Panda Tea">
+                        </div>
+                        <div class="avatar-preset" data-avatar="preset:backview" onclick="selectPresetAvatar(this)">
+                            <img src="assets/images/preset-backview.png" alt="Back View">
+                        </div>
+                        <div class="avatar-preset" data-avatar="preset:cutecat" onclick="selectPresetAvatar(this)">
+                            <img src="assets/images/preset-cutecat.png" alt="Cute Cat">
+                        </div>
+                        <div class="avatar-preset" data-avatar="preset:hamster" onclick="selectPresetAvatar(this)">
+                            <img src="assets/images/preset-hamster.png" alt="Hamster">
+                        </div>
+                        <div class="avatar-preset" data-avatar="preset:bunny" onclick="selectPresetAvatar(this)">
+                            <img src="assets/images/preset-bunny.png" alt="Bunny">
+                        </div>
+                        <div class="avatar-preset" data-avatar="preset:shibapair" onclick="selectPresetAvatar(this)">
+                            <img src="assets/images/preset-shibapair.png" alt="Shiba Pair">
+                        </div>
+                        <div class="avatar-preset" data-avatar="preset:tangping" onclick="selectPresetAvatar(this)">
+                            <img src="assets/images/preset-tangping.png" alt="Tang Ping">
+                        </div>
+                        <div class="avatar-preset" data-avatar="preset:doge" onclick="selectPresetAvatar(this)">
+                            <img src="assets/images/preset-doge.png" alt="Doge">
+                        </div>
+                        <div class="avatar-preset" data-avatar="preset:shibarest" onclick="selectPresetAvatar(this)">
+                            <img src="assets/images/preset-shibarest.png" alt="Shiba Rest">
+                        </div>
+                        <div class="avatar-preset" data-avatar="preset:shibaflower" onclick="selectPresetAvatar(this)">
+                            <img src="assets/images/preset-shibaflower.png" alt="Shiba Flower">
+                        </div>
+                        <div class="avatar-preset" data-avatar="preset:cheems" onclick="selectPresetAvatar(this)">
+                            <img src="assets/images/preset-cheems.png" alt="Cheems">
+                        </div>
                         <div class="avatar-preset" data-avatar="color:blue" onclick="selectPresetAvatar(this)">
                             <span class="avatar-color-preview" style="background:linear-gradient(135deg,#667eea,#764ba2)"></span>
                         </div>
@@ -443,12 +501,12 @@
             <!-- 账户信息 -->
             <div class="settings-section">
                 <h4>账户信息</h4>
-                <div class="setting-group">
+                <div class="setting-group-inline">
                     <label>用户名</label>
                     <div class="settings-value" id="settings-username">--</div>
                 </div>
-                <div class="setting-group">
-                    <label>显示名称</label>
+                <div class="setting-group-inline">
+                    <label>昵称</label>
                     <div class="settings-value" id="settings-display-name">--</div>
                 </div>
             </div>
@@ -514,6 +572,16 @@
             <!-- 二狗设置 -->
             <div class="settings-section" id="settings-ergou-section">
                 <h4>二狗设置</h4>
+                <div class="setting-group" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                    <div>
+                        <label>二狗巡游</label>
+                        <div class="setting-desc" style="margin:0;font-size:12px;color:var(--text-muted)">让二狗在页面上留下爪印</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="patrol-toggle" onchange="togglePatrol(this.checked)">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
                 <p class="setting-desc">设置二狗的时区，影响提醒和时间感知</p>
                 <div class="ai-model-options" id="timezone-options">
                     <button class="ai-model-btn active" data-tz="America/Toronto" onclick="selectTimezone('America/Toronto')">
@@ -529,6 +597,15 @@
                         <span class="ai-model-desc">北京时间 (CST)</span>
                     </button>
                 </div>
+            </div>
+            <!-- 二狗的记忆 -->
+            <div class="settings-section" id="settings-memory-section">
+                <h4>二狗的记忆</h4>
+                <p class="setting-desc">二狗在聊天中记住的关于你的信息，你可以随时查看和删除</p>
+                <div id="memory-list" class="memory-list">
+                    <div class="memory-loading">加载中...</div>
+                </div>
+                <button class="btn btn-danger" id="clear-all-memories-btn" style="display:none;margin-top:12px;width:100%" onclick="deleteAllMemories()">清空所有记忆</button>
             </div>
             <!-- 推送通知 -->
             <div class="settings-section">
@@ -1166,7 +1243,7 @@
             <span class="mobile-nav-label">例行</span>
         </a>
         <a class="mobile-nav-item mobile-nav-abao" id="mobile-nav-abao">
-            <span class="mobile-nav-icon">🐾</span>
+            <span class="mobile-nav-icon"><svg class="tab-icon-patrol" id="abao-tab-icon" width="22" height="22" viewBox="0 0 24 24"><g class="paw-fill" fill="currentColor"><ellipse cx="3.8" cy="4.5" rx="1.2" ry="1.5"/><ellipse cx="6.5" cy="3.5" rx="1.1" ry="1.4"/><ellipse cx="9" cy="4.8" rx="1" ry="1.4"/><ellipse cx="10.5" cy="7.2" rx="0.9" ry="1.2" transform="rotate(20 10.5 7.2)"/><ellipse cx="6.6" cy="9.2" rx="3" ry="2.6" transform="rotate(-5 6.6 9.2)"/></g><g class="paw-fill" fill="currentColor" transform="translate(24 2) scale(-1 1)"><ellipse cx="3.8" cy="4.5" rx="1.2" ry="1.5"/><ellipse cx="6.5" cy="3.5" rx="1.1" ry="1.4"/><ellipse cx="9" cy="4.8" rx="1" ry="1.4"/><ellipse cx="10.5" cy="7.2" rx="0.9" ry="1.2" transform="rotate(20 10.5 7.2)"/><ellipse cx="6.6" cy="9.2" rx="3" ry="2.6" transform="rotate(-5 6.6 9.2)"/></g><g class="paw-stroke" fill="none" stroke="currentColor" stroke-width="0.5"><ellipse cx="3.8" cy="4.5" rx="1.2" ry="1.5"/><ellipse cx="6.5" cy="3.5" rx="1.1" ry="1.4"/><ellipse cx="9" cy="4.8" rx="1" ry="1.4"/><ellipse cx="10.5" cy="7.2" rx="0.9" ry="1.2" transform="rotate(20 10.5 7.2)"/><ellipse cx="6.6" cy="9.2" rx="3" ry="2.6" transform="rotate(-5 6.6 9.2)"/></g><g class="paw-stroke" fill="none" stroke="currentColor" stroke-width="0.5" transform="translate(24 2) scale(-1 1)"><ellipse cx="3.8" cy="4.5" rx="1.2" ry="1.5"/><ellipse cx="6.5" cy="3.5" rx="1.1" ry="1.4"/><ellipse cx="9" cy="4.8" rx="1" ry="1.4"/><ellipse cx="10.5" cy="7.2" rx="0.9" ry="1.2" transform="rotate(20 10.5 7.2)"/><ellipse cx="6.6" cy="9.2" rx="3" ry="2.6" transform="rotate(-5 6.6 9.2)"/></g></svg></span>
             <span class="mobile-nav-label">二狗</span>
         </a>
         <a class="mobile-nav-item" data-page="english" onclick="switchPage('english'); activateMobileNav(this)">
@@ -1193,13 +1270,13 @@
         <div class="abao-header" id="abao-header">
             <div class="abao-drag-bar">
                 <div class="abao-bar-identity">
-                    <div class="abao-mini-avatar">🐾</div>
+                    <div class="abao-mini-avatar"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><ellipse cx="4.2" cy="3.4" rx="1.6" ry="2"/><ellipse cx="8" cy="2.2" rx="1.5" ry="1.9"/><ellipse cx="11.6" cy="3.8" rx="1.4" ry="1.9"/><ellipse cx="14" cy="6.8" rx="1.2" ry="1.7" transform="rotate(20 14 6.8)"/><ellipse cx="8.2" cy="9" rx="4" ry="3.5" transform="rotate(-5 8.2 9)"/></svg></div>
                     <span class="abao-mini-name">二狗</span>
                 </div>
                 <div class="abao-bar-handle"><span></span></div>
             </div>
             <div class="abao-header-left">
-                <div class="abao-avatar">🐾</div>
+                <div class="abao-avatar"><svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><ellipse cx="4.2" cy="3.4" rx="1.6" ry="2"/><ellipse cx="8" cy="2.2" rx="1.5" ry="1.9"/><ellipse cx="11.6" cy="3.8" rx="1.4" ry="1.9"/><ellipse cx="14" cy="6.8" rx="1.2" ry="1.7" transform="rotate(20 14 6.8)"/><ellipse cx="8.2" cy="9" rx="4" ry="3.5" transform="rotate(-5 8.2 9)"/></svg></div>
                 <span class="abao-header-title">二狗</span>
                 <span class="abao-header-status">· 在线</span>
             </div>
@@ -1241,34 +1318,38 @@
     </div>
 
     <!-- JS Modules -->
-    <script src="assets/js/api.js?v=20260302h"></script>
-    <script src="assets/js/utils.js?v=20260302h"></script>
-    <script src="assets/js/jelly-indicator.js?v=20260302h"></script>
-    <script src="assets/js/app.js?v=20260302h"></script>
-    <script src="assets/js/tasks.js?v=20260302h"></script>
-    <script src="assets/js/modal.js?v=20260302h"></script>
-    <script src="assets/js/datepicker.js?v=20260302h"></script>
-    <script src="assets/js/drag.js?v=20260302h"></script>
-    <script src="assets/js/actionsheet.js?v=20260302h"></script>
-    <script src="assets/js/share-modal.js?v=20260302h"></script>
-    <script src="assets/js/review.js?v=20260302h"></script>
-    <script src="assets/js/routines.js?v=20260302h"></script>
-    <script src="assets/js/features.js?v=20260302h"></script>
-    <script src="assets/js/particles.js?v=20260302h"></script>
-    <script src="assets/js/living-line.js?v=20260302h"></script>
-    <script src="assets/js/abao.js?v=20260302h"></script>
-    <script src="assets/js/english.js?v=20260302h"></script>
-    <script src="assets/js/life.js?v=20260302h"></script>
-    <script src="assets/js/expense.js?v=20260302h"></script>
-    <script src="assets/js/expense-analytics.js?v=20260302h"></script>
-    <script src="assets/js/trip.js?v=20260302h"></script>
-    <script src="assets/js/health-data.js?v=20260302h"></script>
-    <script src="assets/js/health-renderer.js?v=20260302h"></script>
-    <script src="assets/js/health.js?v=20260302h"></script>
-    <script src="assets/js/friends.js?v=20260302h"></script>
-    <script src="assets/js/notifications.js?v=20260302h"></script>
-    <script src="assets/js/settings.js?v=20260302h"></script>
-    <script src="assets/js/admin.js?v=20260302h"></script>
+    <script src="assets/js/api.js?v=20260302s"></script>
+    <script src="assets/js/utils.js?v=20260302s"></script>
+    <script src="assets/js/jelly-indicator.js?v=20260302s"></script>
+    <script src="assets/js/app.js?v=20260302s"></script>
+    <script src="assets/js/tasks.js?v=20260302s"></script>
+    <script src="assets/js/modal.js?v=20260302s"></script>
+    <script src="assets/js/datepicker.js?v=20260302s"></script>
+    <script src="assets/js/drag.js?v=20260302s"></script>
+    <script src="assets/js/actionsheet.js?v=20260302s"></script>
+    <script src="assets/js/share-modal.js?v=20260302s"></script>
+    <script src="assets/js/review.js?v=20260302s"></script>
+    <script src="assets/js/routines.js?v=20260302s"></script>
+    <script src="assets/js/features.js?v=20260302s"></script>
+    <script src="assets/js/particles.js?v=20260302s"></script>
+    <script src="assets/js/living-line.js?v=20260302s"></script>
+    <script src="assets/js/abao.js?v=20260302s"></script>
+    <script src="assets/js/english.js?v=20260302s"></script>
+    <script src="assets/js/life.js?v=20260302s"></script>
+    <script src="assets/js/expense.js?v=20260302s"></script>
+    <script src="assets/js/expense-analytics.js?v=20260302s"></script>
+    <script src="assets/js/trip.js?v=20260302s"></script>
+    <script src="assets/js/health-data.js?v=20260302s"></script>
+    <script src="assets/js/health-renderer.js?v=20260302s"></script>
+    <script src="assets/js/health.js?v=20260302s"></script>
+    <script src="assets/js/friends.js?v=20260302s"></script>
+    <script src="assets/js/notifications.js?v=20260302s"></script>
+    <script src="assets/js/settings.js?v=20260302s"></script>
+    <script src="assets/js/admin.js?v=20260302s"></script>
+    <script src="assets/js/patrol-utils.js?v=20260302s"></script>
+    <script src="assets/js/patrol-terrain.js?v=20260302s"></script>
+    <script src="assets/js/patrol-debug.js?v=20260302s"></script>
+    <script src="assets/js/patrol.js?v=20260302s"></script>
 
     <script>
     // Initialize
@@ -1285,6 +1366,11 @@
             Friends.loadSharedInbox();
         }
     }, 2500);
+
+    // 巡游系统初始化（仅移动端 + 开关开启）
+    if (typeof Patrol !== 'undefined') { Patrol.init(); }
+    // 巡游调试面板（仅 admin + localStorage 标记激活）
+    if (typeof PatrolDebug !== 'undefined') { PatrolDebug.init(); }
 
     // Register Service Worker (版本号强制更新)
     if ('serviceWorker' in navigator) {

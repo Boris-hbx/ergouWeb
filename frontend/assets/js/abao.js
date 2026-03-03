@@ -63,6 +63,9 @@ var Abao = (function() {
         // Send button
         if (sendBtn) {
             sendBtn.addEventListener('click', sendMessage);
+            if (window._userStatus === 'guest') {
+                sendBtn.setAttribute('data-guest-ai-action', '1');
+            }
         }
 
         // Enter to send, Shift+Enter for newline
@@ -124,14 +127,6 @@ var Abao = (function() {
                     sendMessage();
                 }
             });
-        });
-
-        // Keyboard shortcut: B to toggle
-        document.addEventListener('keydown', function(e) {
-            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
-            if (e.key === 'b' || e.key === 'B') {
-                toggle();
-            }
         });
 
         // Long-press on avatar → open About dialog
@@ -313,6 +308,9 @@ var Abao = (function() {
         isOpen = true;
         if (overlay) overlay.classList.add('open');
         document.getElementById('header-avatar')?.classList.add('abao-active');
+        // Keyboard shortcut: add listener (guard against duplicates)
+        document.removeEventListener('keydown', _abaoKeydownHandler);
+        document.addEventListener('keydown', _abaoKeydownHandler);
         panel.classList.remove('gesture-dragging');
 
         // .open's transition handles the rest: animate from current inline
@@ -461,6 +459,8 @@ var Abao = (function() {
 
     function gestureClose() {
         gesture.animating = true;
+        // Remove keyboard shortcut listener
+        document.removeEventListener('keydown', _abaoKeydownHandler);
         panel.style.transition = 'transform ' + GESTURE.CLOSE_DURATION + 'ms cubic-bezier(0.4, 0, 1, 1), opacity ' + GESTURE.CLOSE_DURATION + 'ms ease';
         panel.style.transform = 'translateY(100%)';
         panel.style.opacity = '0';
@@ -488,6 +488,14 @@ var Abao = (function() {
         }, GESTURE.SNAP_BACK_DURATION);
     }
 
+    // ─── Keyboard shortcut: B to toggle (named for proper add/remove) ───
+    function _abaoKeydownHandler(e) {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
+        if (e.key === 'b' || e.key === 'B') {
+            toggle();
+        }
+    }
+
     // ─── Open/Close ───
     function open() {
         if (!panel || gesture.animating) return;
@@ -498,6 +506,10 @@ var Abao = (function() {
         panel.classList.add('open');
         if (overlay) overlay.classList.add('open');
         document.getElementById('header-avatar')?.classList.add('abao-active');
+
+        // Keyboard shortcut: add listener (guard against duplicates)
+        document.removeEventListener('keydown', _abaoKeydownHandler);
+        document.addEventListener('keydown', _abaoKeydownHandler);
 
         // Mobile: don't auto-focus to avoid keyboard pushing panel up
         if (!_isMobile && inputEl) inputEl.focus();
@@ -511,6 +523,10 @@ var Abao = (function() {
     function close() {
         if (!panel || gesture.animating) return;
         isOpen = false;
+        // Remove keyboard shortcut listener
+        document.removeEventListener('keydown', _abaoKeydownHandler);
+        // Notify patrol system: leaving abao (logo wiggle)
+        document.dispatchEvent(new CustomEvent('patrol:leaveAbao'));
         // Mobile: closing animation (CSS handles .closing class)
         panel.classList.add('closing');
         panel.classList.remove('open', 'gesture-dragging');
@@ -536,12 +552,14 @@ var Abao = (function() {
 
     function createUserAvatarContent() {
         var avatarValue = localStorage.getItem('userAvatar') || '';
-        // Custom uploaded image
+        // Custom uploaded image — use DOM API to safely set src attribute
         if (avatarValue && avatarValue.startsWith('data:image/')) {
-            return '<img src="' + avatarValue + '">';
+            var img = document.createElement('img');
+            img.src = avatarValue;
+            return img.outerHTML;
         }
-        // Preset image
-        var presets = { 'preset:cat': 'assets/images/preset-cat.png', 'preset:panda': 'assets/images/preset-panda.png' };
+        // Preset image (hardcoded paths, safe)
+        var presets = (typeof AVATAR_PRESETS !== 'undefined') ? AVATAR_PRESETS : { 'preset:cat': 'assets/images/preset-cat.png', 'preset:panda': 'assets/images/preset-panda.png' };
         if (presets[avatarValue]) {
             return '<img src="' + presets[avatarValue] + '">';
         }
@@ -594,22 +612,23 @@ var Abao = (function() {
             if (tc.tool === 'create_todo' && tc.result.text) {
                 var card = document.createElement('div');
                 card.className = 'abao-task-card';
-                card.innerHTML = '<div class="abao-task-card-title">' + escapeHtml(tc.result.text) + '</div>' +
-                    '<div class="abao-task-card-meta">' +
-                    (tc.result.tab || 'today') + ' · ' + quadrantLabel(tc.result.quadrant || '') +
-                    '</div>';
+                card.innerHTML = '<div class="abao-task-card-title"></div>' +
+                    '<div class="abao-task-card-meta"></div>';
+                card.querySelector('.abao-task-card-title').textContent = tc.result.text;
+                card.querySelector('.abao-task-card-meta').textContent =
+                    (tc.result.tab || 'today') + ' \u00b7 ' + quadrantLabel(tc.result.quadrant || '');
                 messagesContainer.appendChild(card);
             }
             // Show reminder card for create_reminder
             if (tc.tool === 'create_reminder' && tc.result.text) {
                 var rcard = document.createElement('div');
                 rcard.className = 'abao-task-card abao-reminder-card';
-                var cancelBtn = '<button class="abao-reminder-cancel" data-id="' + escapeHtml(tc.result.id) + '">取消提醒</button>';
-                rcard.innerHTML = '<div class="abao-task-card-title">🔔 ' + escapeHtml(tc.result.text) + '</div>' +
-                    '<div class="abao-task-card-meta">' +
-                    (tc.result.display_time || tc.result.remind_at) +
-                    '</div>' +
-                    '<div class="abao-reminder-actions">' + cancelBtn + '</div>';
+                rcard.innerHTML = '<div class="abao-task-card-title"></div>' +
+                    '<div class="abao-task-card-meta"></div>' +
+                    '<div class="abao-reminder-actions"><button class="abao-reminder-cancel">取消提醒</button></div>';
+                rcard.querySelector('.abao-task-card-title').textContent = '\ud83d\udd14 ' + tc.result.text;
+                rcard.querySelector('.abao-task-card-meta').textContent = tc.result.display_time || tc.result.remind_at || '';
+                rcard.querySelector('.abao-reminder-cancel').setAttribute('data-id', tc.result.id || '');
                 rcard.querySelector('.abao-reminder-cancel').addEventListener('click', function() {
                     var rid = this.getAttribute('data-id');
                     API.cancelReminder(rid).then(function(res) {
@@ -678,7 +697,7 @@ var Abao = (function() {
         thinkingTimer = setTimeout(function() {
             if (textEl) {
                 textEl.style.display = 'inline';
-                textEl.textContent = '阿宝正在想...';
+                textEl.textContent = '二狗正在想...';
             }
         }, 3000);
 
@@ -786,6 +805,9 @@ var Abao = (function() {
         if (sendBtn) sendBtn.disabled = true;
         showThinking();
 
+        // Notify patrol system: AI thinking
+        document.dispatchEvent(new CustomEvent('patrol:chatStatus', { detail: { status: 'thinking' } }));
+
         try {
             var resp = await fetch('/api/chat', {
                 method: 'POST',
@@ -830,6 +852,7 @@ var Abao = (function() {
                 var guestEl = document.getElementById('guest-ai-count');
                 if (guestEl) guestEl.textContent = data.ai_remaining;
                 updateAbaoGuestHint();
+                if (typeof updateAllGuestAiHints === 'function') updateAllGuestAiHints();
             }
 
             if (data.success && data.reply) {
@@ -841,9 +864,9 @@ var Abao = (function() {
                     refreshTasksIfNeeded(data.tool_calls);
                 }
             } else if (data.message) {
-                addMessage('error', data.message);
+                addMessage('error', sanitizeErrorMessage(data.message));
             } else {
-                addMessage('error', '阿宝想了太久，请重试一下');
+                addMessage('error', '二狗想了太久，请重试一下');
             }
         } catch (err) {
             hideThinking();
@@ -853,6 +876,8 @@ var Abao = (function() {
             isSending = false;
             if (sendBtn) sendBtn.disabled = false;
             if (!_isMobile && inputEl) inputEl.focus();
+            // Notify patrol system: AI done
+            document.dispatchEvent(new CustomEvent('patrol:chatStatus', { detail: { status: 'idle' } }));
         }
     }
 
@@ -923,6 +948,19 @@ var Abao = (function() {
         var div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    function sanitizeErrorMessage(msg) {
+        if (!msg || typeof msg !== 'string') return '出了点问题，请重试';
+        // Catch raw technical errors that shouldn't be shown to users
+        if (/API request failed|error sending request|https?:\/\/\S+/i.test(msg)) {
+            console.warn('[Abao] raw error suppressed:', msg);
+            return 'AI 服务暂时不可用，请稍后重试';
+        }
+        if (/No text in .* response|parse error|Failed to parse/i.test(msg)) {
+            return 'AI 服务响应异常，请稍后重试';
+        }
+        return msg;
     }
 
     function quadrantLabel(q) {

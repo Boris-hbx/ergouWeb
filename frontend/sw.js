@@ -1,4 +1,4 @@
-const CACHE_NAME = 'next-v16';
+const CACHE_NAME = 'next-v21';
 const STATIC_ASSETS = [
     '/',
     '/index.html',
@@ -10,6 +10,7 @@ const STATIC_ASSETS = [
     '/assets/css/abao.css',
     '/assets/js/api.js',
     '/assets/js/utils.js',
+    '/assets/js/jelly-indicator.js',
     '/assets/js/app.js',
     '/assets/js/tasks.js',
     '/assets/js/modal.js',
