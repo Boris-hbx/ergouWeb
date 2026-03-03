@@ -857,7 +857,7 @@ var Patrol = (function() {
 
             // Create IdleDetector
             _idle = IdleDetector.create({
-                idleThreshold: 8000,
+                idleThreshold: 3000,
                 cooldown: 180000,
                 onIdle: function() {
                     if (_sm) _sm.transition('idle');
@@ -941,6 +941,17 @@ var Patrol = (function() {
 
         get enabled() {
             return _initialized;
+        },
+
+        /** Expose internal refs for admin PatrolLab panel */
+        getDebugRefs: function() {
+            if (!_initialized) return null;
+            return {
+                sm: _sm,
+                idle: _idle,
+                pawPool: _pawPool,
+                terrainOverlay: _terrainOverlay
+            };
         }
     };
 })();

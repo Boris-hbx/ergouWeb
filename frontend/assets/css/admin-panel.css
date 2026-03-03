@@ -429,6 +429,102 @@
     opacity: 0.6;
 }
 
+/* ===== Chat Monitor 3-Level Layout ===== */
+.admin-chats-layout {
+    display: flex;
+    border: 1px solid var(--border-color, rgba(0,0,0,0.1));
+    border-radius: 10px;
+    overflow: hidden;
+    height: calc(100vh - 220px);
+    min-height: 400px;
+}
+
+.admin-chats-user-list {
+    width: 220px;
+    min-width: 220px;
+    border-right: 1px solid var(--border-color, rgba(0,0,0,0.1));
+    overflow-y: auto;
+    background: var(--card-bg, #fff);
+}
+
+.admin-chats-user-item {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border-color, rgba(0,0,0,0.06));
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.admin-chats-user-item:hover {
+    background: var(--hover-bg, rgba(0,0,0,0.03));
+}
+
+.admin-chats-user-item.active {
+    background: var(--active-bg, rgba(102,126,234,0.08));
+    border-left: 3px solid var(--primary-color, #667eea);
+}
+
+.chats-user-name {
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 2px;
+}
+
+.chats-user-stats {
+    font-size: 11px;
+    opacity: 0.55;
+}
+
+.admin-chats-right {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.admin-chats-conv-list {
+    border-bottom: 1px solid var(--border-color, rgba(0,0,0,0.1));
+    overflow-y: auto;
+    max-height: 180px;
+    min-height: 60px;
+    background: var(--card-bg, #fff);
+}
+
+.admin-chats-conv-item {
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border-color, rgba(0,0,0,0.04));
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.admin-chats-conv-item:hover {
+    background: var(--hover-bg, rgba(0,0,0,0.03));
+}
+
+.admin-chats-conv-item.active {
+    background: var(--active-bg, rgba(102,126,234,0.08));
+    border-left: 3px solid var(--primary-color, #667eea);
+}
+
+.chats-conv-title {
+    font-weight: 600;
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.chats-conv-meta {
+    font-size: 11px;
+    opacity: 0.55;
+    margin-top: 2px;
+}
+
+.admin-chats-msg-area {
+    flex: 1;
+    overflow-y: auto;
+    background: var(--card-bg, #fff);
+}
+
 /* ===== Loading State ===== */
 .admin-loading-text {
     text-align: center;
@@ -488,5 +584,252 @@
     }
     .admin-content-area {
         padding: 16px;
+    }
+    .admin-chats-layout {
+        flex-direction: column;
+        height: auto;
+    }
+    .admin-chats-user-list {
+        width: 100%;
+        min-width: unset;
+        border-right: none;
+        border-bottom: 1px solid var(--border-color, rgba(0,0,0,0.1));
+        max-height: 150px;
+    }
+    .admin-chats-conv-list {
+        max-height: 120px;
+    }
+    .admin-chats-msg-area {
+        max-height: 50vh;
+    }
+}
+
+/* ===== PatrolLab — 二狗实验室 ===== */
+.admin-patrol-layout {
+    display: flex;
+    gap: 24px;
+    margin-bottom: 24px;
+}
+
+.admin-patrol-status {
+    width: 220px;
+    min-width: 220px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.admin-patrol-preview {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.admin-patrol-group {
+    background: var(--card-bg, #fff);
+    border: 1px solid var(--border-color, rgba(0,0,0,0.1));
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.admin-patrol-group-title {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    opacity: 0.5;
+    margin-bottom: 8px;
+}
+
+/* Status rows */
+.ap-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 2px 0;
+    font-size: 13px;
+    font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+    line-height: 1.6;
+}
+
+.ap-label {
+    opacity: 0.55;
+    font-size: 12px;
+}
+
+.ap-val {
+    font-weight: 600;
+    font-size: 12px;
+}
+
+.ap-hint {
+    font-size: 11px;
+    opacity: 0.45;
+    margin-top: 6px;
+    font-style: italic;
+}
+
+/* Control buttons */
+.admin-patrol-btns {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+/* SVG preview box */
+.admin-patrol-svg-box {
+    background:
+        linear-gradient(to right, var(--border-color, rgba(0,0,0,0.04)) 1px, transparent 1px),
+        linear-gradient(to bottom, var(--border-color, rgba(0,0,0,0.04)) 1px, transparent 1px);
+    background-size: 16px 16px;
+    border: 1px solid var(--border-color, rgba(0,0,0,0.1));
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 200px;
+    padding: 24px;
+}
+
+.admin-patrol-svg {
+    width: 160px;
+    height: 200px;
+    transition: opacity 0.2s;
+}
+
+/* Pose buttons */
+.admin-patrol-poses {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+/* SVG fine-tuning controls */
+.admin-patrol-svg-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.ap-svg-ctrl-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+}
+
+.ap-color-swatch {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color, rgba(0,0,0,0.15));
+    display: inline-block;
+}
+
+/* Sliders shared */
+.ap-slider {
+    flex: 1;
+    height: 4px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: var(--border-color, rgba(0,0,0,0.12));
+    border-radius: 2px;
+    outline: none;
+}
+
+.ap-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--primary-color, #667eea);
+    cursor: pointer;
+}
+
+.ap-slider::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--primary-color, #667eea);
+    cursor: pointer;
+    border: none;
+}
+
+/* Bottom parameter sliders */
+.admin-patrol-sliders {
+    background: var(--card-bg, #fff);
+    border: 1px solid var(--border-color, rgba(0,0,0,0.1));
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.admin-patrol-slider-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 12px 24px;
+}
+
+.ap-slider-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.ap-slider-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    opacity: 0.65;
+}
+
+/* SVG pose animations */
+.patrol-svg-tail {
+    animation: patrol-wag 0.6s ease-in-out infinite alternate;
+    transform-origin: 20px 22px;
+}
+
+@keyframes patrol-wag {
+    0%   { transform: rotate(-12deg); }
+    100% { transform: rotate(12deg); }
+}
+
+.patrol-svg-walk-fl,
+.patrol-svg-walk-br {
+    animation: patrol-walk-leg-a 0.5s ease-in-out infinite alternate;
+}
+
+.patrol-svg-walk-fr,
+.patrol-svg-walk-bl {
+    animation: patrol-walk-leg-b 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes patrol-walk-leg-a {
+    0%   { transform: rotate(-8deg); }
+    100% { transform: rotate(8deg); }
+}
+
+@keyframes patrol-walk-leg-b {
+    0%   { transform: rotate(8deg); }
+    100% { transform: rotate(-8deg); }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .admin-patrol-layout {
+        flex-direction: column;
+    }
+    .admin-patrol-status {
+        width: 100%;
+        min-width: unset;
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+    .admin-patrol-status .admin-patrol-group {
+        flex: 1;
+        min-width: 180px;
+    }
+    .admin-patrol-slider-grid {
+        grid-template-columns: 1fr;
     }
 }
