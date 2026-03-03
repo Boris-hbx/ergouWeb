@@ -9645,6 +9645,22 @@ body.dark-mode .action-sheet-cancel {
     font-size: 0.9rem;
 }
 
+.share-loading::before {
+    content: '';
+    display: block;
+    width: 24px;
+    height: 24px;
+    margin: 0 auto 8px;
+    border: 2.5px solid var(--border-color, #d0d7de);
+    border-top-color: var(--primary-color, #667eea);
+    border-radius: 50%;
+    animation: share-spin 0.6s linear infinite;
+}
+
+@keyframes share-spin {
+    to { transform: rotate(360deg); }
+}
+
 /* Collaborate mode */
 .share-collab-section {
     margin-bottom: 14px;

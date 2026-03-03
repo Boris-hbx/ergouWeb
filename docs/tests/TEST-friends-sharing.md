@@ -9,11 +9,9 @@
 
 **修复**: 将 Unicode 转义改回中文原文
 
-### BUG-5: 分享弹窗无 loading 状态 [P3]
+### ~~BUG-5: 分享弹窗无 loading 状态~~ [已修复]
 
-**现象**: `renderShareFriendsList()` 懒加载好友列表时，可能先闪现"还没有好友"再更新
-
-**修复**: 加载中显示 spinner
+**修复内容**: 加载中显示 spinner 动画（CSS `share-spin`），空好友列表不缓存避免闪现。
 
 ---
 

@@ -117,9 +117,13 @@ var ShareModal = (function() {
         try {
             var resp = await API.getFriends();
             if (resp.success) {
-                _friendsCache = resp.items || [];
-                _friendsCacheTime = Date.now();
-                return _friendsCache;
+                var items = resp.items || [];
+                // Only cache non-empty results to avoid stale empty state
+                if (items.length > 0) {
+                    _friendsCache = items;
+                    _friendsCacheTime = Date.now();
+                }
+                return items;
             }
         } catch (e) {
             console.error('[ShareModal] loadFriends error:', e);
