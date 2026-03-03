@@ -459,6 +459,7 @@ var Abao = (function() {
 
     function gestureClose() {
         gesture.animating = true;
+        pawNod();
         // Remove keyboard shortcut listener
         document.removeEventListener('keydown', _abaoKeydownHandler);
         panel.style.transition = 'transform ' + GESTURE.CLOSE_DURATION + 'ms cubic-bezier(0.4, 0, 1, 1), opacity ' + GESTURE.CLOSE_DURATION + 'ms ease';
@@ -520,9 +521,21 @@ var Abao = (function() {
         }
     }
 
+    function pawNod() {
+        var icon = document.getElementById('abao-tab-icon');
+        if (!icon) return;
+        icon.classList.remove('patrol-nod');
+        void icon.offsetWidth; // reflow to restart animation
+        icon.classList.add('patrol-nod');
+        icon.addEventListener('animationend', function() {
+            icon.classList.remove('patrol-nod');
+        }, { once: true });
+    }
+
     function close() {
         if (!panel || gesture.animating) return;
         isOpen = false;
+        pawNod();
         // Remove keyboard shortcut listener
         document.removeEventListener('keydown', _abaoKeydownHandler);
         // Notify patrol system: leaving abao (logo wiggle)

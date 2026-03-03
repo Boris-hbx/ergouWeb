@@ -159,7 +159,7 @@
 .tab-icon-patrol {
   width: 24px;
   height: 24px;
-  transition: opacity 0.5s ease;
+  transition: opacity 0.5s ease, transform 0.5s ease;
   vertical-align: middle;
   display: inline-block;
 }
@@ -177,7 +177,11 @@
   transition: opacity 0.5s ease;
 }
 
-/* 二狗出去巡游 — 空心轮廓 */
+/* 二狗出去巡游 — 空心轮廓 + 歪头 */
+.tab-icon-patrol.patrol-out {
+  transform: rotate(2deg);
+}
+
 .tab-icon-patrol.patrol-out .paw-fill {
   opacity: 0;
 }
@@ -227,6 +231,17 @@
   100% { transform: translateY(0); }
 }
 
+/* 关闭聊天: 点头 (爪印下压) */
+.tab-icon-patrol.patrol-nod {
+  animation: patrol-tab-nod 120ms ease-in-out;
+}
+
+@keyframes patrol-tab-nod {
+  0%   { transform: translateY(0) scale(1); }
+  50%  { transform: translateY(2px) scale(0.95); }
+  100% { transform: translateY(0) scale(1); }
+}
+
 /* --------------------------------------------------------------------------
    Convergence Light Arc
    -------------------------------------------------------------------------- */
@@ -260,6 +275,12 @@
   100% { transform: translate(-50%, -50%) scale(1.2) rotate(var(--paw-heading)) scaleX(var(--paw-mirror)); opacity: 0.7; }
 }
 
+/* 踩凹 — 爪印落下时卡片短暂凹陷 */
+.patrol-dent {
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.08) !important;
+  transition: box-shadow 0.15s ease-in !important;
+}
+
 /* Abao thinking breathing light */
 @keyframes abao-breathing {
   0%, 100% { opacity: 1; }
@@ -274,38 +295,28 @@
    Phase 4: Convergence Animation
    -------------------------------------------------------------------------- */
 
-/* Light arc point */
+/* Convergence point — straight, clean, no fuss */
 .patrol-arc {
   position: absolute;
-  width: 8px;
-  height: 8px;
+  width: 4px;
+  height: 4px;
   border-radius: 50%;
   background: var(--primary-color, #6366f1);
-  box-shadow: 0 0 8px 2px var(--primary-color, #6366f1),
-              0 0 16px 4px rgba(99, 102, 241, 0.3);
   pointer-events: none;
   z-index: 2;
-  animation: patrol-arc-fly 0.4s cubic-bezier(0.2, 0, 0, 1) forwards;
+  animation: patrol-arc-fly 0.35s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
 @keyframes patrol-arc-fly {
   0% {
     left: var(--arc-from-x);
     top: var(--arc-from-y);
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    left: var(--arc-mid-x);
-    top: var(--arc-mid-y);
-    opacity: 1;
-    transform: scale(1.2);
+    opacity: 0.6;
   }
   100% {
     left: var(--arc-to-x);
     top: var(--arc-to-y);
     opacity: 0;
-    transform: scale(0);
   }
 }
 
