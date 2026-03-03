@@ -326,7 +326,10 @@ pub fn build_app(state: AppState) -> Router {
                 .route("/security-events-v2", get(routes::admin::security_events_v2))
                 .route("/security-events/{id}/review", post(routes::admin::review_security_event))
                 .route("/system-status", get(routes::admin::system_status))
-                .route("/audit-log", get(routes::admin::audit_log)),
+                .route("/audit-log", get(routes::admin::audit_log))
+                // People (人物档案)
+                .route("/people", get(routes::admin::list_people).post(routes::admin::create_person))
+                .route("/people/{id}", put(routes::admin::update_person).delete(routes::admin::delete_person)),
         )
         .route("/moment", get(routes::moment::get_moment))
         .route(
