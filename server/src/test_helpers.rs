@@ -11,6 +11,8 @@ pub fn test_state() -> AppState {
 
     AppState {
         db: Arc::new(Mutex::new(conn)),
+        db_path: ":memory:".to_string(),
+        start_time: std::time::Instant::now(),
         moment_cache: Arc::new(Mutex::new(HashMap::new())),
         login_ip_attempts: Arc::new(Mutex::new(HashMap::new())),
         login_user_lockouts: Arc::new(Mutex::new(HashMap::new())),

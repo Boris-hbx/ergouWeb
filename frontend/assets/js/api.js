@@ -572,6 +572,10 @@ var API = (function() {
         restoreUser: async function(id) {
             return await request('POST', '/admin/users/' + encodeURIComponent(id) + '/restore');
         },
+        // Generic admin request helper for new admin panel endpoints
+        adminRequest: async function(method, path, body) {
+            return await request(method, path, body);
+        },
 
         // ===== Memory APIs =====
         getMemories: async function() {

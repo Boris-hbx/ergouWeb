@@ -30,6 +30,13 @@
             // Store current user info for cross-module use
             window._currentUser = data.user;
 
+            // Show admin nav link for admin/owner roles
+            var adminNavLink = document.getElementById('admin-nav-link');
+            if (adminNavLink) {
+                var userRole = data.user.role || 'user';
+                adminNavLink.style.display = (userRole === 'admin' || userRole === 'owner') ? '' : 'none';
+            }
+
             // Handle account status
             window._userStatus = data.user.status || 'active';
             if (window._userStatus === 'pending') {
@@ -57,11 +64,54 @@
                 var inboxBell = document.getElementById('inbox-bell-wrapper');
                 if (inboxBell) inboxBell.style.display = 'none';
             }
+
+            // Mobile install banner: show on mobile browsers not in standalone mode
+            checkInstallBanner();
         }
     } catch(e) {
         // Network error — stay on page, will work offline with cached data
     }
 })();
+
+// ========== 手机安装引导 ==========
+
+function checkInstallBanner() {
+    // Only on mobile, not already installed (standalone), and not dismissed
+    var isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    var isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+    if (!isMobile || isStandalone) return;
+
+    // Show settings install section
+    var settingsInstall = document.getElementById('settings-install-section');
+    if (settingsInstall) settingsInstall.style.display = '';
+    var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    var iosSteps = document.getElementById('settings-install-ios');
+    var androidSteps = document.getElementById('settings-install-android');
+    if (iosSteps) iosSteps.style.display = isIOS ? '' : 'none';
+    if (androidSteps) androidSteps.style.display = isIOS ? 'none' : '';
+
+    // Show banner if not dismissed
+    if (!localStorage.getItem('install_banner_dismissed')) {
+        var banner = document.getElementById('install-banner');
+        if (banner) banner.style.display = '';
+    }
+}
+
+function dismissInstallBanner() {
+    var banner = document.getElementById('install-banner');
+    if (banner) banner.style.display = 'none';
+    localStorage.setItem('install_banner_dismissed', '1');
+}
+
+function showInstallGuide() {
+    dismissInstallBanner();
+    switchPage('settings');
+    // Scroll to install section after a tick
+    setTimeout(function() {
+        var el = document.getElementById('settings-install-section');
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 200);
+}
 
 // ========== 全局状态 & 初始化 ==========
 
@@ -72,7 +122,7 @@ var draggedItem = null;
 var draggedItemQuadrant = null;  // 拖拽任务原本所在的象限
 var routines = [];  // 每日例行任务
 var currentAssigneeFilter = null;  // null = 全部, 'name' = 指定人
-var currentPage = 'todo';  // 'todo' | 'review' | 'english' | 'life' | 'settings'
+var currentPage = 'todo';  // 'todo' | 'review' | 'english' | 'life' | 'settings' | 'admin'
 
 // ========== Jelly Pill Indicators ==========
 var _jellyMobileNav = null;
@@ -214,6 +264,8 @@ function switchPage(page) {
     var lifeView = document.getElementById('life-view');
     if (lifeView) lifeView.style.display = page === 'life' ? '' : 'none';
     document.getElementById('settings-view').style.display = page === 'settings' ? '' : 'none';
+    var adminView = document.getElementById('admin-view');
+    if (adminView) adminView.style.display = page === 'admin' ? '' : 'none';
 
     // Mobile FAB: show only on todo page
     var fab = document.getElementById('mobile-fab');
@@ -242,6 +294,9 @@ function switchPage(page) {
         if (typeof loadSettingsData === 'function') loadSettingsData();
         if (typeof Friends !== 'undefined' && Friends.loadFriendsData) Friends.loadFriendsData();
         activateMobileNav(null);
+    }
+    if (page === 'admin' && typeof AdminPanel !== 'undefined') {
+        AdminPanel.init();
     }
 
     // Load shared inbox when switching to content pages

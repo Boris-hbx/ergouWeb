@@ -303,15 +303,29 @@ pub fn build_app(state: AppState) -> Router {
         .nest(
             "/admin",
             Router::new()
+                // Existing endpoints
                 .route("/dashboard", get(routes::admin::dashboard))
                 .route("/pending-users", get(routes::admin::pending_users))
                 .route("/users/{id}/approve", post(routes::admin::approve_user))
                 .route("/users/{id}/reject", post(routes::admin::reject_user))
                 .route("/security-events", get(routes::admin::security_events))
-                .route(
-                    "/users/{id}/restore",
-                    post(routes::admin::restore_user),
-                ),
+                .route("/users/{id}/restore", post(routes::admin::restore_user))
+                // New endpoints: User Management
+                .route("/users", get(routes::admin::list_users))
+                .route("/users/{id}/role", put(routes::admin::change_role))
+                .route("/users/{id}/force-logout", post(routes::admin::force_logout))
+                .route("/users/{id}/suspend", post(routes::admin::suspend_user))
+                // New endpoints: Conversation Monitor
+                .route("/conversations", get(routes::admin::list_conversations))
+                .route("/conversations/{id}/messages", get(routes::admin::get_conversation_messages))
+                // New endpoints: AI Dashboard
+                .route("/ai-usage", get(routes::admin::ai_usage))
+                .route("/ai-usage/providers", get(routes::admin::ai_providers))
+                // New endpoints: Risk & System
+                .route("/security-events-v2", get(routes::admin::security_events_v2))
+                .route("/security-events/{id}/review", post(routes::admin::review_security_event))
+                .route("/system-status", get(routes::admin::system_status))
+                .route("/audit-log", get(routes::admin::audit_log)),
         )
         .route("/moment", get(routes::moment::get_moment))
         .route(
@@ -380,6 +394,8 @@ async fn main() {
 
     let state = AppState {
         db: Arc::new(Mutex::new(conn)),
+        db_path: db_path.clone(),
+        start_time: std::time::Instant::now(),
         moment_cache: Arc::new(Mutex::new(std::collections::HashMap::new())),
         login_ip_attempts: Arc::new(Mutex::new(std::collections::HashMap::new())),
         login_user_lockouts: Arc::new(Mutex::new(std::collections::HashMap::new())),

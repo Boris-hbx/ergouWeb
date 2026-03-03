@@ -9,6 +9,10 @@ pub type MomentCache = HashMap<String, (Vec<String>, chrono::NaiveDate)>;
 #[derive(Clone)]
 pub struct AppState {
     pub db: Arc<Mutex<Connection>>,
+    /// Path to the SQLite database file (for system status reporting)
+    pub db_path: String,
+    /// Server start time (for uptime calculation)
+    pub start_time: Instant,
     /// Cache for moment pool: user_id -> (pool, date)
     pub moment_cache: Arc<Mutex<MomentCache>>,
     /// Login rate limiting: IP -> (attempt_count, window_start)

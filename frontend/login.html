@@ -229,6 +229,59 @@
             color: #fff;
             font-weight: 600;
         }
+        /* Mobile install tip */
+        .install-tip {
+            display: none;
+            width: 100%;
+            max-width: 400px;
+            margin: 12px 16px 0;
+            padding: 16px 20px;
+            background: var(--bg-secondary, #161b22);
+            border: 1px solid var(--border-color, rgba(255,255,255,0.08));
+            border-radius: 12px;
+            font-size: 13px;
+            color: var(--text-secondary, #8b949e);
+            line-height: 1.6;
+        }
+        .install-tip-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary, #e6edf3);
+            margin-bottom: 8px;
+        }
+        .install-tip .step {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            margin: 6px 0;
+        }
+        .install-tip .step-num {
+            min-width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--primary-color, #667eea);
+            color: #fff;
+            font-size: 11px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+        .install-tip .platform-label {
+            font-weight: 600;
+            color: var(--text-primary, #e6edf3);
+            margin-top: 10px;
+            margin-bottom: 2px;
+        }
+        @media (max-width: 768px) {
+            .install-tip { display: block; }
+        }
+        /* Hide if already in standalone (installed) */
+        @media (display-mode: standalone) {
+            .install-tip { display: none !important; }
+        }
     </style>
 </head>
 <body>
@@ -283,7 +336,32 @@
         </div>
     </div>
 
+    <!-- Mobile install tip -->
+    <div class="install-tip" id="install-tip">
+        <div class="install-tip-title">添加到手机桌面，体验更佳</div>
+        <div id="install-ios-steps">
+            <div class="platform-label">iPhone / iPad (Safari)</div>
+            <div class="step"><span class="step-num">1</span><span>点击底部 <strong>分享按钮</strong> (方框+箭头图标)</span></div>
+            <div class="step"><span class="step-num">2</span><span>向下滑动，点击 <strong>"添加到主屏幕"</strong></span></div>
+            <div class="step"><span class="step-num">3</span><span>点击右上角 <strong>"添加"</strong>，完成</span></div>
+        </div>
+        <div id="install-android-steps">
+            <div class="platform-label">Android (Chrome)</div>
+            <div class="step"><span class="step-num">1</span><span>点击右上角 <strong>菜单</strong> (三个点)</span></div>
+            <div class="step"><span class="step-num">2</span><span>点击 <strong>"添加到主屏幕"</strong> 或 <strong>"安装应用"</strong></span></div>
+        </div>
+    </div>
+
     <script>
+    // Show only the relevant platform instructions
+    (function() {
+        var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+        var ios = document.getElementById('install-ios-steps');
+        var android = document.getElementById('install-android-steps');
+        if (isIOS && android) android.style.display = 'none';
+        if (!isIOS && ios) ios.style.display = 'none';
+    })();
+
     var authMode = 'login';
 
     function showGuestDialog() {

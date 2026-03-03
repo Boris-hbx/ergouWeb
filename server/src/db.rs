@@ -92,16 +92,33 @@ fn run_migrations(conn: &Connection) {
     if !has_role {
         conn.execute_batch("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user';")
             .ok();
-        // Set first registered user as admin
+        // Set first registered user as owner
         conn.execute(
-            "UPDATE users SET role = 'admin' WHERE id = (SELECT id FROM users ORDER BY created_at ASC LIMIT 1)",
+            "UPDATE users SET role = 'owner' WHERE id = (SELECT id FROM users ORDER BY created_at ASC LIMIT 1)",
             [],
         )
         .ok();
     }
-    // Ensure boris_dev is always admin
+    // Migrate: ensure exactly one owner exists (promote first admin by created_at)
+    let has_owner: bool = conn
+        .query_row(
+            "SELECT COUNT(*) FROM users WHERE role = 'owner'",
+            [],
+            |r| r.get::<_, i64>(0),
+        )
+        .unwrap_or(0)
+        > 0;
+    if !has_owner {
+        // Promote first admin to owner
+        conn.execute(
+            "UPDATE users SET role = 'owner' WHERE id = (SELECT id FROM users WHERE role = 'admin' ORDER BY created_at ASC LIMIT 1)",
+            [],
+        )
+        .ok();
+    }
+    // Ensure boris_dev is always owner
     conn.execute(
-        "UPDATE users SET role = 'admin' WHERE username = 'boris_dev'",
+        "UPDATE users SET role = 'owner' WHERE username = 'boris_dev'",
         [],
     )
     .ok();
@@ -138,6 +155,23 @@ fn run_migrations(conn: &Connection) {
     if !has_timezone {
         conn.execute_batch(
             "ALTER TABLE user_settings ADD COLUMN timezone TEXT DEFAULT 'America/Toronto';",
+        )
+        .ok();
+    }
+
+    // Migrate ergou_memories categories: user_fact→fact, preference→habit, delete old categories
+    let has_old_categories: bool = conn
+        .query_row(
+            "SELECT COUNT(*) > 0 FROM ergou_memories WHERE category IN ('user_fact', 'preference', 'behavioral_pattern', 'conversation_highlight')",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or(false);
+    if has_old_categories {
+        conn.execute_batch(
+            "UPDATE ergou_memories SET category = 'fact' WHERE category = 'user_fact';
+             UPDATE ergou_memories SET category = 'habit' WHERE category = 'preference';
+             DELETE FROM ergou_memories WHERE category IN ('behavioral_pattern', 'conversation_highlight');",
         )
         .ok();
     }
@@ -572,6 +606,19 @@ fn create_tables(conn: &Connection) {
             created_at TEXT NOT NULL
         );
         CREATE INDEX IF NOT EXISTS idx_security_events_user ON security_events(user_id, created_at DESC);
+
+        -- Admin audit log (管理员操作审计)
+        CREATE TABLE IF NOT EXISTS admin_audit_log (
+            id TEXT PRIMARY KEY,
+            admin_user_id TEXT NOT NULL REFERENCES users(id),
+            action_type TEXT NOT NULL,
+            target_user_id TEXT,
+            target_resource TEXT,
+            details TEXT,
+            created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_audit_log_admin ON admin_audit_log(admin_user_id, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_audit_log_action ON admin_audit_log(action_type, created_at DESC);
 
         CREATE TABLE IF NOT EXISTS client_errors (
             id INTEGER PRIMARY KEY AUTOINCREMENT,

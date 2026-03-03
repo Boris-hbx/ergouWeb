@@ -59,6 +59,8 @@ pub struct UserInfo {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub role: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub ai_calls_remaining: Option<i32>,
 }
 
@@ -161,6 +163,96 @@ impl FromRequestParts<AppState> for ActiveUserId {
                     })),
                 )),
             },
+            Err(_) => Err(unauthorized()),
+        }
+    }
+}
+
+// ─── AdminUserId: requires role=admin or role=owner ───
+
+#[derive(Debug, Clone)]
+pub struct AdminUserId(pub String);
+
+impl FromRequestParts<AppState> for AdminUserId {
+    type Rejection = (StatusCode, Json<serde_json::Value>);
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
+        let jar = CookieJar::from_request_parts(parts, state)
+            .await
+            .map_err(|_| unauthorized())?;
+
+        let token = jar
+            .get("session")
+            .map(|c| c.value().to_string())
+            .ok_or_else(unauthorized)?;
+
+        let db = state.db.lock();
+        let result = db.query_row(
+            "SELECT s.user_id, COALESCE(u.role, 'user')
+             FROM sessions s JOIN users u ON u.id = s.user_id
+             WHERE s.token = ?1 AND s.expires_at > datetime('now')",
+            [&token],
+            |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+        );
+
+        match result {
+            Ok((user_id, role)) if role == "admin" || role == "owner" => Ok(AdminUserId(user_id)),
+            Ok(_) => Err((
+                StatusCode::FORBIDDEN,
+                Json(serde_json::json!({
+                    "success": false,
+                    "error": "PERMISSION_DENIED",
+                    "message": "权限不足"
+                })),
+            )),
+            Err(_) => Err(unauthorized()),
+        }
+    }
+}
+
+// ─── OwnerUserId: requires role=owner ───
+
+#[derive(Debug, Clone)]
+pub struct OwnerUserId(pub String);
+
+impl FromRequestParts<AppState> for OwnerUserId {
+    type Rejection = (StatusCode, Json<serde_json::Value>);
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
+        let jar = CookieJar::from_request_parts(parts, state)
+            .await
+            .map_err(|_| unauthorized())?;
+
+        let token = jar
+            .get("session")
+            .map(|c| c.value().to_string())
+            .ok_or_else(unauthorized)?;
+
+        let db = state.db.lock();
+        let result = db.query_row(
+            "SELECT s.user_id, COALESCE(u.role, 'user')
+             FROM sessions s JOIN users u ON u.id = s.user_id
+             WHERE s.token = ?1 AND s.expires_at > datetime('now')",
+            [&token],
+            |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+        );
+
+        match result {
+            Ok((user_id, role)) if role == "owner" => Ok(OwnerUserId(user_id)),
+            Ok(_) => Err((
+                StatusCode::FORBIDDEN,
+                Json(serde_json::json!({
+                    "success": false,
+                    "error": "PERMISSION_DENIED",
+                    "message": "仅系统所有者可执行此操作"
+                })),
+            )),
             Err(_) => Err(unauthorized()),
         }
     }
@@ -512,6 +604,7 @@ pub async fn register(
                     display_name: Some(display_name),
                     avatar: None,
                     status: Some(status.to_string()),
+                    role: None,
                     ai_calls_remaining: None,
                 }),
                 message: Some(message.into()),
@@ -563,7 +656,7 @@ pub async fn login(
 
     // Find user
     let user_row = db.query_row(
-        "SELECT id, username, password_hash, display_name, COALESCE(avatar,''), COALESCE(status,'active') FROM users WHERE username = ?1",
+        "SELECT id, username, password_hash, display_name, COALESCE(avatar,''), COALESCE(status,'active'), COALESCE(role,'user') FROM users WHERE username = ?1",
         [&req.username],
         |row: &rusqlite::Row| {
             Ok((
@@ -573,11 +666,12 @@ pub async fn login(
                 row.get::<_, Option<String>>(3)?,
                 row.get::<_, String>(4)?,
                 row.get::<_, String>(5)?,
+                row.get::<_, String>(6)?,
             ))
         },
     );
 
-    let (user_id, username, password_hash, display_name, avatar, status) = match user_row {
+    let (user_id, username, password_hash, display_name, avatar, status, role) = match user_row {
         Ok(r) => r,
         Err(_) => {
             // Timing attack mitigation: run dummy hash even when user not found
@@ -678,6 +772,7 @@ pub async fn login(
                         Some(avatar)
                     },
                     status: Some(status),
+                    role: Some(role),
                     ai_calls_remaining: None,
                 }),
                 message: Some("登录成功".into()),
@@ -703,12 +798,13 @@ pub async fn me(State(state): State<AppState>, user_id: UserId) -> impl IntoResp
     let db = state.db.lock();
 
     let result = db.query_row(
-        "SELECT id, username, display_name, COALESCE(avatar,''), COALESCE(status,'active'), ai_calls_remaining FROM users WHERE id = ?1",
+        "SELECT id, username, display_name, COALESCE(avatar,''), COALESCE(status,'active'), ai_calls_remaining, COALESCE(role,'user') FROM users WHERE id = ?1",
         [&user_id.0],
         |row: &rusqlite::Row| {
             let av: String = row.get(3)?;
             let st: String = row.get(4)?;
             let ai_remaining: Option<i32> = row.get(5)?;
+            let rl: String = row.get(6)?;
             Ok(UserInfo {
                 id: row.get(0)?,
                 username: row.get(1)?,
@@ -716,6 +812,7 @@ pub async fn me(State(state): State<AppState>, user_id: UserId) -> impl IntoResp
                 avatar: if av.is_empty() { None } else { Some(av) },
                 ai_calls_remaining: if st == "guest" { ai_remaining } else { None },
                 status: Some(st),
+                role: Some(rl),
             })
         },
     );
@@ -1065,6 +1162,7 @@ pub async fn guest_login(
                     display_name: Some("访客".into()),
                     avatar: None,
                     status: Some("guest".into()),
+                    role: None,
                     ai_calls_remaining: Some(GUEST_AI_QUOTA),
                 }),
                 message: Some("体验模式已开启".into()),
