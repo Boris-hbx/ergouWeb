@@ -634,6 +634,21 @@ fn create_tables(conn: &Connection) {
             created_at TEXT NOT NULL
         );
         CREATE INDEX IF NOT EXISTS idx_client_errors_created ON client_errors(created_at);
+
+        -- Ergou people (二狗认识的人)
+        CREATE TABLE IF NOT EXISTS ergou_people (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL REFERENCES users(id),
+            name TEXT NOT NULL,
+            relationship TEXT NOT NULL,
+            nickname TEXT DEFAULT '',
+            attitude TEXT DEFAULT '',
+            notes TEXT DEFAULT '',
+            created_by TEXT DEFAULT 'admin',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_ergou_people_user ON ergou_people(user_id);
         ",
     )
     .expect("Failed to create tables");

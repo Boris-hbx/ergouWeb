@@ -101,6 +101,9 @@ pub fn execute_tool(db: &Connection, user_id: &str, tool_name: &str, input: &Val
         "update_trip_item" => tool_update_trip_item(db, user_id, input),
         "delete_trip_item" => tool_delete_trip_item(db, user_id, input),
         "get_trip_summary" => tool_get_trip_summary(db, user_id, input),
+        "save_person" => tool_save_person(db, user_id, input),
+        "update_person" => tool_update_person(db, user_id, input),
+        "delete_person" => tool_delete_person(db, user_id, input),
         "save_memory" => tool_save_memory(db, user_id, input),
         "delete_memory" => tool_delete_memory(db, user_id, input),
         "report_security_event" => tool_report_security_event(db, user_id, input),
@@ -609,6 +612,48 @@ pub fn tool_definitions() -> Vec<Value> {
                 "properties": {
                     "trip_id": {"type": "string", "description": "行程ID（不填则返回所有行程汇总）"}
                 }
+            }
+        }),
+        json!({
+            "name": "save_person",
+            "description": "记住用户提到的重要人物（家人、朋友、同事等）。用户自然提到时才记，不主动套话。",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "人物的名字或常用称呼"},
+                    "relationship": {"type": "string", "description": "与用户的关系，如 wife/friend/colleague/family/assistant"},
+                    "nickname": {"type": "string", "description": "二狗对这个人的称呼"},
+                    "attitude": {"type": "string", "description": "二狗对这个人的态度指引"},
+                    "notes": {"type": "string", "description": "补充信息（生日、喜好等）"}
+                },
+                "required": ["name", "relationship"]
+            }
+        }),
+        json!({
+            "name": "update_person",
+            "description": "更新已知人物的信息",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string", "description": "人物ID"},
+                    "name": {"type": "string"},
+                    "relationship": {"type": "string"},
+                    "nickname": {"type": "string"},
+                    "attitude": {"type": "string"},
+                    "notes": {"type": "string"}
+                },
+                "required": ["id"]
+            }
+        }),
+        json!({
+            "name": "delete_person",
+            "description": "忘掉某个人物",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string", "description": "人物ID"}
+                },
+                "required": ["id"]
             }
         }),
         json!({
@@ -2532,6 +2577,131 @@ fn is_sensitive_content(content: &str) -> bool {
         "私钥", "private key", "secret key",
     ];
     patterns.iter().any(|p| lower.contains(p))
+}
+
+// ─── Person (人物档案) tools ───
+
+fn tool_save_person(db: &Connection, user_id: &str, input: &Value) -> Value {
+    let name = match input["name"].as_str() {
+        Some(n) if !n.trim().is_empty() => n.trim(),
+        _ => return json!({"error": "name 不能为空"}),
+    };
+    let relationship = match input["relationship"].as_str() {
+        Some(r) if !r.trim().is_empty() => r.trim(),
+        _ => return json!({"error": "relationship 不能为空"}),
+    };
+
+    // Sensitive content check
+    if is_sensitive_content(name) {
+        return json!({"error": "不能记录敏感信息"});
+    }
+
+    // Limit: 20 people per user
+    let count: i64 = db
+        .query_row(
+            "SELECT COUNT(*) FROM ergou_people WHERE user_id=?1",
+            [user_id],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+    if count >= 20 {
+        return json!({"error": "人物档案已满（最多20个），请先删除不需要的"});
+    }
+
+    // Dedup by name
+    let exists: bool = db
+        .query_row(
+            "SELECT COUNT(*) > 0 FROM ergou_people WHERE user_id=?1 AND name=?2",
+            rusqlite::params![user_id, name],
+            |r| r.get(0),
+        )
+        .unwrap_or(false);
+    if exists {
+        return json!({"error": format!("已经认识{}了，用 update_person 更新信息", name)});
+    }
+
+    let id = uuid::Uuid::new_v4().to_string()[..8].to_string();
+    let now = chrono::Utc::now().to_rfc3339();
+    let nickname = input["nickname"].as_str().unwrap_or("").trim();
+    let attitude = input["attitude"].as_str().unwrap_or("").trim();
+    let notes = input["notes"].as_str().unwrap_or("").trim();
+
+    match db.execute(
+        "INSERT INTO ergou_people (id, user_id, name, relationship, nickname, attitude, notes, created_by, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'chat', ?8, ?9)",
+        rusqlite::params![id, user_id, name, relationship, nickname, attitude, notes, now, now],
+    ) {
+        Ok(_) => json!({"success": true, "id": id, "message": format!("记住了，{}（{}）", name, relationship)}),
+        Err(e) => json!({"error": format!("保存失败: {}", e)}),
+    }
+}
+
+fn tool_update_person(db: &Connection, user_id: &str, input: &Value) -> Value {
+    let id = match input["id"].as_str() {
+        Some(i) if !i.is_empty() => i,
+        _ => return json!({"error": "id is required"}),
+    };
+
+    // Check ownership
+    let exists: bool = db
+        .query_row(
+            "SELECT COUNT(*) > 0 FROM ergou_people WHERE id=?1 AND user_id=?2",
+            rusqlite::params![id, user_id],
+            |r| r.get(0),
+        )
+        .unwrap_or(false);
+    if !exists {
+        return json!({"error": "人物不存在"});
+    }
+
+    let now = chrono::Utc::now().to_rfc3339();
+    let name = input["name"].as_str().map(|s| s.trim().to_string());
+    let relationship = input["relationship"].as_str().map(|s| s.trim().to_string());
+    let nickname = input["nickname"].as_str().map(|s| s.trim().to_string());
+    let attitude = input["attitude"].as_str().map(|s| s.trim().to_string());
+    let notes = input["notes"].as_str().map(|s| s.trim().to_string());
+
+    if name.is_none() && relationship.is_none() && nickname.is_none() && attitude.is_none() && notes.is_none() {
+        return json!({"error": "没有需要更新的字段"});
+    }
+
+    // Name dedup check if updating name
+    if let Some(ref new_name) = name {
+        let name_exists: bool = db
+            .query_row(
+                "SELECT COUNT(*) > 0 FROM ergou_people WHERE user_id=?1 AND name=?2 AND id!=?3",
+                rusqlite::params![user_id, new_name, id],
+                |r| r.get(0),
+            )
+            .unwrap_or(false);
+        if name_exists {
+            return json!({"error": format!("已经有一个叫{}的了", new_name)});
+        }
+    }
+
+    match db.execute(
+        "UPDATE ergou_people SET name=COALESCE(?2, name), relationship=COALESCE(?3, relationship), nickname=COALESCE(?4, nickname), attitude=COALESCE(?5, attitude), notes=COALESCE(?6, notes), updated_at=?7 WHERE id=?1 AND user_id=?8",
+        rusqlite::params![id, name, relationship, nickname, attitude, notes, now, user_id],
+    ) {
+        Ok(0) => json!({"error": "更新失败"}),
+        Ok(_) => json!({"success": true, "message": "更新了"}),
+        Err(e) => json!({"error": format!("更新失败: {}", e)}),
+    }
+}
+
+fn tool_delete_person(db: &Connection, user_id: &str, input: &Value) -> Value {
+    let id = match input["id"].as_str() {
+        Some(i) if !i.is_empty() => i,
+        _ => return json!({"error": "id is required"}),
+    };
+
+    match db.execute(
+        "DELETE FROM ergou_people WHERE id=?1 AND user_id=?2",
+        rusqlite::params![id, user_id],
+    ) {
+        Ok(0) => json!({"error": "人物不存在或不属于当前用户"}),
+        Ok(_) => json!({"success": true, "message": "忘掉了"}),
+        Err(e) => json!({"error": format!("删除失败: {}", e)}),
+    }
 }
 
 fn tool_save_memory(db: &Connection, user_id: &str, input: &Value) -> Value {

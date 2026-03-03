@@ -54,6 +54,47 @@ pub fn parse_tz(tz_str: &str) -> Tz {
     tz_str.parse::<Tz>().unwrap_or(chrono_tz::America::Toronto)
 }
 
+/// Build people context: inject known people into prompt
+fn build_people_context(db: &Connection, user_id: &str) -> String {
+    let mut stmt = match db.prepare(
+        "SELECT name, relationship, nickname, attitude FROM ergou_people WHERE user_id=?1 ORDER BY created_at ASC",
+    ) {
+        Ok(s) => s,
+        Err(_) => return String::new(),
+    };
+
+    let rows: Vec<(String, String, String, String)> = match stmt.query_map([user_id], |row| {
+        Ok((
+            row.get::<_, String>(0)?,
+            row.get::<_, String>(1)?,
+            row.get::<_, String>(2)?,
+            row.get::<_, String>(3)?,
+        ))
+    }) {
+        Ok(rows) => rows.flatten().collect(),
+        Err(_) => return String::new(),
+    };
+
+    if rows.is_empty() {
+        return String::new();
+    }
+
+    let mut ctx = String::from("\n## 你认识的人\n以下是用户生活中的重要人物，对话中提到时请自然使用对应称呼和态度：\n");
+
+    for (name, relationship, nickname, attitude) in &rows {
+        ctx.push_str(&format!(
+            "- {} — 关系:{} | 称呼:{} | 态度:{}\n",
+            sanitize_for_prompt(name, 50),
+            sanitize_for_prompt(relationship, 50),
+            if nickname.is_empty() { name.as_str() } else { nickname.as_str() },
+            if attitude.is_empty() { "（无特殊）" } else { attitude.as_str() }
+        ));
+    }
+    ctx.push_str("（自然融入对话，不要刻意逐条展示。用户提到这些人时用对应称呼。）\n");
+
+    ctx
+}
+
 /// Build memory context: load recent memories and inject into prompt
 fn build_memory_context(db: &Connection, user_id: &str) -> String {
     // Load top 20 most recently accessed memories
@@ -122,6 +163,7 @@ pub fn build_system_prompt_with_page(
 ) -> String {
     let task_context = build_task_context(db, user_id);
     let page_section = build_page_context(db, user_id, page_context);
+    let people_section = build_people_context(db, user_id);
     let memory_section = build_memory_context(db, user_id);
     let tz = parse_tz(timezone);
     let now = chrono::Utc::now()
@@ -238,6 +280,13 @@ pub fn build_system_prompt_with_page(
 - "推迟/晚点再说" → snooze_reminder
 - 不确定日期时 → 先调 get_current_datetime
 
+### 人物档案
+- 用户提到新的重要人物（家人、朋友、同事）→ save_person
+- 用户补充已知人物的信息 → update_person
+- 用户说"忘掉xxx" → delete_person
+- 不主动套话，用户自然提到时才记
+- 对话中提到已知人物时，自然使用对应称呼
+
 ### 记忆
 - 用户的操作习惯和默认值（记账默认加币、任务喜欢放周五） → save_memory(habit)
 - 用户的个人事实（城市、职业、养了只猫） → save_memory(fact)
@@ -338,6 +387,7 @@ pub fn build_system_prompt_with_page(
 {task_context}
 {page_section}
 {master_section}
+{people_section}
 {memory_section}
 帮用户看清下一步该做什么。然后闭嘴，让他去做。"#
     )

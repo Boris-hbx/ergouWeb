@@ -1179,3 +1179,180 @@ pub async fn audit_log(
 
     (StatusCode::OK, Json(json!({"success": true, "entries": rows})))
 }
+
+// ═══════════════════════════════════════════
+// People (人物档案) management
+// ═══════════════════════════════════════════
+
+/// GET /api/admin/people?user_id=
+pub async fn list_people(
+    State(state): State<AppState>,
+    _admin: AdminUserId,
+    axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
+) -> impl IntoResponse {
+    let db = state.db.lock();
+    let user_id = params.get("user_id").map(|s| s.as_str()).unwrap_or("");
+
+    let mut stmt = match db.prepare(
+        "SELECT p.id, p.user_id, p.name, p.relationship, p.nickname, p.attitude, p.notes, p.created_by, p.created_at, p.updated_at, u.username
+         FROM ergou_people p
+         LEFT JOIN users u ON u.id = p.user_id
+         WHERE (?1 = '' OR p.user_id = ?1)
+         ORDER BY p.created_at ASC",
+    ) {
+        Ok(s) => s,
+        Err(e) => {
+            tracing::warn!("[admin] list_people error: {}", e);
+            return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"success": false, "error": "内部错误"})));
+        }
+    };
+
+    let rows: Vec<serde_json::Value> = stmt
+        .query_map([user_id], |r| {
+            Ok(json!({
+                "id": r.get::<_, String>(0)?,
+                "user_id": r.get::<_, String>(1)?,
+                "name": r.get::<_, String>(2)?,
+                "relationship": r.get::<_, String>(3)?,
+                "nickname": r.get::<_, String>(4)?,
+                "attitude": r.get::<_, String>(5)?,
+                "notes": r.get::<_, String>(6)?,
+                "created_by": r.get::<_, String>(7)?,
+                "created_at": r.get::<_, String>(8)?,
+                "updated_at": r.get::<_, String>(9)?,
+                "username": r.get::<_, Option<String>>(10)?
+            }))
+        })
+        .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        .unwrap_or_default();
+
+    (StatusCode::OK, Json(json!({"success": true, "people": rows})))
+}
+
+/// POST /api/admin/people
+pub async fn create_person(
+    State(state): State<AppState>,
+    _admin: AdminUserId,
+    Json(body): Json<serde_json::Value>,
+) -> impl IntoResponse {
+    let db = state.db.lock();
+
+    let user_id = match body["user_id"].as_str() {
+        Some(u) if !u.is_empty() => u,
+        _ => return (StatusCode::BAD_REQUEST, Json(json!({"success": false, "error": "user_id is required"}))),
+    };
+    let name = match body["name"].as_str() {
+        Some(n) if !n.trim().is_empty() => n.trim(),
+        _ => return (StatusCode::BAD_REQUEST, Json(json!({"success": false, "error": "name is required"}))),
+    };
+    let relationship = match body["relationship"].as_str() {
+        Some(r) if !r.trim().is_empty() => r.trim(),
+        _ => return (StatusCode::BAD_REQUEST, Json(json!({"success": false, "error": "relationship is required"}))),
+    };
+
+    // Check limit
+    let count: i64 = db
+        .query_row("SELECT COUNT(*) FROM ergou_people WHERE user_id=?1", [user_id], |r| r.get(0))
+        .unwrap_or(0);
+    if count >= 20 {
+        return (StatusCode::BAD_REQUEST, Json(json!({"success": false, "error": "每个用户最多20个人物"})));
+    }
+
+    // Dedup
+    let exists: bool = db
+        .query_row(
+            "SELECT COUNT(*) > 0 FROM ergou_people WHERE user_id=?1 AND name=?2",
+            rusqlite::params![user_id, name],
+            |r| r.get(0),
+        )
+        .unwrap_or(false);
+    if exists {
+        return (StatusCode::BAD_REQUEST, Json(json!({"success": false, "error": format!("已存在名为 {} 的人物", name)})));
+    }
+
+    let id = uuid::Uuid::new_v4().to_string()[..8].to_string();
+    let now = chrono::Utc::now().to_rfc3339();
+    let nickname = body["nickname"].as_str().unwrap_or("").trim().to_string();
+    let attitude = body["attitude"].as_str().unwrap_or("").trim().to_string();
+    let notes = body["notes"].as_str().unwrap_or("").trim().to_string();
+
+    match db.execute(
+        "INSERT INTO ergou_people (id, user_id, name, relationship, nickname, attitude, notes, created_by, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'admin', ?8, ?9)",
+        rusqlite::params![id, user_id, name, relationship, nickname, attitude, notes, now, now],
+    ) {
+        Ok(_) => (StatusCode::OK, Json(json!({"success": true, "id": id}))),
+        Err(e) => {
+            tracing::warn!("[admin] create_person error: {}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"success": false, "error": "创建失败"})))
+        }
+    }
+}
+
+/// PUT /api/admin/people/{id}
+pub async fn update_person(
+    State(state): State<AppState>,
+    _admin: AdminUserId,
+    Path(id): Path<String>,
+    Json(body): Json<serde_json::Value>,
+) -> impl IntoResponse {
+    let db = state.db.lock();
+    let now = chrono::Utc::now().to_rfc3339();
+
+    // Build update dynamically
+    let name = body["name"].as_str().map(|s| s.trim().to_string());
+    let relationship = body["relationship"].as_str().map(|s| s.trim().to_string());
+    let nickname = body["nickname"].as_str().map(|s| s.trim().to_string());
+    let attitude = body["attitude"].as_str().map(|s| s.trim().to_string());
+    let notes = body["notes"].as_str().map(|s| s.trim().to_string());
+
+    // Name dedup check
+    if let Some(ref new_name) = name {
+        // Get user_id for this person
+        let user_id: String = match db.query_row(
+            "SELECT user_id FROM ergou_people WHERE id=?1", [&id], |r| r.get(0),
+        ) {
+            Ok(u) => u,
+            Err(_) => return (StatusCode::NOT_FOUND, Json(json!({"success": false, "error": "人物不存在"}))),
+        };
+        let dup: bool = db
+            .query_row(
+                "SELECT COUNT(*) > 0 FROM ergou_people WHERE user_id=?1 AND name=?2 AND id!=?3",
+                rusqlite::params![user_id, new_name, id],
+                |r| r.get(0),
+            )
+            .unwrap_or(false);
+        if dup {
+            return (StatusCode::BAD_REQUEST, Json(json!({"success": false, "error": format!("已存在名为 {} 的人物", new_name)})));
+        }
+    }
+
+    match db.execute(
+        "UPDATE ergou_people SET name=COALESCE(?2, name), relationship=COALESCE(?3, relationship), nickname=COALESCE(?4, nickname), attitude=COALESCE(?5, attitude), notes=COALESCE(?6, notes), updated_at=?7 WHERE id=?1",
+        rusqlite::params![id, name, relationship, nickname, attitude, notes, now],
+    ) {
+        Ok(0) => (StatusCode::NOT_FOUND, Json(json!({"success": false, "error": "人物不存在"}))),
+        Ok(_) => (StatusCode::OK, Json(json!({"success": true}))),
+        Err(e) => {
+            tracing::warn!("[admin] update_person error: {}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"success": false, "error": "更新失败"})))
+        }
+    }
+}
+
+/// DELETE /api/admin/people/{id}
+pub async fn delete_person(
+    State(state): State<AppState>,
+    _admin: AdminUserId,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    let db = state.db.lock();
+
+    match db.execute("DELETE FROM ergou_people WHERE id=?1", [&id]) {
+        Ok(0) => (StatusCode::NOT_FOUND, Json(json!({"success": false, "error": "人物不存在"}))),
+        Ok(_) => (StatusCode::OK, Json(json!({"success": true}))),
+        Err(e) => {
+            tracing::warn!("[admin] delete_person error: {}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"success": false, "error": "删除失败"})))
+        }
+    }
+}

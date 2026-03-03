@@ -97,6 +97,7 @@ var AdminPanel = (function() {
             case 'risk': Risk.load(); break;
             case 'system': System.load(); break;
             case 'audit': Audit.load(); break;
+            case 'people': People.load(); break;
             case 'patrol': PatrolLab.load(); break;
         }
     }
@@ -914,6 +915,177 @@ var AdminPanel = (function() {
             var nextBtn = document.getElementById('admin-audit-next');
             if (prevBtn) prevBtn.addEventListener('click', function() { self._offset -= self._limit; self.fetchList(); });
             if (nextBtn) nextBtn.addEventListener('click', function() { self._offset += self._limit; self.fetchList(); });
+        }
+    };
+
+    // ── People — 人物档案 ──
+    var People = {
+        _data: [],
+        _users: [],
+
+        load: async function() {
+            var el = document.getElementById('admin-people-content');
+            if (!el) return;
+            el.innerHTML = '<div class="admin-loading-text">加载中...</div>';
+            try {
+                // Load users for the dropdown
+                var usersData = await API.adminRequest('GET', '/admin/users');
+                if (usersData.success) this._users = usersData.users || [];
+                // Load people
+                var data = await API.adminRequest('GET', '/admin/people');
+                if (!data.success) { el.innerHTML = '<div class="admin-empty">加载失败</div>'; return; }
+                this._data = data.people || [];
+                this.render(el);
+            } catch(e) {
+                console.error('[admin-people]', e);
+                el.innerHTML = '<div class="admin-empty">加载失败</div>';
+            }
+        },
+
+        render: function(el) {
+            var self = this;
+            var html = '<div style="margin-bottom:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">';
+            // User filter
+            html += '<select id="people-user-filter" class="admin-select" style="min-width:140px;">';
+            html += '<option value="">全部用户</option>';
+            this._users.forEach(function(u) {
+                html += '<option value="' + esc(u.id) + '">' + esc(u.display_name || u.username) + '</option>';
+            });
+            html += '</select>';
+            html += '<button class="admin-btn admin-btn-primary" id="people-add-btn">+ 新增人物</button>';
+            html += '</div>';
+
+            if (this._data.length === 0) {
+                html += '<div class="admin-empty">暂无人物档案</div>';
+            } else {
+                html += '<div class="admin-table-wrap"><table class="admin-table"><thead><tr>';
+                html += '<th>名字</th><th>关系</th><th>称呼</th><th>态度</th><th>备注</th><th>来源</th><th>用户</th><th>操作</th>';
+                html += '</tr></thead><tbody>';
+                this._data.forEach(function(p) {
+                    html += '<tr>';
+                    html += '<td>' + esc(p.name) + '</td>';
+                    html += '<td>' + esc(p.relationship) + '</td>';
+                    html += '<td>' + esc(p.nickname || '-') + '</td>';
+                    html += '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(p.attitude || '-') + '</td>';
+                    html += '<td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(p.notes || '-') + '</td>';
+                    html += '<td><span class="admin-badge">' + esc(p.created_by) + '</span></td>';
+                    html += '<td>' + esc(p.username || p.user_id) + '</td>';
+                    html += '<td style="white-space:nowrap;">';
+                    html += '<button class="admin-btn admin-btn-sm" data-action="edit-person" data-id="' + esc(p.id) + '">编辑</button> ';
+                    html += '<button class="admin-btn admin-btn-sm admin-btn-danger" data-action="delete-person" data-id="' + esc(p.id) + '" data-name="' + esc(p.name) + '">删除</button>';
+                    html += '</td></tr>';
+                });
+                html += '</tbody></table></div>';
+            }
+            el.innerHTML = html;
+
+            // Bind filter
+            var filterEl = document.getElementById('people-user-filter');
+            if (filterEl) {
+                filterEl.addEventListener('change', async function() {
+                    var uid = this.value;
+                    var url = '/admin/people' + (uid ? '?user_id=' + encodeURIComponent(uid) : '');
+                    try {
+                        var data = await API.adminRequest('GET', url);
+                        if (data.success) { self._data = data.people || []; self.render(el); }
+                    } catch(e) { console.error('[admin-people]', e); }
+                });
+            }
+
+            // Bind add
+            var addBtn = document.getElementById('people-add-btn');
+            if (addBtn) addBtn.addEventListener('click', function() { self.showForm(el, null); });
+
+            // Bind edit/delete
+            el.querySelectorAll('[data-action="edit-person"]').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    var person = self._data.find(function(p) { return p.id === btn.dataset.id; });
+                    if (person) self.showForm(el, person);
+                });
+            });
+            el.querySelectorAll('[data-action="delete-person"]').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    if (!confirm('确定删除人物 "' + btn.dataset.name + '"？')) return;
+                    self.deletePerson(btn.dataset.id);
+                });
+            });
+        },
+
+        showForm: function(parentEl, person) {
+            var self = this;
+            var isEdit = !!person;
+            var overlay = document.createElement('div');
+            overlay.className = 'admin-modal-overlay';
+            overlay.innerHTML = '<div class="admin-modal" style="max-width:480px;">' +
+                '<div class="admin-modal-title">' + (isEdit ? '编辑人物' : '新增人物') + '</div>' +
+                '<div class="admin-form">' +
+                (isEdit ? '' : '<div class="admin-form-group"><label>所属用户</label>' +
+                    '<select id="person-user-id" class="admin-select">' +
+                    this._users.map(function(u) { return '<option value="' + esc(u.id) + '">' + esc(u.display_name || u.username) + '</option>'; }).join('') +
+                    '</select></div>') +
+                '<div class="admin-form-group"><label>名字 *</label><input type="text" id="person-name" class="admin-input" value="' + esc(person ? person.name : '') + '"></div>' +
+                '<div class="admin-form-group"><label>关系 *</label><input type="text" id="person-relationship" class="admin-input" placeholder="wife/friend/colleague/family/assistant" value="' + esc(person ? person.relationship : '') + '"></div>' +
+                '<div class="admin-form-group"><label>二狗称呼</label><input type="text" id="person-nickname" class="admin-input" placeholder="如:夫人、Ruby姐姐" value="' + esc(person ? person.nickname : '') + '"></div>' +
+                '<div class="admin-form-group"><label>态度</label><input type="text" id="person-attitude" class="admin-input" placeholder="如:经常夸她，特别尊重" value="' + esc(person ? person.attitude : '') + '"></div>' +
+                '<div class="admin-form-group"><label>备注</label><textarea id="person-notes" class="admin-input" rows="2" placeholder="生日、喜好等">' + esc(person ? person.notes : '') + '</textarea></div>' +
+                '</div>' +
+                '<div class="admin-modal-actions">' +
+                '<button class="admin-btn" id="person-cancel">取消</button>' +
+                '<button class="admin-btn admin-btn-primary" id="person-save">' + (isEdit ? '保存' : '添加') + '</button>' +
+                '</div></div>';
+            document.body.appendChild(overlay);
+
+            overlay.querySelector('#person-cancel').addEventListener('click', function() { overlay.remove(); });
+            overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+
+            overlay.querySelector('#person-save').addEventListener('click', async function() {
+                var name = document.getElementById('person-name').value.trim();
+                var relationship = document.getElementById('person-relationship').value.trim();
+                if (!name || !relationship) { showToast('名字和关系为必填', 'error'); return; }
+
+                var body = {
+                    name: name,
+                    relationship: relationship,
+                    nickname: document.getElementById('person-nickname').value.trim(),
+                    attitude: document.getElementById('person-attitude').value.trim(),
+                    notes: document.getElementById('person-notes').value.trim()
+                };
+
+                try {
+                    var result;
+                    if (isEdit) {
+                        result = await API.adminRequest('PUT', '/admin/people/' + encodeURIComponent(person.id), body);
+                    } else {
+                        body.user_id = document.getElementById('person-user-id').value;
+                        result = await API.adminRequest('POST', '/admin/people', body);
+                    }
+                    if (result.success) {
+                        overlay.remove();
+                        showToast(isEdit ? '已更新' : '已添加', 'success');
+                        self.load();
+                    } else {
+                        showToast(result.error || '操作失败', 'error');
+                    }
+                } catch(e) {
+                    console.error('[admin-people]', e);
+                    showToast('操作失败', 'error');
+                }
+            });
+        },
+
+        deletePerson: async function(id) {
+            try {
+                var result = await API.adminRequest('DELETE', '/admin/people/' + encodeURIComponent(id));
+                if (result.success) {
+                    showToast('已删除', 'success');
+                    this.load();
+                } else {
+                    showToast(result.error || '删除失败', 'error');
+                }
+            } catch(e) {
+                console.error('[admin-people]', e);
+                showToast('删除失败', 'error');
+            }
         }
     };
 
