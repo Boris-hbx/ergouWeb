@@ -669,6 +669,29 @@ var Trip = (function() {
     }
 
     // ─── AI Analysis (图片 + 文字，支持拆单) ───
+    // Fetch existing photo <img> elements as base64 data URLs (edit mode)
+    async function _getExistingItemPhotosBase64() {
+        var container = document.querySelector('.trip-existing-photos');
+        if (!container) return [];
+        var imgs = container.querySelectorAll('img');
+        var results = [];
+        for (var i = 0; i < imgs.length; i++) {
+            try {
+                var resp = await fetch(imgs[i].src);
+                var blob = await resp.blob();
+                var b64 = await new Promise(function(resolve) {
+                    var reader = new FileReader();
+                    reader.onload = function() { resolve(reader.result); };
+                    reader.readAsDataURL(blob);
+                });
+                results.push(b64);
+            } catch (e) {
+                console.warn('[Trip] existing photo to base64 failed', e);
+            }
+        }
+        return results;
+    }
+
     async function analyzeText() {
         var textEl = document.getElementById('trip-ai-text');
         var text = textEl ? textEl.value.trim() : '';
@@ -685,6 +708,12 @@ var Trip = (function() {
             if (images.length < pendingFiles.length) {
                 showToast('有图片读取失败，已跳过', 'error');
             }
+        }
+
+        // Include existing photos (edit mode)
+        if (_editingItemId) {
+            var existingB64 = await _getExistingItemPhotosBase64();
+            if (existingB64.length > 0) images = existingB64.concat(images);
         }
 
         if (!text && images.length === 0) {

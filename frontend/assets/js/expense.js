@@ -422,6 +422,29 @@ var Expense = (function() {
 
     // fileToBase64 removed — use _photoManager.getBase64() instead
 
+    // Fetch existing photo <img> elements as base64 data URLs
+    async function _getExistingPhotosBase64() {
+        var grid = document.getElementById('expense-existing-photos');
+        if (!grid) return [];
+        var imgs = grid.querySelectorAll('img');
+        var results = [];
+        for (var i = 0; i < imgs.length; i++) {
+            try {
+                var resp = await fetch(imgs[i].src);
+                var blob = await resp.blob();
+                var b64 = await new Promise(function(resolve) {
+                    var reader = new FileReader();
+                    reader.onload = function() { resolve(reader.result); };
+                    reader.readAsDataURL(blob);
+                });
+                results.push(b64);
+            } catch (e) {
+                console.warn('[Expense] existing photo to base64 failed', e);
+            }
+        }
+        return results;
+    }
+
     async function startParse() {
         var photos = _photoManager ? _photoManager.getFiles() : [];
         var notesEl = document.getElementById('expense-notes-input');
@@ -429,17 +452,29 @@ var Expense = (function() {
         var notes = notesEl ? notesEl.value.trim() : '';
         var amount = amountEl ? amountEl.value.trim() : '';
 
-        if (photos.length === 0 && !notes && !amount) {
+        // In edit mode, also check for existing photos
+        var hasExistingPhotos = false;
+        if (_editingId) {
+            var existingGrid = document.getElementById('expense-existing-photos');
+            hasExistingPhotos = existingGrid && existingGrid.querySelectorAll('img').length > 0;
+        }
+
+        if (photos.length === 0 && !hasExistingPhotos && !notes && !amount) {
             showToast('请输入文字或添加照片', 'error');
             return;
         }
 
-        log('startParse', { photoCount: photos.length, hasNotes: !!notes, hasAmount: !!amount });
+        log('startParse', { photoCount: photos.length, hasExisting: hasExistingPhotos, hasNotes: !!notes, hasAmount: !!amount });
         setModalState('analyzing');
         startFakeProgress();
 
         try {
             var images = photos.length > 0 ? await _photoManager.getBase64() : [];
+            // Include existing photos (edit mode)
+            if (_editingId) {
+                var existingB64 = await _getExistingPhotosBase64();
+                if (existingB64.length > 0) images = existingB64.concat(images);
+            }
             var textParts = [];
             if (notes) textParts.push('备注: ' + notes);
             if (amount) textParts.push('金额: ' + amount);
