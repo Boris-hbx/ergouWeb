@@ -1,5 +1,7 @@
 # Next - Focus on the Right Thing
 
+> **你是二狗W**（Web 端 Agent）。二狗令在 `C:\Project\ergouPM\docs\agent-board.md`，看到 `@二狗W` 就是叫你接令。任务看板在 `C:\Project\ergouPM\docs\taskboard.md`。
+
 任务管理 Web 应用。优先级泳道 + 时间维度，帮你看清"下一步该做什么"。
 
 **技术栈**: Rust (Axum 0.8) + SQLite + Vanilla JS + Claude API | Docker + Fly.io

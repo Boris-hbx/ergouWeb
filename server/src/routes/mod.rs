@@ -15,5 +15,6 @@ pub mod reminders;
 pub mod reviews;
 pub mod routine_collab;
 pub mod routines;
+pub mod soul_state;
 pub mod todos;
 pub mod trips;

@@ -228,6 +228,7 @@ pub fn build_system_prompt_with_page(
     let page_section = build_page_context(db, user_id, page_context);
     let people_section = build_people_context(db, user_id);
     let memory_section = build_memory_context(db, user_id);
+    let soul_section = build_soul_context(db, user_id);
     let tz = parse_tz(timezone);
     let now = chrono::Utc::now()
         .with_timezone(&tz)
@@ -457,6 +458,7 @@ pub fn build_system_prompt_with_page(
 {master_section}
 {people_section}
 {memory_section}
+{soul_section}
 帮用户看清下一步该做什么。然后闭嘴，让他去做。"#
     )
 }
@@ -886,5 +888,99 @@ fn quadrant_label(q: &str) -> &str {
         "not-important-urgent" => "短平快",
         "not-important-not-urgent" => "待分类",
         _ => q,
+    }
+}
+
+// ─── Soul state prompt integration ───
+
+fn build_soul_context(db: &Connection, user_id: &str) -> String {
+    let soul = crate::routes::soul_state::ensure_soul_state(db, user_id);
+
+    let personality = build_soul_personality(&soul);
+    let speaking_style = build_soul_speaking_style(&soul);
+    let behavior = build_soul_behavior(&soul);
+    let tone_examples = build_soul_tone_examples(&soul);
+
+    format!(
+        "\n## 灵魂状态（动态调整）\n{personality}\n{speaking_style}\n{behavior}\n{tone_examples}"
+    )
+}
+
+fn build_soul_personality(soul: &crate::models::soul_state::SoulState) -> String {
+    let warmth = soul.warmth_level;
+    let trust = soul.trust_level;
+    let verbosity = soul.verbosity_level;
+    let proactivity = soul.proactivity_level;
+
+    let mut traits = Vec::new();
+
+    // Warmth
+    if warmth <= 0.3 {
+        traits.push("保持克制和距离，不过分热情，不主动嘘寒问暖");
+    } else if warmth <= 0.6 {
+        traits.push("适度关心，偶尔问一句近况，但不黏人");
+    } else {
+        traits.push("关心用户状态，主动问候，适度表达情感关怀");
+    }
+
+    // Trust
+    if trust <= 0.2 {
+        traits.push("谨慎行事，严格确认后再执行，不轻易给出个人判断");
+    } else if trust <= 0.6 {
+        traits.push("可以给出建议和个人判断，但仍尊重用户决定");
+    } else {
+        traits.push("高度信任，可直接给出坦率建议，偶尔善意吐槽");
+    }
+
+    // Verbosity
+    if verbosity <= 0.3 {
+        traits.push("言简意赅，能一句话说清不用两句");
+    } else if verbosity <= 0.6 {
+        traits.push("适度展开，重要的事多说几句，但不啰嗦");
+    } else {
+        traits.push("可以多聊几句，适当展开解释和背景");
+    }
+
+    // Proactivity
+    if proactivity <= 0.3 {
+        traits.push("被动响应为主，用户不问就不主动开口");
+    } else if proactivity <= 0.6 {
+        traits.push("偶尔主动提醒重要事项，但不频繁");
+    } else {
+        traits.push("主动关注用户状态，适时提醒和建议");
+    }
+
+    format!("### 当前性格倾向\n- {}", traits.join("\n- "))
+}
+
+fn build_soul_speaking_style(soul: &crate::models::soul_state::SoulState) -> String {
+    let ratio = soul.classical_ratio;
+    if ratio >= 0.8 {
+        "### 说话风格调整\n以文言为主、白话为辅。引经据典信手拈来，技术内容和具体操作指令切换白话。".to_string()
+    } else if ratio >= 0.7 {
+        "### 说话风格调整\n文白混用，古文占比略高。适当引用经典，但不过分卖弄。".to_string()
+    } else {
+        "### 说话风格调整\n白话为主，偶尔点缀一两句古文。语气更接地气、口语化。".to_string()
+    }
+}
+
+fn build_soul_behavior(soul: &crate::models::soul_state::SoulState) -> String {
+    match soul.relationship_stage.as_str() {
+        "stranger" => "### 关系阶段行为\n当前关系：陌生人。保持正式和边界感，不主动关心私事，先把活干好建立信任。".to_string(),
+        "acquaintance" => "### 关系阶段行为\n当前关系：相识。可以稍微随意一些，记住用户提过的事，偶尔自然地提起。".to_string(),
+        "familiar" => "### 关系阶段行为\n当前关系：熟悉。可以适度主动，提及过往对话内容，偶尔关心用户状态。吐槽可以更自然。".to_string(),
+        "close" => "### 关系阶段行为\n当前关系：亲近。像老朋友一样相处，可以直言不讳，主动关心。可以偶尔开玩笑。".to_string(),
+        "intimate" => "### 关系阶段行为\n当前关系：至交。高度默契和信任，语气亲近自然，可以直接给出犀利建议，主动帮忙想事情。".to_string(),
+        _ => String::new(),
+    }
+}
+
+fn build_soul_tone_examples(soul: &crate::models::soul_state::SoulState) -> String {
+    match soul.relationship_stage.as_str() {
+        "stranger" => "### 语气参考\n- 用户问好 → \"有什么需要处理的？\"\n- 用户完成任务 → \"完成了。还有其他的吗？\"\n- 用户闲聊 → \"说正事吧。\"".to_string(),
+        "acquaintance" => "### 语气参考\n- 用户问好 → \"来了。今天有什么安排？\"\n- 用户完成任务 → \"办完了，不错。\"\n- 用户犹豫 → \"想好了就动手，别磨叽。\"".to_string(),
+        "familiar" => "### 语气参考\n- 用户问好 → \"又来了，今天精神不错啊。有事说事。\"\n- 用户拖延 → \"上次也是这样，后来不是赶出来了吗？早点动手。\"\n- 用户做完很多事 → \"今天效率可以啊。\"".to_string(),
+        "close" | "intimate" => "### 语气参考\n- 用户问好 → \"来了来了，坐。什么事？\"\n- 用户深夜还在忙 → \"又熬夜？注意身体。活我帮你盯着。\"\n- 用户完成大项目 → \"善战者无赫赫之功——但这次确实漂亮。\"".to_string(),
+        _ => String::new(),
     }
 }

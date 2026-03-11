@@ -993,3 +993,343 @@ async fn test_routine_toggle_and_list() {
     let items = body["items"].as_array().unwrap();
     assert!(!items[0]["completed_today"].as_bool().unwrap());
 }
+
+// ──────────────────── Soul State: GET ────────────────────
+
+#[tokio::test]
+async fn test_get_soul_state_success() {
+    let state = test_state();
+    let (user_id, token) = create_test_user(&state, "soul_user1", "Soul123x");
+
+    // Pre-insert a soul state record
+    {
+        let db = state.db.lock();
+        db.execute(
+            "INSERT INTO soul_states (user_id, updated_at) VALUES (?1, datetime('now'))",
+            [&user_id],
+        )
+        .unwrap();
+    }
+
+    let app = build_app(state);
+    let req = Request::get("/api/soul-state")
+        .header("cookie", auth_cookie(&token))
+        .body(Body::empty())
+        .unwrap();
+    let (status, body) = send(app, req).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["success"], true);
+    let soul = &body["soul_state"];
+    assert_eq!(soul["user_id"], user_id);
+    assert_eq!(soul["classical_ratio"], 0.9);
+    assert_eq!(soul["warmth_level"], 0.3);
+    assert_eq!(soul["verbosity_level"], 0.3);
+    assert_eq!(soul["proactivity_level"], 0.2);
+    assert_eq!(soul["trust_level"], 0.1);
+    assert_eq!(soul["relationship_stage"], "stranger");
+    assert_eq!(soul["total_interactions"], 0);
+    assert!(soul["updated_at"].is_string());
+}
+
+#[tokio::test]
+async fn test_get_soul_state_lazy_create() {
+    let state = test_state();
+    let (user_id, token) = create_test_user(&state, "soul_lazy", "Lazy123x");
+
+    // No pre-insert — should lazy-create on GET
+    let app = build_app(state);
+    let req = Request::get("/api/soul-state")
+        .header("cookie", auth_cookie(&token))
+        .body(Body::empty())
+        .unwrap();
+    let (status, body) = send(app, req).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["success"], true);
+    assert_eq!(body["soul_state"]["user_id"], user_id);
+    assert_eq!(body["soul_state"]["relationship_stage"], "stranger");
+}
+
+#[tokio::test]
+async fn test_soul_state_unauthenticated_401() {
+    let app = build_app(test_state());
+    let req = Request::get("/api/soul-state")
+        .body(Body::empty())
+        .unwrap();
+    let (status, _) = send(app, req).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+}
+
+// ──────────────────── Soul State: PUT ────────────────────
+
+#[tokio::test]
+async fn test_put_soul_state_partial_update() {
+    let state = test_state();
+    let (user_id, token) = create_test_user(&state, "soul_put1", "Sput123x");
+
+    // Seed default soul state
+    {
+        let db = state.db.lock();
+        db.execute(
+            "INSERT INTO soul_states (user_id, updated_at) VALUES (?1, datetime('now'))",
+            [&user_id],
+        )
+        .unwrap();
+    }
+
+    let app = build_app(state);
+    let req = Request::put("/api/soul-state")
+        .header("cookie", auth_cookie(&token))
+        .header("content-type", "application/json")
+        .body(Body::from(
+            serde_json::to_string(&serde_json::json!({
+                "warmth_level": 0.5,
+                "trust_level": 0.3
+            }))
+            .unwrap(),
+        ))
+        .unwrap();
+    let (status, body) = send(app, req).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["success"], true);
+    let soul = &body["soul_state"];
+    // Updated fields
+    assert_eq!(soul["warmth_level"], 0.5);
+    assert_eq!(soul["trust_level"], 0.3);
+    // Unchanged fields
+    assert_eq!(soul["classical_ratio"], 0.9);
+    assert_eq!(soul["verbosity_level"], 0.3);
+    assert_eq!(soul["proactivity_level"], 0.2);
+}
+
+#[tokio::test]
+async fn test_put_soul_state_range_validation() {
+    let state = test_state();
+    let (user_id, token) = create_test_user(&state, "soul_put2", "Sput223x");
+    {
+        let db = state.db.lock();
+        db.execute(
+            "INSERT INTO soul_states (user_id, updated_at) VALUES (?1, datetime('now'))",
+            [&user_id],
+        )
+        .unwrap();
+    }
+
+    let app = build_app(state);
+    let req = Request::put("/api/soul-state")
+        .header("cookie", auth_cookie(&token))
+        .header("content-type", "application/json")
+        .body(Body::from(
+            serde_json::to_string(&serde_json::json!({
+                "warmth_level": 1.5,
+                "classical_ratio": 0.3
+            }))
+            .unwrap(),
+        ))
+        .unwrap();
+    let (status, body) = send(app, req).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(body["success"], false);
+    let invalid = body["invalid_fields"].as_array().unwrap();
+    assert!(invalid.len() >= 2); // warmth_level > 1.0 and classical_ratio < 0.6
+}
+
+#[tokio::test]
+async fn test_put_soul_state_logs_changes() {
+    let state = test_state();
+    let (user_id, token) = create_test_user(&state, "soul_log1", "Slog123x");
+    {
+        let db = state.db.lock();
+        db.execute(
+            "INSERT INTO soul_states (user_id, updated_at) VALUES (?1, datetime('now'))",
+            [&user_id],
+        )
+        .unwrap();
+    }
+
+    let app = build_app(state.clone());
+    let req = Request::put("/api/soul-state")
+        .header("cookie", auth_cookie(&token))
+        .header("content-type", "application/json")
+        .body(Body::from(
+            serde_json::to_string(&serde_json::json!({
+                "warmth_level": 0.6
+            }))
+            .unwrap(),
+        ))
+        .unwrap();
+    let (status, _) = send(app, req).await;
+    assert_eq!(status, StatusCode::OK);
+
+    // Check evolution log
+    let db = state.db.lock();
+    let log_count: i64 = db
+        .query_row(
+            "SELECT COUNT(*) FROM soul_evolution_log WHERE user_id=?1 AND trigger_type='manual'",
+            [&user_id],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert!(log_count >= 1, "Should have at least 1 manual evolution log entry");
+}
+
+// ──────────────────── Soul Evolution ────────────────────
+
+#[tokio::test]
+async fn test_soul_evolution_interaction_count() {
+    let state = test_state();
+    let (user_id, _token) = create_test_user(&state, "soul_evo1", "Sevo123x");
+    {
+        let db = state.db.lock();
+        db.execute(
+            "INSERT INTO soul_states (user_id, updated_at) VALUES (?1, datetime('now'))",
+            [&user_id],
+        )
+        .unwrap();
+    }
+
+    // Call evolve_after_chat (will skip LLM call since no API key in test)
+    next_server::services::soul_evolution::evolve_after_chat(
+        &state,
+        &user_id,
+        &[serde_json::json!({"role": "user", "content": "test"})],
+    )
+    .await;
+
+    // Check total_interactions was incremented
+    let db = state.db.lock();
+    let count: i64 = db
+        .query_row(
+            "SELECT total_interactions FROM soul_states WHERE user_id=?1",
+            [&user_id],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(count, 1);
+}
+
+#[tokio::test]
+async fn test_soul_evolution_relationship_upgrade() {
+    let state = test_state();
+    let (user_id, _token) = create_test_user(&state, "soul_evo2", "Sevo223x");
+    {
+        let db = state.db.lock();
+        db.execute(
+            "INSERT INTO soul_states (user_id, total_interactions, updated_at) VALUES (?1, 9, datetime('now'))",
+            [&user_id],
+        )
+        .unwrap();
+    }
+
+    // This call should push total_interactions to 10 → acquaintance
+    next_server::services::soul_evolution::evolve_after_chat(
+        &state,
+        &user_id,
+        &[serde_json::json!({"role": "user", "content": "hello"})],
+    )
+    .await;
+
+    let db = state.db.lock();
+    let stage: String = db
+        .query_row(
+            "SELECT relationship_stage FROM soul_states WHERE user_id=?1",
+            [&user_id],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(stage, "acquaintance");
+    assert_eq!(
+        db.query_row::<i64, _, _>(
+            "SELECT total_interactions FROM soul_states WHERE user_id=?1",
+            [&user_id],
+            |r| r.get(0),
+        )
+        .unwrap(),
+        10
+    );
+}
+
+#[tokio::test]
+async fn test_soul_state_field_clamping() {
+    // Test that clamp_field works correctly
+    use next_server::models::soul_state::clamp_field;
+
+    // warmth_level: 0.0-1.0
+    assert_eq!(clamp_field("warmth_level", 1.05), 1.0);
+    assert_eq!(clamp_field("warmth_level", -0.1), 0.0);
+    assert_eq!(clamp_field("warmth_level", 0.5), 0.5);
+
+    // classical_ratio: 0.6-1.0
+    assert_eq!(clamp_field("classical_ratio", 0.5), 0.6);
+    assert_eq!(clamp_field("classical_ratio", 1.1), 1.0);
+
+    // proactivity_level: 0.0-0.8
+    assert_eq!(clamp_field("proactivity_level", 0.9), 0.8);
+}
+
+// ──────────────────── Soul Prompt Building ────────────────────
+
+#[tokio::test]
+async fn test_soul_prompt_building() {
+    let state = test_state();
+    let (user_id, _token) = create_test_user(&state, "soul_prompt", "Spro123x");
+
+    // Insert a soul state with familiar stage and adjusted params
+    {
+        let db = state.db.lock();
+        db.execute(
+            "INSERT INTO soul_states (user_id, warmth_level, trust_level, classical_ratio, relationship_stage, updated_at) VALUES (?1, 0.7, 0.7, 0.85, 'familiar', datetime('now'))",
+            [&user_id],
+        )
+        .unwrap();
+    }
+
+    let db = state.db.lock();
+    let prompt = next_server::services::context::build_system_prompt_with_page(
+        &db,
+        &user_id,
+        None,
+        "America/Toronto",
+    );
+
+    // Check soul state section is present
+    assert!(prompt.contains("灵魂状态"), "Prompt should contain soul state section");
+    // Check dynamic personality (high warmth+trust → caring)
+    assert!(prompt.contains("关心") || prompt.contains("关怀"), "High warmth should show caring personality");
+    // Check relationship stage behavior
+    assert!(prompt.contains("熟悉"), "Familiar stage should be mentioned");
+    // Check tone examples exist
+    assert!(prompt.contains("语气参考"), "Tone examples should be present");
+}
+
+// ──────────────────── Registration creates soul state ────────────────────
+
+#[tokio::test]
+async fn test_register_creates_soul_state() {
+    let state = test_state();
+    let app = build_app(state.clone());
+    let req = Request::post("/api/auth/register")
+        .header("content-type", "application/json")
+        .body(Body::from(
+            serde_json::to_string(&serde_json::json!({
+                "username": "soul_reg_user",
+                "password": "Sreg123x"
+            }))
+            .unwrap(),
+        ))
+        .unwrap();
+    let (status, body) = send(app, req).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["success"], true);
+    let user_id = body["user"]["id"].as_str().unwrap();
+
+    // Verify soul state was created
+    let db = state.db.lock();
+    let exists: bool = db
+        .query_row(
+            "SELECT COUNT(*) > 0 FROM soul_states WHERE user_id=?1",
+            [user_id],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert!(exists, "Soul state should be created on registration");
+}

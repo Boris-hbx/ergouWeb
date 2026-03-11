@@ -233,6 +233,9 @@ pub async fn chat_handler(
     let conv_id_clone = conversation_id.clone();
     let start = std::time::Instant::now();
 
+    // Clone messages for soul evolution (before LLM takes ownership)
+    let evo_messages = history_messages.clone();
+
     // Call LLM with tool use loop
     let result = llm
         .chat(&system_prompt, history_messages, &tools, |name, input| {
@@ -276,6 +279,21 @@ pub async fn chat_handler(
                 rusqlite::params![usage_id, tool_user_id, conv_id_clone, "claude-opus-4-6-20250514", chat_result.input_tokens, chat_result.output_tokens, chat_result.tool_calls.len() as i64, latency_ms, now],
             )
             .ok();
+
+            // Trigger soul evolution asynchronously
+            drop(db); // release lock before spawn
+            {
+                let evo_state = state.clone();
+                let evo_user_id = tool_user_id.clone();
+                tokio::spawn(async move {
+                    crate::services::soul_evolution::evolve_after_chat(
+                        &evo_state,
+                        &evo_user_id,
+                        &evo_messages,
+                    )
+                    .await;
+                });
+            }
 
             let tool_info: Vec<serde_json::Value> = chat_result
                 .tool_calls

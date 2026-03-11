@@ -4,4 +4,5 @@ pub mod guest_seed;
 pub mod llm;
 pub mod push;
 pub mod reminder_poller;
+pub mod soul_evolution;
 pub mod tool_executor;

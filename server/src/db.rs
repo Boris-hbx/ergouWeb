@@ -175,6 +175,37 @@ fn run_migrations(conn: &Connection) {
         )
         .ok();
     }
+
+    // Ensure soul_states table exists (for databases created before this feature)
+    let has_soul_states: bool = conn
+        .prepare("SELECT user_id FROM soul_states LIMIT 1")
+        .is_ok();
+    if !has_soul_states {
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS soul_states (
+                user_id TEXT PRIMARY KEY REFERENCES users(id),
+                classical_ratio REAL NOT NULL DEFAULT 0.9,
+                warmth_level REAL NOT NULL DEFAULT 0.3,
+                verbosity_level REAL NOT NULL DEFAULT 0.3,
+                proactivity_level REAL NOT NULL DEFAULT 0.2,
+                trust_level REAL NOT NULL DEFAULT 0.1,
+                relationship_stage TEXT NOT NULL DEFAULT 'stranger',
+                total_interactions INTEGER NOT NULL DEFAULT 0,
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE TABLE IF NOT EXISTS soul_evolution_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL REFERENCES users(id),
+                parameter TEXT NOT NULL,
+                old_value REAL NOT NULL,
+                new_value REAL NOT NULL,
+                trigger_type TEXT NOT NULL DEFAULT 'auto',
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE INDEX IF NOT EXISTS idx_soul_evo_user ON soul_evolution_log(user_id);",
+        )
+        .ok();
+    }
 }
 
 fn create_tables(conn: &Connection) {
@@ -649,6 +680,31 @@ fn create_tables(conn: &Connection) {
             updated_at TEXT NOT NULL
         );
         CREATE INDEX IF NOT EXISTS idx_ergou_people_user ON ergou_people(user_id);
+
+        -- Soul state (per-user personality parameters)
+        CREATE TABLE IF NOT EXISTS soul_states (
+            user_id TEXT PRIMARY KEY REFERENCES users(id),
+            classical_ratio REAL NOT NULL DEFAULT 0.9,
+            warmth_level REAL NOT NULL DEFAULT 0.3,
+            verbosity_level REAL NOT NULL DEFAULT 0.3,
+            proactivity_level REAL NOT NULL DEFAULT 0.2,
+            trust_level REAL NOT NULL DEFAULT 0.1,
+            relationship_stage TEXT NOT NULL DEFAULT 'stranger',
+            total_interactions INTEGER NOT NULL DEFAULT 0,
+            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+
+        -- Soul evolution audit log
+        CREATE TABLE IF NOT EXISTS soul_evolution_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL REFERENCES users(id),
+            parameter TEXT NOT NULL,
+            old_value REAL NOT NULL,
+            new_value REAL NOT NULL,
+            trigger_type TEXT NOT NULL DEFAULT 'auto',
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_soul_evo_user ON soul_evolution_log(user_id);
         ",
     )
     .expect("Failed to create tables");

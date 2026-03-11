@@ -511,6 +511,14 @@ pub async fn register(
         );
     }
 
+    // Initialize default soul state for new user
+    if let Err(e) = db.execute(
+        "INSERT INTO soul_states (user_id, updated_at) VALUES (?1, ?2)",
+        rusqlite::params![user_id, now],
+    ) {
+        eprintln!("[auth] soul state init failed (will lazy-create later): {}", e);
+    }
+
     // If pending, notify all admins
     if status == "pending" {
         let mut admin_stmt = match db.prepare("SELECT id FROM users WHERE role = 'admin'") {

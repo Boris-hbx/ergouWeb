@@ -301,6 +301,14 @@ pub fn build_app(state: AppState) -> Router {
         .nest("/contacts", contacts_routes)
         .nest("/collaborate", collaborate_routes)
         .nest(
+            "/soul-state",
+            Router::new().route(
+                "/",
+                get(routes::soul_state::get_soul_state)
+                    .put(routes::soul_state::update_soul_state),
+            ),
+        )
+        .nest(
             "/admin",
             Router::new()
                 // Existing endpoints
