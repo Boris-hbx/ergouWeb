@@ -44,12 +44,6 @@ pub struct TagsResponse {
 }
 
 #[derive(Debug, Serialize)]
-pub struct SummaryResponse {
-    pub success: bool,
-    pub summary: ExpenseSummary,
-}
-
-#[derive(Debug, Serialize)]
 pub struct SimpleResponse {
     pub success: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -553,7 +547,7 @@ pub async fn get_summary(
     State(state): State<AppState>,
     user_id: UserId,
     Query(query): Query<ExpenseSummaryQuery>,
-) -> (StatusCode, Json<SummaryResponse>) {
+) -> (StatusCode, Json<serde_json::Value>) {
     let db = state.db.lock();
     let today = chrono::Local::now().date_naive();
     let ref_date = query
@@ -635,18 +629,218 @@ pub async fn get_summary(
 
     (
         StatusCode::OK,
-        Json(SummaryResponse {
-            success: true,
-            summary: ExpenseSummary {
-                total_amount,
-                entry_count,
-                period: query.period,
-                from,
-                to,
-                tag_totals,
-            },
-        }),
+        Json(json!({
+            "success": true,
+            "deprecated": true,
+            "summary": {
+                "total_amount": total_amount,
+                "entry_count": entry_count,
+                "period": query.period,
+                "from": from,
+                "to": to,
+                "tag_totals": tag_totals,
+            }
+        })),
     )
+}
+
+// ===== Stats (unified) =====
+pub async fn get_stats(
+    State(state): State<AppState>,
+    user_id: UserId,
+    Query(query): Query<ExpenseStatsQuery>,
+) -> (StatusCode, Json<serde_json::Value>) {
+    let today = chrono::Local::now().date_naive();
+    let ref_date = match query.date.as_ref() {
+        Some(d) => match chrono::NaiveDate::parse_from_str(d, "%Y-%m-%d") {
+            Ok(date) => date,
+            Err(_) => {
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(json!({ "error": "invalid date format, expected YYYY-MM-DD" })),
+                );
+            }
+        },
+        None => today,
+    };
+
+    let (from_date, to_date) = match query.period.as_str() {
+        "day" => (ref_date, ref_date),
+        "week" => {
+            let weekday = ref_date.weekday().num_days_from_monday();
+            let start = ref_date - chrono::Duration::days(weekday as i64);
+            let end = start + chrono::Duration::days(6);
+            (start, end)
+        }
+        "month" => {
+            let start = chrono::NaiveDate::from_ymd_opt(ref_date.year(), ref_date.month(), 1)
+                .unwrap_or(ref_date);
+            let end = if ref_date.month() == 12 {
+                chrono::NaiveDate::from_ymd_opt(ref_date.year() + 1, 1, 1)
+            } else {
+                chrono::NaiveDate::from_ymd_opt(ref_date.year(), ref_date.month() + 1, 1)
+            }
+            .map(|d| d - chrono::Duration::days(1))
+            .unwrap_or(ref_date);
+            (start, end)
+        }
+        _ => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": "invalid period, must be day/week/month" })),
+            );
+        }
+    };
+
+    let from = from_date.to_string();
+    let to = to_date.to_string();
+
+    let db = state.db.lock();
+
+    // Query all entries in range
+    let mut tag_map: std::collections::HashMap<String, (f64, i64)> =
+        std::collections::HashMap::new();
+    let mut cat_map: std::collections::HashMap<&str, (f64, i64)> =
+        std::collections::HashMap::new();
+    let mut day_map: std::collections::HashMap<String, f64> = std::collections::HashMap::new();
+    let mut total_amount: f64 = 0.0;
+    let mut entry_count: i64 = 0;
+
+    if let Ok(mut stmt) = db.prepare(
+        "SELECT amount, date, tags FROM expense_entries WHERE user_id = ?1 AND date >= ?2 AND date <= ?3",
+    ) {
+        if let Ok(rows) = stmt.query_map(rusqlite::params![user_id.0, from, to], |row| {
+            Ok((
+                row.get::<_, f64>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+            ))
+        }) {
+            for row in rows.flatten() {
+                let (amount, date, tags_json) = row;
+                total_amount += amount;
+                entry_count += 1;
+
+                // tag_totals
+                let tags: Vec<String> = serde_json::from_str(&tags_json).unwrap_or_default();
+                for tag in &tags {
+                    let e = tag_map.entry(tag.clone()).or_insert((0.0, 0));
+                    e.0 += amount;
+                    e.1 += 1;
+                }
+
+                // category_totals
+                let cat = entry_category(&tags_json);
+                let e = cat_map.entry(cat).or_insert((0.0, 0));
+                e.0 += amount;
+                e.1 += 1;
+
+                // daily
+                *day_map.entry(date).or_insert(0.0) += amount;
+            }
+        }
+    }
+
+    // Build tag_totals sorted by amount desc
+    let mut tag_totals: Vec<TagTotal> = tag_map
+        .into_iter()
+        .map(|(tag, (amount, count))| TagTotal { tag, amount, count })
+        .collect();
+    tag_totals.sort_by(|a, b| {
+        b.amount
+            .partial_cmp(&a.amount)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    // Build category_totals sorted by amount desc
+    let mut category_totals: Vec<CategoryTotal> = cat_map
+        .into_iter()
+        .map(|(cat, (amount, count))| {
+            let percentage = if total_amount > 0.0 {
+                (amount / total_amount * 1000.0).round() / 10.0
+            } else {
+                0.0
+            };
+            CategoryTotal {
+                category: cat.to_string(),
+                amount,
+                count,
+                percentage,
+            }
+        })
+        .collect();
+    category_totals.sort_by(|a, b| {
+        b.amount
+            .partial_cmp(&a.amount)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    // Build daily totals — every date in range, 0 for missing
+    let mut daily: Vec<DailyTotal> = Vec::new();
+    let mut d = from_date;
+    while d <= to_date {
+        let ds = d.to_string();
+        let amt = day_map.get(&ds).copied().unwrap_or(0.0);
+        daily.push(DailyTotal {
+            date: ds,
+            amount: amt,
+        });
+        d += chrono::Duration::days(1);
+    }
+
+    // Comparison: query previous period total
+    let (prev_from, prev_to) = match query.period.as_str() {
+        "day" => {
+            let prev = ref_date - chrono::Duration::days(1);
+            (prev, prev)
+        }
+        "week" => {
+            let prev_start = from_date - chrono::Duration::days(7);
+            let prev_end = from_date - chrono::Duration::days(1);
+            (prev_start, prev_end)
+        }
+        _ => {
+            // month: previous month
+            let prev_end = from_date - chrono::Duration::days(1);
+            let prev_start =
+                chrono::NaiveDate::from_ymd_opt(prev_end.year(), prev_end.month(), 1)
+                    .unwrap_or(prev_end);
+            (prev_start, prev_end)
+        }
+    };
+
+    let prev_total: f64 = db
+        .query_row(
+            "SELECT COALESCE(SUM(amount), 0) FROM expense_entries WHERE user_id = ?1 AND date >= ?2 AND date <= ?3",
+            rusqlite::params![user_id.0, prev_from.to_string(), prev_to.to_string()],
+            |row| row.get(0),
+        )
+        .unwrap_or(0.0);
+
+    let change_percent = if prev_total == 0.0 && total_amount > 0.0 {
+        100.0
+    } else if prev_total == 0.0 {
+        0.0
+    } else {
+        ((total_amount - prev_total) / prev_total * 1000.0).round() / 10.0
+    };
+
+    let stats = ExpenseStats {
+        period: query.period,
+        from,
+        to,
+        total_amount,
+        entry_count,
+        tag_totals,
+        category_totals,
+        daily,
+        comparison: Comparison {
+            prev_total,
+            change_percent,
+        },
+    };
+
+    (StatusCode::OK, Json(json!({ "success": true, "stats": stats })))
 }
 
 // ===== List tags =====
@@ -1512,6 +1706,7 @@ pub async fn get_analytics(
         StatusCode::OK,
         Json(json!({
             "success": true,
+            "deprecated": true,
             "analytics": {
                 "period": query.period,
                 "from": from,

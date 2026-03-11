@@ -196,6 +196,36 @@ pub struct ExpenseAnalyticsQuery {
     pub date: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct ExpenseStatsQuery {
+    #[serde(default = "default_stats_period")]
+    pub period: String,
+    pub date: Option<String>,
+}
+
+fn default_stats_period() -> String {
+    "month".to_string()
+}
+
+#[derive(Debug, Serialize)]
+pub struct ExpenseStats {
+    pub period: String,
+    pub from: String,
+    pub to: String,
+    pub total_amount: f64,
+    pub entry_count: i64,
+    pub tag_totals: Vec<TagTotal>,
+    pub category_totals: Vec<CategoryTotal>,
+    pub daily: Vec<DailyTotal>,
+    pub comparison: Comparison,
+}
+
+#[derive(Debug, Serialize)]
+pub struct Comparison {
+    pub prev_total: f64,
+    pub change_percent: f64,
+}
+
 #[derive(Debug, Serialize)]
 pub struct CategoryTotal {
     pub category: String,
