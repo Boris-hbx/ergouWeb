@@ -67,40 +67,40 @@ pub fn execute_tool(db: &Connection, user_id: &str, tool_name: &str, input: &Val
         "update_todo" => tool_update_todo(db, user_id, input),
         "delete_todo" => tool_delete_todo(db, user_id, input),
         "restore_todo" => tool_restore_todo(db, user_id, input),
-        "query_todos" => tool_query_todos(db, user_id, input),
+        "list_todos" => tool_query_todos(db, user_id, input),
         "batch_update_todos" => tool_batch_update_todos(db, user_id, input),
         "create_routine" => tool_create_routine(db, user_id, input),
-        "query_routines" => tool_query_routines(db, user_id, input),
+        "list_routines" => tool_query_routines(db, user_id, input),
         "update_routine" => tool_update_routine(db, user_id, input),
         "delete_routine" => tool_delete_routine(db, user_id, input),
         "create_review" => tool_create_review(db, user_id, input),
-        "query_reviews" => tool_query_reviews(db, user_id, input),
+        "list_reviews" => tool_query_reviews(db, user_id, input),
         "update_review" => tool_update_review(db, user_id, input),
         "delete_review" => tool_delete_review(db, user_id, input),
-        "get_statistics" => tool_get_statistics(db, user_id, input),
-        "get_current_datetime" => tool_get_current_datetime(),
-        "create_english_scenario" => tool_create_english_scenario(db, user_id, input),
-        "query_english_scenarios" => tool_query_english_scenarios(db, user_id, input),
-        "update_english_scenario" => tool_update_english_scenario(db, user_id, input),
-        "delete_english_scenario" => tool_delete_english_scenario(db, user_id, input),
+        "get_stats" => tool_get_statistics(db, user_id, input),
+        "get_datetime" => tool_get_current_datetime(),
+        "create_scenario" => tool_create_english_scenario(db, user_id, input),
+        "list_scenarios" => tool_query_english_scenarios(db, user_id, input),
+        "update_scenario" => tool_update_english_scenario(db, user_id, input),
+        "delete_scenario" => tool_delete_english_scenario(db, user_id, input),
         "create_expense" => tool_create_expense(db, user_id, input),
-        "query_expenses" => tool_query_expenses(db, user_id, input),
+        "list_expenses" => tool_query_expenses(db, user_id, input),
         "update_expense" => tool_update_expense(db, user_id, input),
         "delete_expense" => tool_delete_expense(db, user_id, input),
-        "get_expense_summary" => tool_get_expense_summary(db, user_id, input),
+        "get_expense_stats" => tool_get_expense_summary(db, user_id, input),
         "create_reminder" => tool_create_reminder(db, user_id, input),
-        "query_reminders" => tool_query_reminders(db, user_id, input),
+        "list_reminders" => tool_query_reminders(db, user_id, input),
         "cancel_reminder" => tool_cancel_reminder(db, user_id, input),
         "snooze_reminder" => tool_snooze_reminder(db, user_id, input),
-        "query_trips" => tool_query_trips(db, user_id, input),
-        "get_trip_detail" => tool_get_trip_detail(db, user_id, input),
+        "list_trips" => tool_query_trips(db, user_id, input),
+        "get_trip" => tool_get_trip_detail(db, user_id, input),
         "create_trip" => tool_create_trip(db, user_id, input),
         "update_trip" => tool_update_trip(db, user_id, input),
         "delete_trip" => tool_delete_trip(db, user_id, input),
         "create_trip_item" => tool_create_trip_item(db, user_id, input),
         "update_trip_item" => tool_update_trip_item(db, user_id, input),
         "delete_trip_item" => tool_delete_trip_item(db, user_id, input),
-        "get_trip_summary" => tool_get_trip_summary(db, user_id, input),
+        "get_trip_stats" => tool_get_trip_summary(db, user_id, input),
         "save_person" => tool_save_person(db, user_id, input),
         "update_person" => tool_update_person(db, user_id, input),
         "delete_person" => tool_delete_person(db, user_id, input),
@@ -172,7 +172,7 @@ pub fn tool_definitions() -> Vec<Value> {
             }
         }),
         json!({
-            "name": "query_todos",
+            "name": "list_todos",
             "description": "查询任务列表，支持多种过滤条件。也会返回协作任务。",
             "input_schema": {
                 "type": "object",
@@ -236,7 +236,7 @@ pub fn tool_definitions() -> Vec<Value> {
             }
         }),
         json!({
-            "name": "get_statistics",
+            "name": "get_stats",
             "description": "获取用户的任务统计数据",
             "input_schema": {
                 "type": "object",
@@ -247,7 +247,7 @@ pub fn tool_definitions() -> Vec<Value> {
             }
         }),
         json!({
-            "name": "get_current_datetime",
+            "name": "get_datetime",
             "description": "获取当前日期和时间",
             "input_schema": {
                 "type": "object",
@@ -255,7 +255,7 @@ pub fn tool_definitions() -> Vec<Value> {
             }
         }),
         json!({
-            "name": "create_english_scenario",
+            "name": "create_scenario",
             "description": "创建一个学习场景（支持英语、编程、职场、生活等分类），创建后会自动生成学习内容",
             "input_schema": {
                 "type": "object",
@@ -268,7 +268,7 @@ pub fn tool_definitions() -> Vec<Value> {
             }
         }),
         json!({
-            "name": "query_english_scenarios",
+            "name": "list_scenarios",
             "description": "查询用户的学习场景列表。需要修改内容时请传 include_content: true 获取完整内容",
             "input_schema": {
                 "type": "object",
@@ -293,7 +293,7 @@ pub fn tool_definitions() -> Vec<Value> {
             }
         }),
         json!({
-            "name": "query_reminders",
+            "name": "list_reminders",
             "description": "查询用户的提醒列表",
             "input_schema": {
                 "type": "object",
@@ -327,7 +327,7 @@ pub fn tool_definitions() -> Vec<Value> {
         }),
         // ─── Routine tools ───
         json!({
-            "name": "query_routines",
+            "name": "list_routines",
             "description": "查询例行任务列表",
             "input_schema": {
                 "type": "object",
@@ -361,7 +361,7 @@ pub fn tool_definitions() -> Vec<Value> {
         }),
         // ─── Review tools ───
         json!({
-            "name": "query_reviews",
+            "name": "list_reviews",
             "description": "查询审视项列表",
             "input_schema": {
                 "type": "object",
@@ -400,7 +400,7 @@ pub fn tool_definitions() -> Vec<Value> {
         }),
         // ─── English scenario tools ───
         json!({
-            "name": "update_english_scenario",
+            "name": "update_scenario",
             "description": "更新学习笔记的标题、内容、备注或分类",
             "input_schema": {
                 "type": "object",
@@ -415,7 +415,7 @@ pub fn tool_definitions() -> Vec<Value> {
             }
         }),
         json!({
-            "name": "delete_english_scenario",
+            "name": "delete_scenario",
             "description": "删除一条学习笔记",
             "input_schema": {
                 "type": "object",
@@ -442,7 +442,7 @@ pub fn tool_definitions() -> Vec<Value> {
             }
         }),
         json!({
-            "name": "query_expenses",
+            "name": "list_expenses",
             "description": "查询记账记录列表",
             "input_schema": {
                 "type": "object",
@@ -483,7 +483,7 @@ pub fn tool_definitions() -> Vec<Value> {
             }
         }),
         json!({
-            "name": "get_expense_summary",
+            "name": "get_expense_stats",
             "description": "获取记账统计汇总（总额、笔数、按标签分组）",
             "input_schema": {
                 "type": "object",
@@ -495,7 +495,7 @@ pub fn tool_definitions() -> Vec<Value> {
         }),
         // ─── Trip tools ───
         json!({
-            "name": "query_trips",
+            "name": "list_trips",
             "description": "查询用户的差旅行程列表",
             "input_schema": {
                 "type": "object",
@@ -503,7 +503,7 @@ pub fn tool_definitions() -> Vec<Value> {
             }
         }),
         json!({
-            "name": "get_trip_detail",
+            "name": "get_trip",
             "description": "获取某个差旅行程的详细信息（包含所有条目和协作者）",
             "input_schema": {
                 "type": "object",
@@ -606,7 +606,7 @@ pub fn tool_definitions() -> Vec<Value> {
             }
         }),
         json!({
-            "name": "get_trip_summary",
+            "name": "get_trip_stats",
             "description": "获取差旅费用汇总（总额、报销状态统计）",
             "input_schema": {
                 "type": "object",
