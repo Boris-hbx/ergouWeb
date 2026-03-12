@@ -6,6 +6,7 @@ pub mod conversations;
 pub mod english;
 pub mod expenses;
 pub mod friends;
+pub mod memories;
 pub mod moment;
 pub mod notifications;
 pub mod observability;

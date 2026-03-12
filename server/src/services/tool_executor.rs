@@ -105,6 +105,7 @@ pub fn execute_tool(db: &Connection, user_id: &str, tool_name: &str, input: &Val
         "update_person" => tool_update_person(db, user_id, input),
         "delete_person" => tool_delete_person(db, user_id, input),
         "save_memory" => tool_save_memory(db, user_id, input),
+        "search_memory" => tool_search_memory(db, user_id, input),
         "delete_memory" => tool_delete_memory(db, user_id, input),
         "report_security_event" => tool_report_security_event(db, user_id, input),
         _ => json!({"error": format!("Unknown tool: {}", tool_name)}),
@@ -662,10 +663,22 @@ pub fn tool_definitions() -> Vec<Value> {
             "input_schema": {
                 "type": "object",
                 "properties": {
-                    "content": {"type": "string", "description": "要记住的内容，简明扼要，不超过200字"},
-                    "category": {"type": "string", "enum": ["habit", "fact", "personality", "intent"], "description": "记忆类别：habit=操作习惯/默认值，fact=个人事实，personality=沟通偏好，intent=提过但没做的事"}
+                    "content": {"type": "string", "description": "要记住的内容，简明扼要，不超过500字"},
+                    "category": {"type": "string", "enum": ["habit", "fact", "personality", "intent"], "description": "记忆类别：habit=操作习惯/默认值，fact=个人事实，personality=沟通偏好，intent=提过但没做的事"},
+                    "importance": {"type": "integer", "description": "重要程度1-5，默认3", "minimum": 1, "maximum": 5}
                 },
                 "required": ["content", "category"]
+            }
+        }),
+        json!({
+            "name": "search_memory",
+            "description": "搜索用户的记忆。当需要回忆用户之前提到的信息时调用。",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "搜索关键词"}
+                },
+                "required": ["query"]
             }
         }),
         json!({
@@ -2724,9 +2737,9 @@ fn tool_save_memory(db: &Connection, user_id: &str, input: &Value) -> Value {
         _ => return json!({"error": "content 不能为空"}),
     };
 
-    // Length check (200 chars)
-    if content.chars().count() > 200 {
-        return json!({"error": "记忆内容不能超过200字"});
+    // Length check (500 chars)
+    if content.chars().count() > 500 {
+        return json!({"error": "记忆内容不能超过500字"});
     }
 
     // Category validation
@@ -2735,6 +2748,9 @@ fn tool_save_memory(db: &Connection, user_id: &str, input: &Value) -> Value {
     if !valid_categories.contains(&category) {
         return json!({"error": "无效的记忆类别"});
     }
+
+    // Importance (1-5, default 3)
+    let importance = input["importance"].as_i64().unwrap_or(3).clamp(1, 5);
 
     // Sensitive content check
     if is_sensitive_content(content) {
@@ -2753,7 +2769,7 @@ fn tool_save_memory(db: &Connection, user_id: &str, input: &Value) -> Value {
         return json!({"success": true, "message": "已经记住了，不用重复记"});
     }
 
-    // Check 50 limit
+    // Check 100 limit
     let count: i64 = db
         .query_row(
             "SELECT COUNT(*) FROM ergou_memories WHERE user_id=?1",
@@ -2761,7 +2777,7 @@ fn tool_save_memory(db: &Connection, user_id: &str, input: &Value) -> Value {
             |r| r.get(0),
         )
         .unwrap_or(0);
-    if count >= 50 {
+    if count >= 100 {
         // Delete the oldest least-accessed memory to make room
         db.execute(
             "DELETE FROM ergou_memories WHERE id = (SELECT id FROM ergou_memories WHERE user_id=?1 ORDER BY access_count ASC, last_accessed_at ASC LIMIT 1)",
@@ -2770,17 +2786,65 @@ fn tool_save_memory(db: &Connection, user_id: &str, input: &Value) -> Value {
         .ok();
     }
 
-    let id = uuid::Uuid::new_v4().to_string()[..8].to_string();
+    let id = format!("mem_{}", &uuid::Uuid::new_v4().to_string()[..12]);
     let now = chrono::Utc::now().to_rfc3339();
     let conversation_id = input["conversation_id"].as_str().unwrap_or("");
 
     match db.execute(
-        "INSERT INTO ergou_memories (id, user_id, category, content, source_conversation_id, created_at, last_accessed_at, access_count) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 0)",
-        rusqlite::params![id, user_id, category, content, conversation_id, now, now],
+        "INSERT INTO ergou_memories (id, user_id, category, content, importance, source_conversation_id, created_at, last_accessed_at, access_count) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 0)",
+        rusqlite::params![id, user_id, category, content, importance, conversation_id, now, now],
     ) {
         Ok(_) => json!({"success": true, "id": id, "message": "记住了"}),
         Err(e) => json!({"error": format!("保存记忆失败: {}", e)}),
     }
+}
+
+fn tool_search_memory(db: &Connection, user_id: &str, input: &Value) -> Value {
+    let query = match input["query"].as_str() {
+        Some(q) if !q.trim().is_empty() => q.trim(),
+        _ => return json!({"error": "query 不能为空"}),
+    };
+
+    let pattern = format!("%{}%", query);
+    let mut results: Vec<Value> = Vec::new();
+    let mut ids: Vec<String> = Vec::new();
+
+    if let Ok(mut stmt) = db.prepare(
+        "SELECT id, category, content, importance FROM ergou_memories WHERE user_id=?1 AND content LIKE ?2 COLLATE NOCASE ORDER BY importance DESC, access_count DESC LIMIT 10",
+    ) {
+        if let Ok(rows) = stmt.query_map(rusqlite::params![user_id, pattern], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, i64>(3).unwrap_or(3),
+            ))
+        }) {
+            for row in rows.flatten() {
+                ids.push(row.0.clone());
+                results.push(json!({
+                    "id": row.0,
+                    "category": row.1,
+                    "content": row.2,
+                    "importance": row.3
+                }));
+            }
+        }
+    }
+
+    // Update access tracking
+    if !ids.is_empty() {
+        let now = chrono::Utc::now().to_rfc3339();
+        for id in &ids {
+            db.execute(
+                "UPDATE ergou_memories SET last_accessed_at=?1, access_count=access_count+1 WHERE id=?2",
+                rusqlite::params![now, id],
+            )
+            .ok();
+        }
+    }
+
+    json!({"success": true, "memories": results, "count": results.len()})
 }
 
 fn tool_delete_memory(db: &Connection, user_id: &str, input: &Value) -> Value {

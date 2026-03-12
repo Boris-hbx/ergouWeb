@@ -176,6 +176,22 @@ fn run_migrations(conn: &Connection) {
         .ok();
     }
 
+    // Add importance column to ergou_memories (for databases created before this feature)
+    let has_importance: bool = conn
+        .prepare("SELECT importance FROM ergou_memories LIMIT 1")
+        .is_ok();
+    if !has_importance {
+        conn.execute_batch(
+            "ALTER TABLE ergou_memories ADD COLUMN importance INTEGER DEFAULT 3;",
+        )
+        .ok();
+    }
+    // Add additional indexes for memories
+    conn.execute_batch(
+        "CREATE INDEX IF NOT EXISTS idx_ergou_memories_user_category ON ergou_memories(user_id, category);",
+    )
+    .ok();
+
     // Ensure soul_states table exists (for databases created before this feature)
     let has_soul_states: bool = conn
         .prepare("SELECT user_id FROM soul_states LIMIT 1")
@@ -618,12 +634,14 @@ fn create_tables(conn: &Connection) {
             user_id TEXT NOT NULL REFERENCES users(id),
             category TEXT NOT NULL DEFAULT 'user_fact',
             content TEXT NOT NULL,
+            importance INTEGER DEFAULT 3,
             source_conversation_id TEXT,
             created_at TEXT NOT NULL,
             last_accessed_at TEXT NOT NULL,
             access_count INTEGER DEFAULT 0
         );
         CREATE INDEX IF NOT EXISTS idx_ergou_memories_user ON ergou_memories(user_id, last_accessed_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_ergou_memories_user_category ON ergou_memories(user_id, category);
 
         -- Security events (安全事件)
         CREATE TABLE IF NOT EXISTS security_events (

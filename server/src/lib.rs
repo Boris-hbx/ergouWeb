@@ -263,6 +263,19 @@ pub fn build_app(state: state::AppState) -> Router {
             ),
         )
         .nest(
+            "/memories",
+            Router::new()
+                .route(
+                    "/",
+                    get(routes::memories::list_memories)
+                        .post(routes::memories::create_memory)
+                        .delete(routes::memories::clear_memories),
+                )
+                .route("/batch", post(routes::memories::batch_import))
+                .route("/search", get(routes::memories::search_memories))
+                .route("/{id}", delete(routes::memories::delete_memory)),
+        )
+        .nest(
             "/admin",
             Router::new()
                 .route("/dashboard", get(routes::admin::dashboard))
