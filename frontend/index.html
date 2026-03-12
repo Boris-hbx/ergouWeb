@@ -8,15 +8,15 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Next">
     <title>Next - Focus on the Right Thing</title>
-    <link rel="stylesheet" href="assets/css/base.css?v=20260308a">
-    <link rel="stylesheet" href="assets/css/style.css?v=20260308a">
-    <link rel="stylesheet" href="assets/css/components.css?v=20260308a">
-    <link rel="stylesheet" href="assets/css/mobile.css?v=20260308a">
-    <link rel="stylesheet" href="assets/css/abao.css?v=20260308a">
-    <link rel="stylesheet" href="assets/css/english.css?v=20260308a">
-    <link rel="stylesheet" href="assets/css/health.css?v=20260308a">
-    <link rel="stylesheet" href="assets/css/patrol.css?v=20260308a">
-    <link rel="stylesheet" href="assets/css/admin-panel.css?v=20260308a">
+    <link rel="stylesheet" href="assets/css/base.css?v=20260312a">
+    <link rel="stylesheet" href="assets/css/style.css?v=20260312a">
+    <link rel="stylesheet" href="assets/css/components.css?v=20260312a">
+    <link rel="stylesheet" href="assets/css/mobile.css?v=20260312a">
+    <link rel="stylesheet" href="assets/css/abao.css?v=20260312a">
+    <link rel="stylesheet" href="assets/css/english.css?v=20260312a">
+    <link rel="stylesheet" href="assets/css/health.css?v=20260312a">
+    <link rel="stylesheet" href="assets/css/patrol.css?v=20260312a">
+    <link rel="stylesheet" href="assets/css/admin-panel.css?v=20260312a">
     <link rel="manifest" href="assets/manifest.json">
     <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
     <script>
@@ -858,31 +858,65 @@
 
             <!-- 统计子视图 -->
             <div class="expense-analytics-view" id="expense-analytics-view" style="display:none;">
-                <div class="expense-analytics-period-tabs">
-                    <button class="expense-analytics-period-btn active" data-period="week" onclick="ExpenseAnalytics.switchPeriod('week')">周</button>
-                    <button class="expense-analytics-period-btn" data-period="month" onclick="ExpenseAnalytics.switchPeriod('month')">月</button>
-                </div>
                 <div class="expense-analytics-date-nav">
                     <button class="expense-nav-btn" onclick="ExpenseAnalytics.navigateDate(-1)">&lsaquo;</button>
                     <span class="expense-analytics-date-label" id="expense-analytics-date-label"></span>
-                    <button class="expense-nav-btn" onclick="ExpenseAnalytics.navigateDate(1)">&rsaquo;</button>
+                    <button class="expense-nav-btn" id="expense-analytics-next-btn" onclick="ExpenseAnalytics.navigateDate(1)">&rsaquo;</button>
                 </div>
-                <div class="expense-analytics-total" id="expense-analytics-total"></div>
-                <div class="expense-analytics-chart-section">
-                    <h4 class="expense-analytics-section-title">分类占比</h4>
-                    <div class="expense-analytics-pie-wrapper">
-                        <canvas id="expense-pie-canvas"></canvas>
+                <div class="expense-analytics-period-tabs">
+                    <button class="expense-analytics-period-btn" data-period="day" onclick="ExpenseAnalytics.switchPeriod('day')">日</button>
+                    <button class="expense-analytics-period-btn" data-period="week" onclick="ExpenseAnalytics.switchPeriod('week')">周</button>
+                    <button class="expense-analytics-period-btn active" data-period="month" onclick="ExpenseAnalytics.switchPeriod('month')">月</button>
+                </div>
+                <!-- 骨架屏 -->
+                <div class="expense-analytics-skeleton" id="expense-analytics-skeleton" style="display:none;">
+                    <div class="ea-skeleton-summary"><div class="ea-skeleton-bar wide"></div><div class="ea-skeleton-bar narrow"></div></div>
+                    <div class="ea-skeleton-chart"><div class="ea-skeleton-circle"></div></div>
+                    <div class="ea-skeleton-chart"><div class="ea-skeleton-bar wide"></div><div class="ea-skeleton-bar wide"></div></div>
+                </div>
+                <!-- 错误重试 -->
+                <div class="expense-analytics-error" id="expense-analytics-error" style="display:none;">
+                    <p>加载失败</p>
+                    <button class="btn btn-primary btn-sm" onclick="ExpenseAnalytics.retry()">重试</button>
+                </div>
+                <!-- 数据内容 -->
+                <div id="expense-analytics-content" style="display:none;">
+                    <!-- 汇总卡片 -->
+                    <div class="expense-analytics-summary-card" id="expense-analytics-summary">
+                        <div class="ea-summary-main">
+                            <span class="ea-summary-label">总支出</span>
+                            <span class="ea-summary-amount" id="expense-analytics-amount">¥0.00</span>
+                        </div>
+                        <div class="ea-summary-meta">
+                            <span class="ea-summary-count" id="expense-analytics-count"></span>
+                            <span class="ea-summary-comparison" id="expense-analytics-comparison"></span>
+                        </div>
                     </div>
-                    <div class="expense-analytics-legend" id="expense-analytics-legend"></div>
-                </div>
-                <div class="expense-analytics-chart-section">
-                    <h4 class="expense-analytics-section-title">每日趋势</h4>
-                    <div class="expense-analytics-bar-wrapper">
-                        <canvas id="expense-bar-canvas"></canvas>
+                    <!-- 分类饼图 -->
+                    <div class="expense-analytics-chart-section" id="expense-analytics-pie-section">
+                        <h4 class="expense-analytics-section-title">分类占比</h4>
+                        <div class="expense-analytics-pie-wrapper">
+                            <canvas id="expense-pie-canvas"></canvas>
+                        </div>
+                        <div class="expense-analytics-legend" id="expense-analytics-legend"></div>
+                    </div>
+                    <!-- 每日趋势 -->
+                    <div class="expense-analytics-chart-section" id="expense-analytics-bar-section">
+                        <h4 class="expense-analytics-section-title">每日趋势</h4>
+                        <div class="expense-analytics-bar-wrapper">
+                            <canvas id="expense-bar-canvas"></canvas>
+                        </div>
+                    </div>
+                    <!-- 标签明细 -->
+                    <div class="expense-analytics-chart-section" id="expense-analytics-tags-section">
+                        <h4 class="expense-analytics-section-title">标签明细</h4>
+                        <div class="expense-analytics-tag-list" id="expense-analytics-tag-list"></div>
                     </div>
                 </div>
+                <!-- 空状态 -->
                 <div class="expense-analytics-empty" id="expense-analytics-empty" style="display:none;">
-                    <p>暂无消费记录</p>
+                    <div class="expense-analytics-empty-icon">📊</div>
+                    <p id="expense-analytics-empty-text">暂无消费记录</p>
                 </div>
             </div>
         </div>
@@ -1385,39 +1419,39 @@
     </div>
 
     <!-- JS Modules -->
-    <script src="assets/js/observability.js?v=20260308a"></script>
-    <script src="assets/js/api.js?v=20260308a"></script>
-    <script src="assets/js/utils.js?v=20260308a"></script>
-    <script src="assets/js/jelly-indicator.js?v=20260308a"></script>
-    <script src="assets/js/app.js?v=20260308a"></script>
-    <script src="assets/js/tasks.js?v=20260308a"></script>
-    <script src="assets/js/modal.js?v=20260308a"></script>
-    <script src="assets/js/datepicker.js?v=20260308a"></script>
-    <script src="assets/js/drag.js?v=20260308a"></script>
-    <script src="assets/js/actionsheet.js?v=20260308a"></script>
-    <script src="assets/js/share-modal.js?v=20260308a"></script>
-    <script src="assets/js/review.js?v=20260308a"></script>
-    <script src="assets/js/routines.js?v=20260308a"></script>
-    <script src="assets/js/features.js?v=20260308a"></script>
-    <script src="assets/js/particles.js?v=20260308a"></script>
-    <script src="assets/js/living-line.js?v=20260308a"></script>
-    <script src="assets/js/abao.js?v=20260308a"></script>
-    <script src="assets/js/english.js?v=20260308a"></script>
-    <script src="assets/js/life.js?v=20260308a"></script>
-    <script src="assets/js/expense.js?v=20260308a"></script>
-    <script src="assets/js/expense-analytics.js?v=20260308a"></script>
-    <script src="assets/js/trip.js?v=20260308a"></script>
-    <script src="assets/js/health-data.js?v=20260308a"></script>
-    <script src="assets/js/health-renderer.js?v=20260308a"></script>
-    <script src="assets/js/health.js?v=20260308a"></script>
-    <script src="assets/js/friends.js?v=20260308a"></script>
-    <script src="assets/js/notifications.js?v=20260308a"></script>
-    <script src="assets/js/settings.js?v=20260308a"></script>
-    <script src="assets/js/admin-panel.js?v=20260308a"></script>
-    <script src="assets/js/patrol-utils.js?v=20260308a"></script>
-    <script src="assets/js/patrol-terrain.js?v=20260308a"></script>
-    <script src="assets/js/patrol-debug.js?v=20260308a"></script>
-    <script src="assets/js/patrol.js?v=20260308a"></script>
+    <script src="assets/js/observability.js?v=20260312a"></script>
+    <script src="assets/js/api.js?v=20260312a"></script>
+    <script src="assets/js/utils.js?v=20260312a"></script>
+    <script src="assets/js/jelly-indicator.js?v=20260312a"></script>
+    <script src="assets/js/app.js?v=20260312a"></script>
+    <script src="assets/js/tasks.js?v=20260312a"></script>
+    <script src="assets/js/modal.js?v=20260312a"></script>
+    <script src="assets/js/datepicker.js?v=20260312a"></script>
+    <script src="assets/js/drag.js?v=20260312a"></script>
+    <script src="assets/js/actionsheet.js?v=20260312a"></script>
+    <script src="assets/js/share-modal.js?v=20260312a"></script>
+    <script src="assets/js/review.js?v=20260312a"></script>
+    <script src="assets/js/routines.js?v=20260312a"></script>
+    <script src="assets/js/features.js?v=20260312a"></script>
+    <script src="assets/js/particles.js?v=20260312a"></script>
+    <script src="assets/js/living-line.js?v=20260312a"></script>
+    <script src="assets/js/abao.js?v=20260312a"></script>
+    <script src="assets/js/english.js?v=20260312a"></script>
+    <script src="assets/js/life.js?v=20260312a"></script>
+    <script src="assets/js/expense.js?v=20260312a"></script>
+    <script src="assets/js/expense-analytics.js?v=20260312a"></script>
+    <script src="assets/js/trip.js?v=20260312a"></script>
+    <script src="assets/js/health-data.js?v=20260312a"></script>
+    <script src="assets/js/health-renderer.js?v=20260312a"></script>
+    <script src="assets/js/health.js?v=20260312a"></script>
+    <script src="assets/js/friends.js?v=20260312a"></script>
+    <script src="assets/js/notifications.js?v=20260312a"></script>
+    <script src="assets/js/settings.js?v=20260312a"></script>
+    <script src="assets/js/admin-panel.js?v=20260312a"></script>
+    <script src="assets/js/patrol-utils.js?v=20260312a"></script>
+    <script src="assets/js/patrol-terrain.js?v=20260312a"></script>
+    <script src="assets/js/patrol-debug.js?v=20260312a"></script>
+    <script src="assets/js/patrol.js?v=20260312a"></script>
 
     <script>
     // Initialize

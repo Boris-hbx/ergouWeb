@@ -479,6 +479,12 @@ var API = (function() {
             return await request('GET', '/expenses/analytics?' + params);
         },
 
+        getExpenseStats: async function(period, date) {
+            var params = 'period=' + encodeURIComponent(period);
+            if (date) params += '&date=' + encodeURIComponent(date);
+            return await request('GET', '/expenses/stats?' + params);
+        },
+
         parseExpensePreview: async function(images, text) {
             var body = { images: images || [] };
             if (text) body.text = text;
