@@ -25,8 +25,10 @@ tower = "0.5"
 http = "1"
 axum-extra = { version = "0.10", features = ["cookie"] }
 time = "0.3"
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { version = "0.12", features = ["json", "stream"] }
 tokio-stream = "0.1"
+futures = "0.3"
+async-stream = "0.3"
 p256 = { version = "0.13", features = ["ecdsa", "ecdh"] }
 rand_core_06 = { package = "rand_core", version = "0.6", features = ["getrandom"] }
 aes-gcm = "0.10"

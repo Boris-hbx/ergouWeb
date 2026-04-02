@@ -83,6 +83,7 @@ pub fn build_app(state: AppState) -> Router {
     // Chat routes (阿宝)
     let chat_routes = Router::new()
         .route("/", post(routes::chat::chat_handler))
+        .route("/stream", post(routes::chat::chat_stream_handler))
         .route("/usage", get(routes::conversations::get_usage));
 
     // Conversation routes
@@ -102,8 +103,6 @@ pub fn build_app(state: AppState) -> Router {
             get(routes::expenses::list_entries).post(routes::expenses::create_entry),
         )
         .route("/stats", get(routes::expenses::get_stats))
-        .route("/summary", get(routes::expenses::get_summary))
-        .route("/analytics", get(routes::expenses::get_analytics))
         .route("/tags", get(routes::expenses::list_tags))
         .route("/rates", get(routes::expenses::get_rates))
         .route("/parse-preview", post(routes::expenses::parse_preview))
@@ -264,7 +263,6 @@ pub fn build_app(state: AppState) -> Router {
 
     // Settings routes (user preferences)
     let settings_routes = Router::new()
-        .route("/ai-model", get(auth::get_ai_model).put(auth::set_ai_model))
         .route(
             "/timezone",
             get(auth::get_timezone).put(auth::set_timezone),
@@ -320,7 +318,11 @@ pub fn build_app(state: AppState) -> Router {
                 )
                 .route("/batch", post(routes::memories::batch_import))
                 .route("/search", get(routes::memories::search_memories))
-                .route("/{id}", delete(routes::memories::delete_memory)),
+                .route(
+                    "/{id}",
+                    put(routes::memories::update_memory)
+                        .delete(routes::memories::delete_memory),
+                ),
         )
         .nest(
             "/admin",
