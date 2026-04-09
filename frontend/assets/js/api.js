@@ -458,25 +458,12 @@ var API = (function() {
             return await request('DELETE', '/expenses/' + encodeURIComponent(id));
         },
 
-        getExpenseSummary: async function(period, date) {
-            var params = [];
-            if (period) params.push('period=' + encodeURIComponent(period));
-            if (date) params.push('date=' + encodeURIComponent(date));
-            return await request('GET', '/expenses/summary?' + params.join('&'));
-        },
-
         getExpenseTags: async function() {
             return await request('GET', '/expenses/tags');
         },
 
         parseExpenseReceipts: async function(id) {
             return await request('POST', '/expenses/' + encodeURIComponent(id) + '/parse');
-        },
-
-        getExpenseAnalytics: async function(period, date) {
-            var params = 'period=' + encodeURIComponent(period);
-            if (date) params += '&date=' + encodeURIComponent(date);
-            return await request('GET', '/expenses/analytics?' + params);
         },
 
         getExpenseStats: async function(period, date) {

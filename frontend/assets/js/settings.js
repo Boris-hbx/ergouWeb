@@ -29,8 +29,6 @@ async function loadSettingsData() {
             friendsSection.innerHTML = '<h4>好友</h4><div class="friends-empty">注册后可管理好友</div>';
         }
     }
-    // Load AI model preference
-    loadAiModel();
     // Load timezone preference
     loadTimezone();
     // Init patrol toggle
@@ -106,62 +104,7 @@ async function doLogout() {
     window.location.href = '/login.html';
 }
 
-// ========== AI 模型选择 ==========
-
-var _currentAiModel = 'auto';
-
-async function loadAiModel() {
-    if (window._userStatus === 'guest') {
-        // Guest: disable all buttons, show hint
-        var heading = document.getElementById('ai-model-heading');
-        if (heading) heading.textContent = 'AI 模型 — 注册后可切换';
-        document.querySelectorAll('.ai-model-btn').forEach(function(btn) {
-            btn.disabled = true;
-            btn.classList.add('ai-model-disabled');
-        });
-        return;
-    }
-    try {
-        var data = await API.getAiModel();
-        if (data.success && data.model) {
-            _currentAiModel = data.model;
-            highlightAiModel(data.model);
-        }
-    } catch(e) {
-        console.error('[settings] loadAiModel:', e);
-    }
-}
-
-function highlightAiModel(model) {
-    document.querySelectorAll('.ai-model-btn').forEach(function(btn) {
-        btn.classList.toggle('active', btn.dataset.model === model);
-    });
-}
-
-async function selectAiModel(model) {
-    if (window._userStatus === 'guest') return;
-    if (model === _currentAiModel) return;
-
-    var prevModel = _currentAiModel;
-    _currentAiModel = model;
-    highlightAiModel(model);
-
-    try {
-        var data = await API.setAiModel(model);
-        if (data.success) {
-            var names = { auto: '自动', doubao: '模型 A', claude: '模型 B' };
-            showToast('已切换到 ' + (names[model] || model), 'success');
-        } else {
-            _currentAiModel = prevModel;
-            highlightAiModel(prevModel);
-            showToast(data.message || '保存失败', 'error');
-        }
-    } catch(e) {
-        _currentAiModel = prevModel;
-        highlightAiModel(prevModel);
-        showToast('保存失败', 'error');
-    }
-}
+// AI 模型已固定为 Claude，无需用户选择
 
 // ========== 二狗值班开关 ==========
 

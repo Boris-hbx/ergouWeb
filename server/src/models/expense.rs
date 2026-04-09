@@ -180,23 +180,6 @@ pub struct ExpenseListQuery {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct ExpenseSummaryQuery {
-    #[serde(default = "default_period")]
-    pub period: String,
-    pub date: Option<String>,
-}
-
-fn default_period() -> String {
-    "day".to_string()
-}
-
-#[derive(Debug, Deserialize)]
-pub struct ExpenseAnalyticsQuery {
-    pub period: String,
-    pub date: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
 pub struct ExpenseStatsQuery {
     #[serde(default = "default_stats_period")]
     pub period: String,
@@ -238,16 +221,6 @@ pub struct CategoryTotal {
 pub struct DailyTotal {
     pub date: String,
     pub amount: f64,
-}
-
-#[derive(Debug, Serialize)]
-pub struct ExpenseSummary {
-    pub total_amount: f64,
-    pub entry_count: i64,
-    pub period: String,
-    pub from: String,
-    pub to: String,
-    pub tag_totals: Vec<TagTotal>,
 }
 
 #[derive(Debug, Serialize)]

@@ -92,6 +92,7 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
+    position: relative;
 }
 
 .abao-messages::-webkit-scrollbar {
@@ -334,6 +335,123 @@
 
 .abao-send-btn:not(:disabled):hover {
     opacity: 0.85;
+}
+
+/* --- 图片上传 --- */
+.abao-img-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: none;
+    background: transparent;
+    color: var(--text-muted, #8b949e);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: color 0.15s, background 0.15s;
+}
+
+.abao-img-btn:hover {
+    color: var(--primary-color, #667eea);
+    background: rgba(255,255,255,0.06);
+}
+
+.abao-img-btn.has-images {
+    color: var(--primary-color, #667eea);
+}
+
+.abao-image-preview {
+    display: none;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 16px 0;
+}
+
+.abao-image-preview.active {
+    display: flex;
+}
+
+.abao-image-thumb {
+    position: relative;
+    width: 64px;
+    height: 64px;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--border-color, rgba(255,255,255,0.12));
+}
+
+.abao-image-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.abao-image-thumb .abao-thumb-remove {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(0,0,0,0.6);
+    color: white;
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.abao-image-thumb:hover .abao-thumb-remove {
+    opacity: 1;
+}
+
+.abao-image-count {
+    position: absolute;
+    bottom: 2px;
+    right: 4px;
+    font-size: 10px;
+    color: rgba(255,255,255,0.7);
+    background: rgba(0,0,0,0.5);
+    padding: 1px 4px;
+    border-radius: 4px;
+}
+
+/* Drag overlay */
+.abao-panel.drag-over .abao-messages::after {
+    content: '拖放图片到此处';
+    position: absolute;
+    inset: 0;
+    background: rgba(var(--primary-rgb, 102,126,234), 0.15);
+    border: 2px dashed var(--primary-color, #667eea);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    color: var(--primary-color, #667eea);
+    pointer-events: none;
+    z-index: 10;
+}
+
+/* History message image indicator */
+.abao-msg-images {
+    display: flex;
+    gap: 4px;
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--text-muted, #8b949e);
+    align-items: center;
+}
+
+.abao-msg-images svg {
+    width: 14px;
+    height: 14px;
 }
 
 /* --- 对话历史列表（在面板中切换） --- */
@@ -861,5 +979,157 @@
 @media (min-width: 1025px) {
     .abao-overlay {
         display: none !important;
+    }
+}
+
+/* ========== Markdown rendering in messages ========== */
+.abao-msg.abao-md p { margin: 0 0 8px; }
+.abao-msg.abao-md p:last-child { margin-bottom: 0; }
+.abao-msg.abao-md strong { font-weight: 600; }
+.abao-msg.abao-md em { font-style: italic; }
+.abao-msg.abao-md ul, .abao-msg.abao-md ol { margin: 4px 0 8px 20px; padding: 0; }
+.abao-msg.abao-md li { margin-bottom: 2px; }
+.abao-msg.abao-md code {
+    background: rgba(255,255,255,0.1);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-family: 'SF Mono', 'Consolas', monospace;
+    font-size: 0.9em;
+}
+.abao-msg.abao-md pre {
+    background: rgba(0,0,0,0.3);
+    padding: 10px 12px;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 6px 0;
+}
+.abao-msg.abao-md pre code {
+    background: none;
+    padding: 0;
+    font-size: 13px;
+    line-height: 1.5;
+}
+.abao-msg.abao-md blockquote {
+    border-left: 3px solid rgba(255,255,255,0.3);
+    margin: 6px 0;
+    padding: 2px 12px;
+    opacity: 0.85;
+}
+.abao-msg.abao-md a {
+    color: var(--primary-color, #667eea);
+    text-decoration: underline;
+}
+.abao-msg.abao-md h1, .abao-msg.abao-md h2, .abao-msg.abao-md h3, .abao-msg.abao-md h4 {
+    margin: 8px 0 4px;
+    font-weight: 600;
+}
+.abao-msg.abao-md h1 { font-size: 1.2em; }
+.abao-msg.abao-md h2 { font-size: 1.1em; }
+.abao-msg.abao-md h3, .abao-msg.abao-md h4 { font-size: 1em; }
+.abao-msg.abao-md table {
+    border-collapse: collapse;
+    margin: 6px 0;
+    font-size: 13px;
+}
+.abao-msg.abao-md th, .abao-msg.abao-md td {
+    border: 1px solid rgba(255,255,255,0.15);
+    padding: 4px 8px;
+}
+.abao-msg.abao-md th { font-weight: 600; }
+
+/* Light theme markdown adjustments */
+[data-theme="light"] .abao-msg.abao-md code {
+    background: rgba(0,0,0,0.06);
+}
+[data-theme="light"] .abao-msg.abao-md pre {
+    background: rgba(0,0,0,0.05);
+}
+[data-theme="light"] .abao-msg.abao-md blockquote {
+    border-left-color: rgba(0,0,0,0.2);
+}
+[data-theme="light"] .abao-msg.abao-md th,
+[data-theme="light"] .abao-msg.abao-md td {
+    border-color: rgba(0,0,0,0.12);
+}
+
+/* ========== Message wrapper & action bar ========== */
+.abao-msg-wrapper {
+    display: flex;
+    flex-direction: column;
+    max-width: 85%;
+}
+.abao-action-bar {
+    display: flex;
+    gap: 4px;
+    padding: 2px 4px 0;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+.abao-msg-wrapper:hover .abao-action-bar,
+.abao-msg-wrapper:focus-within .abao-action-bar {
+    opacity: 1;
+}
+.abao-action-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 4px;
+    color: rgba(255,255,255,0.45);
+    display: flex;
+    align-items: center;
+    transition: color 0.15s, background 0.15s;
+}
+.abao-action-btn:hover {
+    color: rgba(255,255,255,0.8);
+    background: rgba(255,255,255,0.08);
+}
+[data-theme="light"] .abao-action-btn {
+    color: rgba(0,0,0,0.35);
+}
+[data-theme="light"] .abao-action-btn:hover {
+    color: rgba(0,0,0,0.7);
+    background: rgba(0,0,0,0.05);
+}
+
+/* ========== Suggestion chips ========== */
+.abao-suggestions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 4px 0 8px;
+    animation: abao-fade-in 0.3s ease;
+}
+.abao-suggestion-chip {
+    background: rgba(var(--primary-rgb, 102,126,234), 0.15);
+    color: var(--primary-color, #667eea);
+    border: 1px solid rgba(var(--primary-rgb, 102,126,234), 0.25);
+    border-radius: 16px;
+    padding: 6px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+    white-space: nowrap;
+}
+.abao-suggestion-chip:hover {
+    background: rgba(var(--primary-rgb, 102,126,234), 0.25);
+    transform: translateY(-1px);
+}
+.abao-suggestion-chip:active {
+    transform: scale(0.97);
+}
+
+/* Mobile action bar always visible */
+@media (max-width: 768px) {
+    .abao-action-bar { opacity: 0.6; }
+    .abao-msg-wrapper { max-width: none; }
+    .abao-suggestions { padding: 4px 8px 8px; }
+
+    /* Mobile dark panel: markdown code blocks */
+    .abao-msg-row .abao-msg.abao-md pre {
+        background: rgba(0,0,0,0.4);
+    }
+    .abao-msg-row .abao-msg.abao-md code {
+        background: rgba(255,255,255,0.12);
     }
 }

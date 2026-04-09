@@ -222,6 +222,15 @@ fn run_migrations(conn: &Connection) {
         )
         .ok();
     }
+
+    // Add image_uris column to chat_messages (T-072: multimodal support)
+    let has_image_uris: bool = conn
+        .prepare("SELECT image_uris FROM chat_messages LIMIT 1")
+        .is_ok();
+    if !has_image_uris {
+        conn.execute_batch("ALTER TABLE chat_messages ADD COLUMN image_uris TEXT;")
+            .ok();
+    }
 }
 
 fn create_tables(conn: &Connection) {
@@ -330,6 +339,7 @@ fn create_tables(conn: &Connection) {
             content_json TEXT,
             tool_name TEXT,
             token_count INTEGER,
+            image_uris TEXT,
             created_at TEXT NOT NULL,
             sequence INTEGER NOT NULL
         );
@@ -723,6 +733,15 @@ fn create_tables(conn: &Connection) {
             created_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
         CREATE INDEX IF NOT EXISTS idx_soul_evo_user ON soul_evolution_log(user_id);
+
+        -- Memory extraction daily log (rate limiting)
+        CREATE TABLE IF NOT EXISTS memory_extraction_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL REFERENCES users(id),
+            extracted_count INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_mem_extract_user ON memory_extraction_log(user_id);
         ",
     )
     .expect("Failed to create tables");

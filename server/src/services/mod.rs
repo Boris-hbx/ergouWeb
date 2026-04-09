@@ -2,6 +2,7 @@ pub mod collaboration;
 pub mod context;
 pub mod guest_seed;
 pub mod llm;
+pub mod memory_extractor;
 pub mod push;
 pub mod reminder_poller;
 pub mod soul_evolution;

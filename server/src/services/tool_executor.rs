@@ -105,6 +105,8 @@ pub fn execute_tool(db: &Connection, user_id: &str, tool_name: &str, input: &Val
         "update_person" => tool_update_person(db, user_id, input),
         "delete_person" => tool_delete_person(db, user_id, input),
         "save_memory" => tool_save_memory(db, user_id, input),
+        "update_memory" => tool_update_memory(db, user_id, input),
+        "list_memories" => tool_list_memories(db, user_id, input),
         "search_memory" => tool_search_memory(db, user_id, input),
         "delete_memory" => tool_delete_memory(db, user_id, input),
         "report_security_event" => tool_report_security_event(db, user_id, input),
@@ -679,6 +681,32 @@ pub fn tool_definitions() -> Vec<Value> {
                     "query": {"type": "string", "description": "搜索关键词"}
                 },
                 "required": ["query"]
+            }
+        }),
+        json!({
+            "name": "update_memory",
+            "description": "更新一条已有记忆的内容、分类或重要性。用户要求修改某条记忆时调用。",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string", "description": "要更新的记忆ID"},
+                    "content": {"type": "string", "description": "新内容（可选）"},
+                    "category": {"type": "string", "enum": ["habit", "fact", "personality", "intent"], "description": "新类别（可选）"},
+                    "importance": {"type": "integer", "description": "新重要程度1-5（可选）", "minimum": 1, "maximum": 5}
+                },
+                "required": ["id"]
+            }
+        }),
+        json!({
+            "name": "list_memories",
+            "description": "列出用户的记忆。当需要查看用户所有记忆或按分类浏览时调用。",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "category": {"type": "string", "enum": ["habit", "fact", "personality", "intent"], "description": "按分类筛选（可选）"},
+                    "limit": {"type": "integer", "description": "返回条数，默认20，最大100", "minimum": 1, "maximum": 100},
+                    "sort": {"type": "string", "enum": ["recent", "importance"], "description": "排序方式，默认recent"}
+                }
             }
         }),
         json!({
@@ -2861,6 +2889,186 @@ fn tool_delete_memory(db: &Connection, user_id: &str, input: &Value) -> Value {
         Ok(_) => json!({"success": true, "message": "已忘掉"}),
         Err(e) => json!({"error": format!("删除失败: {}", e)}),
     }
+}
+
+fn tool_update_memory(db: &Connection, user_id: &str, input: &Value) -> Value {
+    let id = match input["id"].as_str() {
+        Some(i) if !i.is_empty() => i,
+        _ => return json!({"error": "id is required"}),
+    };
+
+    // Check memory exists and belongs to user
+    let exists: bool = db
+        .query_row(
+            "SELECT COUNT(*) > 0 FROM ergou_memories WHERE id=?1 AND user_id=?2",
+            rusqlite::params![id, user_id],
+            |r| r.get(0),
+        )
+        .unwrap_or(false);
+    if !exists {
+        return json!({"error": "记忆不存在或不属于当前用户"});
+    }
+
+    let new_content = input["content"].as_str().map(|s| s.trim()).filter(|s| !s.is_empty());
+    let new_category = input["category"].as_str();
+    let new_importance = input["importance"].as_i64();
+
+    if new_content.is_none() && new_category.is_none() && new_importance.is_none() {
+        return json!({"error": "至少提供 content、category 或 importance 中的一个"});
+    }
+
+    // Validate content
+    if let Some(content) = new_content {
+        if content.chars().count() > 500 {
+            return json!({"error": "记忆内容不能超过500字"});
+        }
+        if is_sensitive_content(content) {
+            return json!({"error": "不能记录敏感信息（密码、银行卡、证件号等）"});
+        }
+        // Dedup
+        let dup: bool = db
+            .query_row(
+                "SELECT COUNT(*) > 0 FROM ergou_memories WHERE user_id=?1 AND content=?2 AND id!=?3",
+                rusqlite::params![user_id, content, id],
+                |r| r.get(0),
+            )
+            .unwrap_or(false);
+        if dup {
+            return json!({"error": "已经有相同内容的记忆了"});
+        }
+    }
+
+    // Validate category
+    if let Some(cat) = new_category {
+        let valid_categories = ["habit", "fact", "personality", "intent"];
+        if !valid_categories.contains(&cat) {
+            return json!({"error": "无效的记忆类别"});
+        }
+    }
+
+    // Build dynamic UPDATE
+    let mut set_clauses: Vec<String> = Vec::new();
+    let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
+    let mut idx = 1;
+
+    if let Some(content) = new_content {
+        set_clauses.push(format!("content=?{}", idx));
+        params.push(Box::new(content.to_string()));
+        idx += 1;
+    }
+    if let Some(cat) = new_category {
+        set_clauses.push(format!("category=?{}", idx));
+        params.push(Box::new(cat.to_string()));
+        idx += 1;
+    }
+    if let Some(imp) = new_importance {
+        let imp = imp.clamp(1, 5);
+        set_clauses.push(format!("importance=?{}", idx));
+        params.push(Box::new(imp));
+        idx += 1;
+    }
+
+    let now = chrono::Utc::now().to_rfc3339();
+    set_clauses.push(format!("last_accessed_at=?{}", idx));
+    params.push(Box::new(now));
+    idx += 1;
+
+    let sql = format!(
+        "UPDATE ergou_memories SET {} WHERE id=?{} AND user_id=?{}",
+        set_clauses.join(", "),
+        idx,
+        idx + 1
+    );
+    params.push(Box::new(id.to_string()));
+    params.push(Box::new(user_id.to_string()));
+
+    let params_refs: Vec<&dyn rusqlite::types::ToSql> =
+        params.iter().map(|p| p.as_ref()).collect();
+
+    match db.execute(&sql, params_refs.as_slice()) {
+        Ok(0) => json!({"error": "更新失败"}),
+        Ok(_) => json!({"success": true, "message": "记忆已更新"}),
+        Err(e) => json!({"error": format!("更新失败: {}", e)}),
+    }
+}
+
+fn tool_list_memories(db: &Connection, user_id: &str, input: &Value) -> Value {
+    let limit = input["limit"].as_i64().unwrap_or(20).clamp(1, 100);
+    let sort = input["sort"].as_str().unwrap_or("recent");
+    let category = input["category"].as_str();
+
+    let order = match sort {
+        "importance" => "importance DESC, last_accessed_at DESC",
+        _ => "last_accessed_at DESC",
+    };
+
+    let (sql, params_vec): (String, Vec<Box<dyn rusqlite::types::ToSql>>) = if let Some(cat) = category {
+        (
+            format!(
+                "SELECT id, category, content, importance, access_count FROM ergou_memories WHERE user_id=?1 AND category=?2 ORDER BY {} LIMIT ?3",
+                order
+            ),
+            vec![
+                Box::new(user_id.to_string()),
+                Box::new(cat.to_string()),
+                Box::new(limit),
+            ],
+        )
+    } else {
+        (
+            format!(
+                "SELECT id, category, content, importance, access_count FROM ergou_memories WHERE user_id=?1 ORDER BY {} LIMIT ?2",
+                order
+            ),
+            vec![Box::new(user_id.to_string()), Box::new(limit)],
+        )
+    };
+
+    let params_refs: Vec<&dyn rusqlite::types::ToSql> =
+        params_vec.iter().map(|p| p.as_ref()).collect();
+
+    let mut memories: Vec<Value> = Vec::new();
+
+    if let Ok(mut stmt) = db.prepare(&sql) {
+        if let Ok(rows) = stmt.query_map(params_refs.as_slice(), |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, i64>(3).unwrap_or(3),
+                row.get::<_, i64>(4)?,
+            ))
+        }) {
+            for row in rows.flatten() {
+                memories.push(json!({
+                    "id": row.0,
+                    "category": row.1,
+                    "content": row.2,
+                    "importance": row.3,
+                    "access_count": row.4
+                }));
+            }
+        }
+    }
+
+    // Total count
+    let total: i64 = if let Some(cat) = category {
+        db.query_row(
+            "SELECT COUNT(*) FROM ergou_memories WHERE user_id=?1 AND category=?2",
+            rusqlite::params![user_id, cat],
+            |r| r.get(0),
+        )
+        .unwrap_or(0)
+    } else {
+        db.query_row(
+            "SELECT COUNT(*) FROM ergou_memories WHERE user_id=?1",
+            [user_id],
+            |r| r.get(0),
+        )
+        .unwrap_or(0)
+    };
+
+    json!({"success": true, "memories": memories, "count": memories.len(), "total": total})
 }
 
 // ─── Security event tool ───

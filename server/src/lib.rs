@@ -88,8 +88,6 @@ pub fn build_app(state: state::AppState) -> Router {
             get(routes::expenses::list_entries).post(routes::expenses::create_entry),
         )
         .route("/stats", get(routes::expenses::get_stats))
-        .route("/summary", get(routes::expenses::get_summary))
-        .route("/analytics", get(routes::expenses::get_analytics))
         .route("/tags", get(routes::expenses::list_tags))
         .route(
             "/{id}",

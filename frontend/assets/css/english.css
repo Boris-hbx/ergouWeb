@@ -1258,6 +1258,50 @@
     outline: none;
 }
 
+/* Tag chips */
+.expense-tag-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.expense-tag-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 12px;
+    border-radius: 16px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    border: 1px solid var(--border-color, #30363d);
+    background: var(--bg-input, #fff);
+    color: var(--text-primary);
+    transition: all 0.15s ease;
+    user-select: none;
+}
+
+.expense-tag-chip.selected {
+    background: var(--primary-color, #667eea);
+    color: #fff;
+    border-color: var(--primary-color, #667eea);
+}
+
+.expense-custom-tag-input {
+    width: 100%;
+    padding: 8px 12px;
+    background: var(--bg-input, #fff);
+    border: 1px solid var(--border-color, #30363d);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    box-sizing: border-box;
+}
+
+.expense-custom-tag-input:focus {
+    border-color: var(--primary-color, #667eea);
+    outline: none;
+}
+
 /* Photo area */
 .expense-photo-area {
     display: flex;

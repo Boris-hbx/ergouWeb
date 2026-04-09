@@ -35,6 +35,13 @@ fn default_importance() -> i64 {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct UpdateMemoryRequest {
+    pub category: Option<String>,
+    pub content: Option<String>,
+    pub importance: Option<i64>,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct BatchImportRequest {
     pub memories: Vec<CreateMemoryRequest>,
 }
@@ -437,6 +444,176 @@ pub async fn search_memories(
             "memories": memories
         })),
     )
+}
+
+/// PUT /api/memories/{id} — 更新记忆
+pub async fn update_memory(
+    State(state): State<AppState>,
+    user_id: UserId,
+    Path(id): Path<String>,
+    Json(req): Json<UpdateMemoryRequest>,
+) -> (StatusCode, Json<serde_json::Value>) {
+    // Validate category if provided
+    if let Some(ref cat) = req.category {
+        if !VALID_CATEGORIES.contains(&cat.as_str()) {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": "invalid category, must be fact/habit/personality/intent" })),
+            );
+        }
+    }
+
+    // Validate content if provided
+    if let Some(ref content) = req.content {
+        let content = content.trim();
+        if content.is_empty() {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": "content cannot be empty" })),
+            );
+        }
+        if content.chars().count() > 500 {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": "content exceeds 500 characters" })),
+            );
+        }
+        if is_sensitive_content(content) {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": "cannot store sensitive information (passwords, card numbers, IDs, etc.)" })),
+            );
+        }
+    }
+
+    // Validate importance if provided
+    if let Some(imp) = req.importance {
+        if !(1..=5).contains(&imp) {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": "importance must be between 1 and 5" })),
+            );
+        }
+    }
+
+    // Check at least one field to update
+    if req.category.is_none() && req.content.is_none() && req.importance.is_none() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "at least one field (category, content, importance) must be provided" })),
+        );
+    }
+
+    let db = state.db.lock();
+
+    // Check memory exists and belongs to user
+    let exists: bool = db
+        .query_row(
+            "SELECT COUNT(*) > 0 FROM ergou_memories WHERE id=?1 AND user_id=?2",
+            rusqlite::params![id, user_id.0],
+            |r| r.get(0),
+        )
+        .unwrap_or(false);
+    if !exists {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "memory not found or not owned by current user" })),
+        );
+    }
+
+    // Dedup check if content is being updated
+    if let Some(ref content) = req.content {
+        let content = content.trim();
+        let dup: bool = db
+            .query_row(
+                "SELECT COUNT(*) > 0 FROM ergou_memories WHERE user_id=?1 AND content=?2 AND id!=?3",
+                rusqlite::params![user_id.0, content, id],
+                |r| r.get(0),
+            )
+            .unwrap_or(false);
+        if dup {
+            return (
+                StatusCode::CONFLICT,
+                Json(json!({ "error": "duplicate memory content" })),
+            );
+        }
+    }
+
+    // Build dynamic UPDATE
+    let mut set_clauses: Vec<String> = Vec::new();
+    let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
+    let mut idx = 1;
+
+    if let Some(ref cat) = req.category {
+        set_clauses.push(format!("category=?{}", idx));
+        params.push(Box::new(cat.clone()));
+        idx += 1;
+    }
+    if let Some(ref content) = req.content {
+        set_clauses.push(format!("content=?{}", idx));
+        params.push(Box::new(content.trim().to_string()));
+        idx += 1;
+    }
+    if let Some(imp) = req.importance {
+        set_clauses.push(format!("importance=?{}", idx));
+        params.push(Box::new(imp));
+        idx += 1;
+    }
+
+    let now = chrono::Utc::now().to_rfc3339();
+    set_clauses.push(format!("last_accessed_at=?{}", idx));
+    params.push(Box::new(now));
+    idx += 1;
+
+    let sql = format!(
+        "UPDATE ergou_memories SET {} WHERE id=?{} AND user_id=?{}",
+        set_clauses.join(", "),
+        idx,
+        idx + 1
+    );
+    params.push(Box::new(id.clone()));
+    params.push(Box::new(user_id.0.clone()));
+
+    let params_refs: Vec<&dyn rusqlite::types::ToSql> =
+        params.iter().map(|p| p.as_ref()).collect();
+
+    match db.execute(&sql, params_refs.as_slice()) {
+        Ok(0) => (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "memory not found" })),
+        ),
+        Ok(_) => {
+            // Fetch updated memory to return
+            match db.query_row(
+                "SELECT id, category, content, importance, created_at, last_accessed_at, access_count FROM ergou_memories WHERE id=?1",
+                [&id],
+                |row| {
+                    Ok(json!({
+                        "id": row.get::<_, String>(0)?,
+                        "category": row.get::<_, String>(1)?,
+                        "content": row.get::<_, String>(2)?,
+                        "importance": row.get::<_, i64>(3)?,
+                        "created_at": row.get::<_, String>(4)?,
+                        "last_accessed_at": row.get::<_, String>(5)?,
+                        "access_count": row.get::<_, i64>(6)?
+                    }))
+                },
+            ) {
+                Ok(memory) => (
+                    StatusCode::OK,
+                    Json(json!({ "success": true, "memory": memory })),
+                ),
+                Err(_) => (
+                    StatusCode::OK,
+                    Json(json!({ "success": true })),
+                ),
+            }
+        }
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": format!("update failed: {}", e) })),
+        ),
+    }
 }
 
 /// DELETE /api/memories/{id} — 删除单条

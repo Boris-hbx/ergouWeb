@@ -22,13 +22,25 @@ use crate::services::{
 use crate::state::AppState;
 
 #[derive(Debug, Deserialize)]
+pub struct ChatImage {
+    pub data: String,
+    pub media_type: String,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct ChatRequest {
     pub message: String,
     #[serde(default)]
     pub conversation_id: Option<String>,
     #[serde(default)]
     pub page_context: Option<serde_json::Value>,
+    #[serde(default)]
+    pub images: Option<Vec<ChatImage>>,
 }
+
+const ALLOWED_IMAGE_TYPES: &[&str] = &["image/jpeg", "image/png", "image/webp", "image/gif"];
+const MAX_IMAGES: usize = 3;
+const MAX_IMAGE_SIZE: usize = 5 * 1024 * 1024; // 5MB raw ≈ 6.7MB base64
 
 #[derive(Debug, Serialize)]
 pub struct ChatResponse {
@@ -66,6 +78,55 @@ pub async fn chat_handler(
             }),
         )
             .into_response();
+    }
+
+    // Validate images
+    let images = req.images.unwrap_or_default();
+    if images.len() > MAX_IMAGES {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(ChatResponse {
+                success: false,
+                message: Some(format!("最多上传{}张图片", MAX_IMAGES)),
+                conversation_id: None,
+                reply: None,
+                tool_calls: None,
+                ai_remaining: None,
+            }),
+        )
+            .into_response();
+    }
+    for img in &images {
+        if !ALLOWED_IMAGE_TYPES.contains(&img.media_type.as_str()) {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(ChatResponse {
+                    success: false,
+                    message: Some(format!("不支持的图片类型: {}", img.media_type)),
+                    conversation_id: None,
+                    reply: None,
+                    tool_calls: None,
+                    ai_remaining: None,
+                }),
+            )
+                .into_response();
+        }
+        // base64 size is ~4/3 of raw, so check decoded size
+        let raw_size = img.data.len() * 3 / 4;
+        if raw_size > MAX_IMAGE_SIZE {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(ChatResponse {
+                    success: false,
+                    message: Some("单张图片不能超过5MB".into()),
+                    conversation_id: None,
+                    reply: None,
+                    tool_calls: None,
+                    ai_remaining: None,
+                }),
+            )
+                .into_response();
+        }
     }
 
     // Guest AI quota check
@@ -208,15 +269,21 @@ pub async fn chat_handler(
                 |r| r.get(0),
             )
             .unwrap_or(1);
+        let image_uris_val: Option<String> = if images.is_empty() {
+            None
+        } else {
+            Some(format!("[{}张图片]", images.len()))
+        };
         db.execute(
-            "INSERT INTO chat_messages (id, conversation_id, role, content_text, created_at, sequence) VALUES (?1, ?2, 'user', ?3, ?4, ?5)",
-            rusqlite::params![msg_id, conversation_id, message, now, seq],
+            "INSERT INTO chat_messages (id, conversation_id, role, content_text, image_uris, created_at, sequence) VALUES (?1, ?2, 'user', ?3, ?4, ?5, ?6)",
+            rusqlite::params![msg_id, conversation_id, message, image_uris_val, now, seq],
         )
         .ok();
     }
 
-    // Add current message to history
-    history_messages.push(json!({"role": "user", "content": message}));
+    // Add current message to history (with images if present)
+    let user_content = build_user_content(&message, &images);
+    history_messages.push(json!({"role": "user", "content": user_content}));
 
     // Read user timezone
     let user_timezone = {
@@ -390,6 +457,22 @@ pub async fn chat_stream_handler(
         .into_response();
     }
 
+    // Validate images
+    let images = req.images.unwrap_or_default();
+    if images.len() > MAX_IMAGES {
+        return make_sse_error("最多上传3张图片").into_response();
+    }
+    for img in &images {
+        if !ALLOWED_IMAGE_TYPES.contains(&img.media_type.as_str()) {
+            return make_sse_error(&format!("不支持的图片类型: {}", img.media_type))
+                .into_response();
+        }
+        let raw_size = img.data.len() * 3 / 4;
+        if raw_size > MAX_IMAGE_SIZE {
+            return make_sse_error("单张图片不能超过5MB").into_response();
+        }
+    }
+
     // Guest AI quota check
     let _guest_ai_remaining = match check_guest_ai_quota(&state, &user_id.0) {
         Ok(remaining) => Some(remaining),
@@ -533,15 +616,21 @@ pub async fn chat_stream_handler(
                 |r| r.get(0),
             )
             .unwrap_or(1);
+        let image_uris_val: Option<String> = if images.is_empty() {
+            None
+        } else {
+            Some(format!("[{}张图片]", images.len()))
+        };
         db.execute(
-            "INSERT INTO chat_messages (id, conversation_id, role, content_text, created_at, sequence) VALUES (?1, ?2, 'user', ?3, ?4, ?5)",
-            rusqlite::params![msg_id, conversation_id, message, now, seq],
+            "INSERT INTO chat_messages (id, conversation_id, role, content_text, image_uris, created_at, sequence) VALUES (?1, ?2, 'user', ?3, ?4, ?5, ?6)",
+            rusqlite::params![msg_id, conversation_id, message, image_uris_val, now, seq],
         )
         .ok();
     }
 
-    // Add current message to history
-    history_messages.push(json!({"role": "user", "content": message}));
+    // Add current message to history (with images if present)
+    let user_content = build_user_content(&message, &images);
+    history_messages.push(json!({"role": "user", "content": user_content}));
 
     // Read user timezone
     let user_timezone = {
@@ -679,6 +768,40 @@ pub async fn chat_stream_handler(
     Sse::new(stream)
         .keep_alive(KeepAlive::default())
         .into_response()
+}
+
+/// Helper: build a single-event SSE error response
+fn make_sse_error(msg: &str) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
+    let payload = json!({"type": "error", "message": msg});
+    Sse::new(futures::stream::once(async move {
+        Ok::<_, Infallible>(
+            Event::default()
+                .event("error")
+                .json_data(payload)
+                .unwrap(),
+        )
+    }))
+    .keep_alive(KeepAlive::default())
+}
+
+/// Build Claude API content array for a user message (text + optional images)
+fn build_user_content(message: &str, images: &[ChatImage]) -> serde_json::Value {
+    if images.is_empty() {
+        return json!(message);
+    }
+    let mut content = Vec::new();
+    for img in images {
+        content.push(json!({
+            "type": "image",
+            "source": {
+                "type": "base64",
+                "media_type": img.media_type,
+                "data": img.data,
+            }
+        }));
+    }
+    content.push(json!({"type": "text", "text": message}));
+    json!(content)
 }
 
 fn make_sse_stream(

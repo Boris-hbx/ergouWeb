@@ -1179,66 +1179,6 @@ pub async fn guest_login(
     )
 }
 
-// ─── AI Model Settings ───
-
-#[derive(Debug, Deserialize)]
-pub struct SetAiModelRequest {
-    pub model: String,
-}
-
-/// GET /api/settings/ai-model
-pub async fn get_ai_model(State(state): State<AppState>, user_id: UserId) -> impl IntoResponse {
-    let db = state.db.lock();
-    let model = db
-        .query_row(
-            "SELECT ai_model FROM user_settings WHERE user_id = ?1",
-            [&user_id.0],
-            |row| row.get::<_, String>(0),
-        )
-        .unwrap_or_else(|_| "auto".to_string());
-
-    Json(serde_json::json!({
-        "success": true,
-        "model": model,
-    }))
-}
-
-/// PUT /api/settings/ai-model
-pub async fn set_ai_model(
-    State(state): State<AppState>,
-    user_id: UserId,
-    Json(body): Json<SetAiModelRequest>,
-) -> impl IntoResponse {
-    let valid = ["auto", "claude", "kimi", "doubao"];
-    if !valid.contains(&body.model.as_str()) {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(serde_json::json!({
-                "success": false,
-                "message": "无效的模型选择",
-            })),
-        );
-    }
-
-    let db = state.db.lock();
-    let now = chrono::Utc::now().to_rfc3339();
-
-    // Upsert into user_settings
-    db.execute(
-        "INSERT INTO user_settings (user_id, ai_model, updated_at) VALUES (?1, ?2, ?3)
-         ON CONFLICT(user_id) DO UPDATE SET ai_model = ?2, updated_at = ?3",
-        rusqlite::params![user_id.0, body.model, now],
-    )
-    .ok();
-
-    (
-        StatusCode::OK,
-        Json(serde_json::json!({
-            "success": true,
-        })),
-    )
-}
-
 // ─── Timezone Settings ───
 
 #[derive(Debug, Deserialize)]
