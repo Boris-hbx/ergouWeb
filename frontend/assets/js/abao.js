@@ -680,7 +680,12 @@ var Abao = (function() {
         return null;
     }
 
-    function createActionBar(msgEl, text) {
+    var SVG_COPY = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>';
+    var SVG_CHECK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>';
+    var SVG_THUMB_UP = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14zM7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg>';
+    var SVG_THUMB_DOWN = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 15v4a3 3 0 003 3l4-9V2H5.72a2 2 0 00-2 1.7l-1.38 9a2 2 0 002 2.3H10zM17 2h2.67A2.31 2.31 0 0122 4v7a2.31 2.31 0 01-2.33 2H17"/></svg>';
+
+    function createActionBar(msgEl, text, messageId) {
         var bar = document.createElement('div');
         bar.className = 'abao-action-bar';
 
@@ -688,14 +693,14 @@ var Abao = (function() {
         var copyBtn = document.createElement('button');
         copyBtn.className = 'abao-action-btn';
         copyBtn.title = '复制';
-        copyBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>';
+        copyBtn.innerHTML = SVG_COPY;
         copyBtn.onclick = function() {
             navigator.clipboard.writeText(text).then(function() {
-                copyBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>';
+                copyBtn.innerHTML = SVG_CHECK;
                 copyBtn.title = '已复制';
                 if (typeof showToast === 'function') showToast('已复制', 'success');
                 setTimeout(function() {
-                    copyBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>';
+                    copyBtn.innerHTML = SVG_COPY;
                     copyBtn.title = '复制';
                 }, 2000);
             }).catch(function() {
@@ -703,6 +708,47 @@ var Abao = (function() {
             });
         };
         bar.appendChild(copyBtn);
+
+        // Thumbs up / down (only if we have a message ID)
+        if (messageId) {
+            var currentFeedback = null;
+
+            var likeBtn = document.createElement('button');
+            likeBtn.className = 'abao-action-btn';
+            likeBtn.title = '有帮助';
+            likeBtn.innerHTML = SVG_THUMB_UP;
+
+            var dislikeBtn = document.createElement('button');
+            dislikeBtn.className = 'abao-action-btn';
+            dislikeBtn.title = '没帮助';
+            dislikeBtn.innerHTML = SVG_THUMB_DOWN;
+
+            function updateFeedbackUI() {
+                likeBtn.classList.toggle('active', currentFeedback === 1);
+                dislikeBtn.classList.toggle('active', currentFeedback === -1);
+            }
+
+            function sendFeedback(value) {
+                var newVal = currentFeedback === value ? null : value;
+                currentFeedback = newVal;
+                updateFeedbackUI();
+                fetch('/api/chat/messages/' + messageId + '/feedback', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ feedback: newVal })
+                }).catch(function(err) {
+                    console.error('[Abao] feedback error:', err);
+                });
+            }
+
+            likeBtn.onclick = function() { sendFeedback(1); };
+            dislikeBtn.onclick = function() { sendFeedback(-1); };
+
+            bar.appendChild(likeBtn);
+            bar.appendChild(dislikeBtn);
+        }
+
         return bar;
     }
 
@@ -765,7 +811,7 @@ var Abao = (function() {
 
     var _lastUserMsg = '';
 
-    function addMessage(role, text) {
+    function addMessage(role, text, messageId) {
         if (!messagesContainer) return;
         var msg = document.createElement('div');
         msg.className = 'abao-msg ' + role;
@@ -778,11 +824,11 @@ var Abao = (function() {
             } else {
                 msg.textContent = text;
             }
-            // Action bar (copy)
+            // Action bar (copy + feedback)
             var wrapper = document.createElement('div');
             wrapper.className = 'abao-msg-wrapper';
             wrapper.appendChild(msg);
-            wrapper.appendChild(createActionBar(msg, text));
+            wrapper.appendChild(createActionBar(msg, text, messageId));
             messagesContainer.appendChild(wrapWithAvatar(role, wrapper));
         } else {
             msg.textContent = text;
@@ -1168,7 +1214,7 @@ var Abao = (function() {
             }
 
             if (data.success && data.reply) {
-                addMessage('assistant', data.reply);
+                addMessage('assistant', data.reply, data.message_id);
                 // Show tool call results (task cards etc.)
                 if (data.tool_calls) {
                     addToolInfo(data.tool_calls);

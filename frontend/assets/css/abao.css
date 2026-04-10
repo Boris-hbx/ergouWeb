@@ -1091,6 +1091,12 @@
     color: rgba(0,0,0,0.7);
     background: rgba(0,0,0,0.05);
 }
+.abao-action-btn.active {
+    color: var(--primary-color, #667eea);
+}
+[data-theme="light"] .abao-action-btn.active {
+    color: var(--primary-color, #667eea);
+}
 
 /* ========== Suggestion chips ========== */
 .abao-suggestions {

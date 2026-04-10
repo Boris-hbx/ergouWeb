@@ -84,7 +84,11 @@ pub fn build_app(state: AppState) -> Router {
     let chat_routes = Router::new()
         .route("/", post(routes::chat::chat_handler))
         .route("/stream", post(routes::chat::chat_stream_handler))
-        .route("/usage", get(routes::conversations::get_usage));
+        .route("/usage", get(routes::conversations::get_usage))
+        .route(
+            "/messages/{id}/feedback",
+            put(routes::chat::message_feedback_handler),
+        );
 
     // Conversation routes
     let conversation_routes = Router::new()

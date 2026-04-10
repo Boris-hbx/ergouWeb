@@ -22,6 +22,7 @@ pub struct ChatMessage {
     pub tool_name: Option<String>,
     pub token_count: Option<i64>,
     pub image_uris: Option<String>,
+    pub feedback: Option<i64>,
     pub created_at: String,
     pub sequence: i64,
 }

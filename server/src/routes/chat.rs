@@ -1,7 +1,7 @@
 use std::convert::Infallible;
 
 use axum::{
-    extract::State,
+    extract::{Path, State},
     http::StatusCode,
     response::{
         sse::{Event, KeepAlive, Sse},
@@ -52,6 +52,8 @@ pub struct ChatResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reply: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub message_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_calls: Option<Vec<serde_json::Value>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ai_remaining: Option<i32>,
@@ -73,6 +75,7 @@ pub async fn chat_handler(
                 message: Some("消息不能为空且不超过4000字符".into()),
                 conversation_id: None,
                 reply: None,
+                message_id: None,
                 tool_calls: None,
                 ai_remaining: None,
             }),
@@ -90,6 +93,7 @@ pub async fn chat_handler(
                 message: Some(format!("最多上传{}张图片", MAX_IMAGES)),
                 conversation_id: None,
                 reply: None,
+                message_id: None,
                 tool_calls: None,
                 ai_remaining: None,
             }),
@@ -105,6 +109,7 @@ pub async fn chat_handler(
                     message: Some(format!("不支持的图片类型: {}", img.media_type)),
                     conversation_id: None,
                     reply: None,
+                    message_id: None,
                     tool_calls: None,
                     ai_remaining: None,
                 }),
@@ -121,6 +126,7 @@ pub async fn chat_handler(
                     message: Some("单张图片不能超过5MB".into()),
                     conversation_id: None,
                     reply: None,
+                    message_id: None,
                     tool_calls: None,
                     ai_remaining: None,
                 }),
@@ -156,6 +162,7 @@ pub async fn chat_handler(
                     message: Some("你发得太快了，歇一会儿".into()),
                     conversation_id: None,
                     reply: None,
+                    message_id: None,
                     tool_calls: None,
                     ai_remaining: None,
                 }),
@@ -175,6 +182,7 @@ pub async fn chat_handler(
                     message: Some("AI 服务未配置".into()),
                     conversation_id: None,
                     reply: None,
+                    message_id: None,
                     tool_calls: None,
                     ai_remaining: None,
                 }),
@@ -207,6 +215,7 @@ pub async fn chat_handler(
                         message: Some("对话不存在".into()),
                         conversation_id: None,
                         reply: None,
+                        message_id: None,
                         tool_calls: None,
                         ai_remaining: None,
                     }),
@@ -407,6 +416,7 @@ pub async fn chat_handler(
                     message: None,
                     conversation_id: Some(conv_id_clone),
                     reply: Some(chat_result.text),
+                    message_id: Some(msg_id),
                     tool_calls: if tool_info.is_empty() {
                         None
                     } else {
@@ -428,6 +438,7 @@ pub async fn chat_handler(
                 message: Some(err),
                 conversation_id: Some(conv_id_clone),
                 reply: None,
+                message_id: None,
                 tool_calls: None,
                 ai_remaining: None,
             }),
@@ -768,6 +779,60 @@ pub async fn chat_stream_handler(
     Sse::new(stream)
         .keep_alive(KeepAlive::default())
         .into_response()
+}
+
+// ─── Feedback ───
+
+#[derive(Debug, Deserialize)]
+pub struct FeedbackRequest {
+    pub feedback: Option<i64>, // 1=like, -1=dislike, null=clear
+}
+
+/// PUT /api/chat/messages/:id/feedback
+pub async fn message_feedback_handler(
+    State(state): State<AppState>,
+    user_id: ActiveUserId,
+    Path(message_id): Path<String>,
+    Json(req): Json<FeedbackRequest>,
+) -> impl IntoResponse {
+    // Validate feedback value
+    if let Some(v) = req.feedback {
+        if v != 1 && v != -1 {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"success": false, "message": "feedback 只能是 1, -1 或 null"})),
+            );
+        }
+    }
+
+    let db = state.db.lock();
+
+    // Verify message belongs to user's conversation
+    let owns: bool = db
+        .query_row(
+            "SELECT COUNT(*) > 0 FROM chat_messages m JOIN conversations c ON m.conversation_id = c.id WHERE m.id = ?1 AND c.user_id = ?2",
+            rusqlite::params![message_id, user_id.0],
+            |r| r.get(0),
+        )
+        .unwrap_or(false);
+
+    if !owns {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(json!({"success": false, "message": "消息不存在"})),
+        );
+    }
+
+    db.execute(
+        "UPDATE chat_messages SET feedback = ?1 WHERE id = ?2",
+        rusqlite::params![req.feedback, message_id],
+    )
+    .ok();
+
+    (
+        StatusCode::OK,
+        Json(json!({"success": true})),
+    )
 }
 
 /// Helper: build a single-event SSE error response

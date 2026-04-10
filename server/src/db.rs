@@ -231,6 +231,15 @@ fn run_migrations(conn: &Connection) {
         conn.execute_batch("ALTER TABLE chat_messages ADD COLUMN image_uris TEXT;")
             .ok();
     }
+
+    // Add feedback column to chat_messages (T-048: thumbs up/down)
+    let has_feedback: bool = conn
+        .prepare("SELECT feedback FROM chat_messages LIMIT 1")
+        .is_ok();
+    if !has_feedback {
+        conn.execute_batch("ALTER TABLE chat_messages ADD COLUMN feedback INTEGER;")
+            .ok();
+    }
 }
 
 fn create_tables(conn: &Connection) {
@@ -340,6 +349,7 @@ fn create_tables(conn: &Connection) {
             tool_name TEXT,
             token_count INTEGER,
             image_uris TEXT,
+            feedback INTEGER,
             created_at TEXT NOT NULL,
             sequence INTEGER NOT NULL
         );
