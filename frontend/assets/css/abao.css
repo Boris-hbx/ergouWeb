@@ -439,19 +439,59 @@
     z-index: 10;
 }
 
-/* History message image indicator */
-.abao-msg-images {
+/* In-message image thumbnails (user messages) */
+.abao-msg-images-row {
     display: flex;
-    gap: 4px;
-    margin-top: 6px;
-    font-size: 12px;
-    color: var(--text-muted, #8b949e);
-    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
 }
 
-.abao-msg-images svg {
-    width: 14px;
-    height: 14px;
+.abao-msg-image {
+    width: 120px;
+    height: 120px;
+    object-fit: cover;
+    border-radius: 10px;
+    cursor: pointer;
+    border: 1px solid rgba(255,255,255,0.15);
+    transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.abao-msg-image:hover {
+    transform: scale(1.02);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+}
+
+.abao-msg-text {
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.abao-msg-text:empty {
+    display: none;
+}
+
+/* Lightbox overlay for full-size viewing */
+.abao-lightbox {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.88);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    cursor: zoom-out;
+    animation: abao-fade-in 0.2s ease;
+    padding: 20px;
+}
+
+.abao-lightbox-img {
+    max-width: 95vw;
+    max-height: 95vh;
+    object-fit: contain;
+    border-radius: 6px;
+    cursor: default;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.6);
 }
 
 /* --- 对话历史列表（在面板中切换） --- */

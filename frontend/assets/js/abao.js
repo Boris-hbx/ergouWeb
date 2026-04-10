@@ -811,7 +811,7 @@ var Abao = (function() {
 
     var _lastUserMsg = '';
 
-    function addMessage(role, text, messageId) {
+    function addMessage(role, text, messageId, images) {
         if (!messagesContainer) return;
         var msg = document.createElement('div');
         msg.className = 'abao-msg ' + role;
@@ -831,7 +831,26 @@ var Abao = (function() {
             wrapper.appendChild(createActionBar(msg, text, messageId));
             messagesContainer.appendChild(wrapWithAvatar(role, wrapper));
         } else {
-            msg.textContent = text;
+            // User message: render images above text (if any)
+            if (images && images.length) {
+                var imgRow = document.createElement('div');
+                imgRow.className = 'abao-msg-images-row';
+                images.forEach(function(dataUrl) {
+                    var thumb = document.createElement('img');
+                    thumb.className = 'abao-msg-image';
+                    thumb.src = dataUrl;
+                    thumb.alt = '用户发送的图片';
+                    thumb.onclick = function() { openLightbox(dataUrl); };
+                    imgRow.appendChild(thumb);
+                });
+                msg.appendChild(imgRow);
+            }
+            if (text) {
+                var textSpan = document.createElement('div');
+                textSpan.className = 'abao-msg-text';
+                textSpan.textContent = text;
+                msg.appendChild(textSpan);
+            }
             if (role === 'user') _lastUserMsg = text;
             messagesContainer.appendChild(wrapWithAvatar(role, msg));
         }
@@ -1123,6 +1142,38 @@ var Abao = (function() {
         renderImagePreviews();
     }
 
+    function openLightbox(dataUrl) {
+        var existing = document.getElementById('abao-lightbox');
+        if (existing) existing.remove();
+
+        var overlay = document.createElement('div');
+        overlay.id = 'abao-lightbox';
+        overlay.className = 'abao-lightbox';
+
+        var img = document.createElement('img');
+        img.src = dataUrl;
+        img.className = 'abao-lightbox-img';
+        img.onclick = function(e) { e.stopPropagation(); };
+
+        overlay.appendChild(img);
+        overlay.onclick = function() { closeLightbox(); };
+        document.body.appendChild(overlay);
+
+        // ESC to close
+        var escHandler = function(e) {
+            if (e.key === 'Escape') {
+                closeLightbox();
+                document.removeEventListener('keydown', escHandler);
+            }
+        };
+        document.addEventListener('keydown', escHandler);
+    }
+
+    function closeLightbox() {
+        var overlay = document.getElementById('abao-lightbox');
+        if (overlay) overlay.remove();
+    }
+
     function collectImagesPayload() {
         if (pendingImages.length === 0) return undefined;
         return pendingImages.map(function(item) {
@@ -1139,6 +1190,8 @@ var Abao = (function() {
         }
         var text = inputEl.value.trim();
         var images = collectImagesPayload();
+        // Snapshot dataUrls for in-message display (before clearing)
+        var imageDataUrls = pendingImages.map(function(item) { return item.dataUrl; });
         if (!text && !images) return;
         if (!text) text = ''; // allow image-only messages
 
@@ -1151,10 +1204,8 @@ var Abao = (function() {
         var oldSuggestions = messagesContainer && messagesContainer.querySelector('.abao-suggestions');
         if (oldSuggestions) oldSuggestions.remove();
 
-        // Add user message (with image count indicator)
-        var displayText = text || '';
-        if (images) displayText = (displayText ? displayText + ' ' : '') + '[' + images.length + '张图片]';
-        addMessage('user', displayText);
+        // Add user message with image thumbnails
+        addMessage('user', text, null, imageDataUrls.length ? imageDataUrls : null);
 
         // Disable input
         isSending = true;
