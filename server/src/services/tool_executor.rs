@@ -711,7 +711,7 @@ pub fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "delete_memory",
-            "description": "用户要求忘掉某条记忆时调用",
+            "description": "删除过时或不再适用的记忆。触发场景：用户说忘掉/别记了；用户说事情完了/搞定了；intent类记忆已过期（如出差回来了就删掉'要出差'）；用户纠正事实时先删旧的再save新的。删除前先 search_memory 找到对应记忆。",
             "input_schema": {
                 "type": "object",
                 "properties": {
