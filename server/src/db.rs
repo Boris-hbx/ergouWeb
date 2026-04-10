@@ -249,6 +249,12 @@ fn run_migrations(conn: &Connection) {
         conn.execute_batch("ALTER TABLE memory_extraction_log ADD COLUMN conversation_id TEXT;")
             .ok();
     }
+    // Index must be created after the column exists (cannot be in create_tables
+    // because CREATE TABLE IF NOT EXISTS is a no-op for legacy tables)
+    conn.execute_batch(
+        "CREATE INDEX IF NOT EXISTS idx_mem_extract_conv ON memory_extraction_log(conversation_id, created_at);",
+    )
+    .ok();
 }
 
 fn create_tables(conn: &Connection) {
@@ -762,7 +768,6 @@ fn create_tables(conn: &Connection) {
             created_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
         CREATE INDEX IF NOT EXISTS idx_mem_extract_user ON memory_extraction_log(user_id);
-        CREATE INDEX IF NOT EXISTS idx_mem_extract_conv ON memory_extraction_log(conversation_id, created_at);
         ",
     )
     .expect("Failed to create tables");
