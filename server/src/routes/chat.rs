@@ -390,12 +390,14 @@ pub async fn chat_handler(
             {
                 let mem_state = state.clone();
                 let mem_user_id = tool_user_id.clone();
+                let mem_conv_id = conv_id_clone.clone();
                 let mem_user_msg = message.clone();
                 let mem_reply = chat_result.text.clone();
                 tokio::spawn(async move {
                     crate::services::memory_extractor::extract_after_chat(
                         &mem_state,
                         &mem_user_id,
+                        &mem_conv_id,
                         &mem_user_msg,
                         &mem_reply,
                     )
@@ -760,11 +762,13 @@ pub async fn chat_stream_handler(
         {
             let mem_state = tool_state.clone();
             let mem_user_id = tool_user_id.clone();
+            let mem_conv_id = conv_id_clone.clone();
             let mem_reply = chat_result.text.clone();
             tokio::spawn(async move {
                 crate::services::memory_extractor::extract_after_chat(
                     &mem_state,
                     &mem_user_id,
+                    &mem_conv_id,
                     &message_clone,
                     &mem_reply,
                 )

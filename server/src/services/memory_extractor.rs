@@ -27,37 +27,46 @@ fn default_importance() -> i64 {
 
 /// Async entry point: called via tokio::spawn after chat completes.
 /// Extracts memorable facts from the conversation and saves them.
+///
+/// Trigger conditions (T-077):
+/// - user message ≥ 20 chars OR assistant reply ≥ 100 chars
+/// - same conversation: at most 1 extraction per 10 minutes
 pub async fn extract_after_chat(
     state: &AppState,
     user_id: &str,
+    conversation_id: &str,
     user_message: &str,
     assistant_reply: &str,
 ) {
-    // Skip short messages — unlikely to contain extractable info
-    if user_message.chars().count() < 5 && assistant_reply.chars().count() < 5 {
+    // Threshold check: skip trivial exchanges
+    let user_len = user_message.chars().count();
+    let reply_len = assistant_reply.chars().count();
+    if user_len < 20 && reply_len < 100 {
         return;
     }
 
-    // Check daily extraction limit (reuse soul_evolution's pattern)
-    let daily_count: i64 = {
+    // Per-conversation rate limit: 1 extraction per 10 minutes
+    let recent: i64 = {
         let db = state.db.lock();
+        let ten_min_ago = (chrono::Utc::now() - chrono::Duration::minutes(10)).to_rfc3339();
         db.query_row(
-            "SELECT COUNT(*) FROM memory_extraction_log WHERE user_id = ?1 AND created_at >= date('now')",
-            [user_id],
+            "SELECT COUNT(*) FROM memory_extraction_log WHERE conversation_id = ?1 AND created_at > ?2",
+            rusqlite::params![conversation_id, ten_min_ago],
             |r| r.get(0),
         )
         .unwrap_or(0)
     };
-
-    // Limit to 20 extractions per day to control API costs
-    if daily_count >= 20 {
+    if recent > 0 {
         return;
     }
 
-    match run_extraction(state, user_id, user_message, assistant_reply).await {
+    match run_extraction(state, user_id, conversation_id, user_message, assistant_reply).await {
         Ok(count) => {
             if count > 0 {
-                info!("[memory-extractor] extracted {} memories for user {}", count, user_id);
+                info!(
+                    "[memory-extractor] extracted {} memories for user {} (conv {})",
+                    count, user_id, conversation_id
+                );
             }
         }
         Err(e) => {
@@ -69,9 +78,23 @@ pub async fn extract_after_chat(
 async fn run_extraction(
     state: &AppState,
     user_id: &str,
+    conversation_id: &str,
     user_message: &str,
     assistant_reply: &str,
 ) -> Result<usize, String> {
+    // Log the extraction attempt FIRST so the rate limit holds even if LLM fails.
+    // We update extracted_count after successful extraction below.
+    let log_id: i64 = {
+        let db = state.db.lock();
+        let now = chrono::Utc::now().to_rfc3339();
+        db.execute(
+            "INSERT INTO memory_extraction_log (user_id, conversation_id, extracted_count, created_at) VALUES (?1, ?2, 0, ?3)",
+            rusqlite::params![user_id, conversation_id, now],
+        )
+        .map_err(|e| format!("log insert error: {e}"))?;
+        db.last_insert_rowid()
+    };
+
     let prompt = format!(
         r#"分析以下对话，提取用户透露的重要个人信息。
 
@@ -195,10 +218,10 @@ async fn run_extraction(
         }
     }
 
-    // Log extraction event
+    // Update the rate-limit log row inserted at the start with the actual count.
     db.execute(
-        "INSERT INTO memory_extraction_log (user_id, extracted_count, created_at) VALUES (?1, ?2, ?3)",
-        rusqlite::params![user_id, saved as i64, now],
+        "UPDATE memory_extraction_log SET extracted_count = ?1 WHERE id = ?2",
+        rusqlite::params![saved as i64, log_id],
     )
     .ok();
 

@@ -240,6 +240,15 @@ fn run_migrations(conn: &Connection) {
         conn.execute_batch("ALTER TABLE chat_messages ADD COLUMN feedback INTEGER;")
             .ok();
     }
+
+    // Add conversation_id to memory_extraction_log (T-077: per-conv rate limit)
+    let has_conv_id: bool = conn
+        .prepare("SELECT conversation_id FROM memory_extraction_log LIMIT 1")
+        .is_ok();
+    if !has_conv_id {
+        conn.execute_batch("ALTER TABLE memory_extraction_log ADD COLUMN conversation_id TEXT;")
+            .ok();
+    }
 }
 
 fn create_tables(conn: &Connection) {
@@ -748,10 +757,12 @@ fn create_tables(conn: &Connection) {
         CREATE TABLE IF NOT EXISTS memory_extraction_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id TEXT NOT NULL REFERENCES users(id),
+            conversation_id TEXT,
             extracted_count INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
         CREATE INDEX IF NOT EXISTS idx_mem_extract_user ON memory_extraction_log(user_id);
+        CREATE INDEX IF NOT EXISTS idx_mem_extract_conv ON memory_extraction_log(conversation_id, created_at);
         ",
     )
     .expect("Failed to create tables");
