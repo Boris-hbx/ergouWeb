@@ -255,6 +255,19 @@ fn run_migrations(conn: &Connection) {
         "CREATE INDEX IF NOT EXISTS idx_mem_extract_conv ON memory_extraction_log(conversation_id, created_at);",
     )
     .ok();
+
+    // T-095: 收紧内置列默认宽度,让 9 列在 1366 屏宽一屏可见。
+    // 只对 width 仍是 T-094 旧默认值的内置列 UPDATE — 保留用户拖过的列宽。
+    // 跑多次幂等:第一次后 width 已不是 320/240/130,WHERE 不再命中。
+    conn.execute_batch(
+        "UPDATE work_columns SET width = 260, min_width = 200
+           WHERE builtin = 1 AND key = 'title'    AND width = 320;
+         UPDATE work_columns SET width = 200, min_width = 140
+           WHERE builtin = 1 AND key = 'desc'     AND width = 240;
+         UPDATE work_columns SET width = 110, min_width = 100
+           WHERE builtin = 1 AND key = 'progress' AND width = 130;",
+    )
+    .ok();
 }
 
 fn create_tables(conn: &Connection) {

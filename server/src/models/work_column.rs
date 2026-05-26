@@ -100,22 +100,24 @@ pub fn builtin_seed() -> Vec<WorkColumn> {
     };
     vec![
         WorkColumn {
+            // T-095: 默认 320→260 让 9 列内置在 1366 屏宽一屏可见;min 不变,用户可拖回去
             key: "title".into(),
             name: "任务".into(),
             col_type: "text".into(),
             options: vec![],
-            width: Some(320),
+            width: Some(260),
             min_width: Some(200),
             position: next(),
             builtin: true,
             sys: false,
         },
         WorkColumn {
+            // T-095: 240→200(简介本来就靠展开按钮看全文)
             key: "desc".into(),
             name: "简介".into(),
             col_type: "longtext".into(),
             options: vec![],
-            width: Some(240),
+            width: Some(200),
             min_width: Some(140),
             position: next(),
             builtin: true,
@@ -188,11 +190,12 @@ pub fn builtin_seed() -> Vec<WorkColumn> {
             sys: false,
         },
         WorkColumn {
+            // T-095: 130→110(进度条 + 数字占不到 130)
             key: "progress".into(),
             name: "进度".into(),
             col_type: "percent".into(),
             options: vec![],
-            width: Some(130),
+            width: Some(110),
             min_width: Some(100),
             position: next(),
             builtin: true,
