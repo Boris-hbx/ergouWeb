@@ -306,6 +306,25 @@ pub fn build_app(state: AppState) -> Router {
         .nest("/collaborate", collaborate_routes)
         // Work module (T-094 / SPEC work-task-table) — registered flat to avoid
         // an Axum 0.8 nest issue we hit when nesting another Router inside api_routes.
+        .route(
+            "/work/tasks",
+            get(routes::work_tasks::list_tasks).post(routes::work_tasks::create_task),
+        )
+        .route(
+            "/work/tasks/{id}",
+            axum::routing::patch(routes::work_tasks::update_task)
+                .delete(routes::work_tasks::delete_task),
+        )
+        .route(
+            "/work/columns",
+            get(routes::work_columns::list_columns)
+                .put(routes::work_columns::batch_save_columns)
+                .post(routes::work_columns::create_column),
+        )
+        .route(
+            "/work/columns/{key}",
+            delete(routes::work_columns::delete_column),
+        )
         .nest(
             "/soul-state",
             Router::new()
