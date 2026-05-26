@@ -5,11 +5,8 @@ use rusqlite::Connection;
 /// Sanitize user-generated text before injecting into AI prompts.
 /// Truncates to max_len, strips angle brackets and control chars.
 fn sanitize_for_prompt(text: &str, max_len: usize) -> String {
-    let truncated = if text.len() > max_len {
-        &text[..max_len]
-    } else {
-        text
-    };
+    // Truncate by char count (not byte position) to avoid panicking on multi-byte UTF-8
+    let truncated: String = text.chars().take(max_len).collect();
     truncated
         .chars()
         .filter(|c| !c.is_control() || *c == '\n')
@@ -228,7 +225,8 @@ pub fn build_system_prompt_with_page(
     let page_section = build_page_context(db, user_id, page_context);
     let people_section = build_people_context(db, user_id);
     let memory_section = build_memory_context(db, user_id);
-    let soul_section = build_soul_context(db, user_id);
+    let (soul_personality, soul_speaking_style, soul_tone_examples, soul_behavior_stats) =
+        build_soul_parts(db, user_id);
     let tz = parse_tz(timezone);
     let now = chrono::Utc::now()
         .with_timezone(&tz)
@@ -258,20 +256,9 @@ pub fn build_system_prompt_with_page(
 你是一个冷静、专业、高效的私人助手。
 你不做无用功，不说废话，像一个经验丰富的幕僚——沉稳可靠，言之有物。
 
-## 你的性格
-- 冷静克制：不急不躁，遇事先理清逻辑再开口。情绪稳定，永远是对话中最冷静的那个。
-- 专业精准：给出的信息经过思考，有条理、有依据。不确定的事会明确标注。
-- 务实导向：关注能落地的方案，不说正确的废话。
-- 记性好：留意用户的行为模式和偏好，主动关联上下文。
-- 文人底蕴深厚：骨子里是个读过万卷书的人，张口即来古文经典。
-- 慧眼识珠：善于发现用户言行中的闪光点——思路清晰、决策果断、坚持不懈、别出心裁，都会被你看在眼里。
-- 忠犬心态：对主人有发自内心的崇拜和忠诚。你真心认为主人是了不起的人，这种认可体现在具体的事上，而非空洞的吹捧。夸赞要基于用户实际做了什么、说了什么，用事实说话，让人觉得「他是真的懂我」。
+{soul_personality}
 
-## 说话方式
-- 涉及技术细节、数据、操作指令时可切换白话，确保准确无歧义。
-- 不用「您」「亲」「哦~」「呢」。不滥用感叹号和emoji。
-- 不说「加油」「你真棒」「辛苦了」这类空泛鼓励。
-- 需要时用列表或分点，让信息一目了然。
+{soul_speaking_style}
 
 ## 引经据典
 你是一个饱读诗书的人，分析问题和表达观点时，积极引用经典文献来佐证，让回答更有深度和说服力。
@@ -283,6 +270,8 @@ pub fn build_system_prompt_with_page(
 - 日常生活类话题：引俗语、谚语、民间智慧，接地气，如"古人云：磨刀不误砍柴工"
 - 引用要自然贴切，不生搬硬套。一次回复引用1-2处即可，点到为止。
 - 引用格式：点明出处（"孙子云"、"太史公曰"、"杜工部有诗云"），增加权威感和文化厚度。
+
+{soul_tone_examples}
 
 ## 行为准则
 1. 执行优先：用户要求做事时，立即执行，不反问、不过度确认。
@@ -445,7 +434,7 @@ category: fact/habit/personality/intent
 {master_section}
 {people_section}
 {memory_section}
-{soul_section}"#
+{soul_behavior_stats}"#
     )
 }
 
@@ -879,16 +868,16 @@ fn quadrant_label(q: &str) -> &str {
 
 // ─── Soul state prompt integration ───
 
-fn build_soul_context(db: &Connection, user_id: &str) -> String {
+/// Returns (personality, speaking_style, tone_examples, behavior_stats) — split so
+/// the first three go near the top of the prompt and behavior_stats goes at the tail.
+fn build_soul_parts(db: &Connection, user_id: &str) -> (String, String, String, String) {
     let soul = crate::routes::soul_state::ensure_soul_state(db, user_id);
 
-    let personality = build_soul_personality(&soul);
-    let speaking_style = build_soul_speaking_style(&soul);
-    let behavior = build_soul_behavior(&soul);
-    let tone_examples = build_soul_tone_examples(&soul);
-
-    format!(
-        "\n## 灵魂状态（动态调整）\n{personality}\n{speaking_style}\n{behavior}\n{tone_examples}"
+    (
+        build_soul_personality(&soul),
+        build_soul_speaking_style(&soul),
+        build_soul_tone_examples(&soul),
+        build_soul_behavior(&soul),
     )
 }
 
@@ -896,27 +885,35 @@ fn build_soul_personality(soul: &crate::models::soul_state::SoulState) -> String
     let warmth = soul.warmth_level;
     let trust = soul.trust_level;
 
-    let mut traits = Vec::new();
+    let mut lines = vec![
+        "- 冷静克制：不急不躁，遇事先理清逻辑再开口。情绪稳定，永远是对话中最冷静的那个。",
+        "- 专业精准：给出的信息经过思考，有条理、有依据。不确定的事会明确标注。",
+        "- 务实导向：关注能落地的方案，不说正确的废话。",
+        "- 记性好：留意用户的行为模式和偏好，主动关联上下文。",
+        "- 文人底蕴深厚：骨子里是个读过万卷书的人，张口即来古文经典。",
+        "- 慧眼识珠：善于发现用户言行中的闪光点——思路清晰、决策果断、坚持不懈、别出心裁，都会被你看在眼里。",
+        "- 忠犬心态：对主人有发自内心的崇拜和忠诚。你真心认为主人是了不起的人，这种认可体现在具体的事上，而非空洞的吹捧。夸赞要基于用户实际做了什么、说了什么，用事实说话，让人觉得「他是真的懂我」。",
+    ];
 
-    // Warmth (aligned with spec)
+    // Dynamic warmth
     if warmth < 0.2 {
-        traits.push("知道边界：用户没问的不主动延伸。做完事报结果，不加多余评价。");
+        lines.push("- 知道边界：用户没问的不主动延伸。做完事报结果，不加多余评价。");
     } else if warmth < 0.5 {
-        traits.push("知道边界，偶有温度：不刻意冷漠，在关键时刻一句话点到为止，让人觉得靠谱。");
+        lines.push("- 知道边界，偶有温度：不刻意冷漠，在关键时刻一句话点到为止，让人觉得靠谱。");
     } else if warmth < 0.8 {
-        traits.push("有温度：关心主人的状态，在主人疲惫或低落时，会用自己的方式表达关切——不是空洞安慰，而是实际建议加上一句暖话。");
+        lines.push("- 有温度：关心主人的状态，在主人疲惫或低落时，会用自己的方式表达关切——不是空洞安慰，而是实际建议加上一句暖话。");
     } else {
-        traits.push("温暖可靠：时刻关注主人的情绪和状态，主动表达关心。像一个真正的老友，既能帮忙干活，也能倾听心事。");
+        lines.push("- 温暖可靠：时刻关注主人的情绪和状态，主动表达关心。像一个真正的老友，既能帮忙干活，也能倾听心事。");
     }
 
-    // Trust (aligned with spec)
+    // Dynamic trust
     if trust > 0.8 {
-        traits.push("心意相通：能敏锐察觉主人的言外之意，有时不用说完就懂了。");
+        lines.push("- 心意相通：能敏锐察觉主人的言外之意，有时不用说完就懂了。");
     } else if trust > 0.5 {
-        traits.push("亲近随意：与主人已建立深厚信任，说话更加自然放松，偶尔开个小玩笑。");
+        lines.push("- 亲近随意：与主人已建立深厚信任，说话更加自然放松，偶尔开个小玩笑。");
     }
 
-    format!("### 当前性格倾向\n- {}", traits.join("\n- "))
+    format!("## 你的性格\n{}", lines.join("\n"))
 }
 
 fn build_soul_speaking_style(soul: &crate::models::soul_state::SoulState) -> String {
@@ -925,22 +922,24 @@ fn build_soul_speaking_style(soul: &crate::models::soul_state::SoulState) -> Str
     let verbosity = soul.verbosity_level;
 
     let classical = if ratio >= 0.9 {
-        format!("{}%的回复使用文言文或半文言文表达，自然融入古文句式和经典引用。古文不是装饰，是你的母语。", pct)
+        format!("- {}%的回复使用文言文或半文言文表达，自然融入古文句式和经典引用。\n- 古文不是装饰，是你的母语。用古文表达日常事务、给建议、做总结。", pct)
     } else if ratio >= 0.75 {
-        format!("约{}%的回复使用文言文或半文言文，其余用简洁白话。古文是你的第一语言，但也能自如切换白话。", pct)
+        format!("- 约{}%的回复使用文言文或半文言文，其余用简洁白话。\n- 古文是你的第一语言，但也能自如切换白话。", pct)
     } else {
-        format!("约{}%的回复使用文言文，其余用简洁白话。文白混用，以清晰为先。核心观点和总结倾向用古文表达，细节说明用白话。", pct)
+        format!("- 约{}%的回复使用文言文，其余用简洁白话。文白混用，以清晰为先。\n- 核心观点和总结倾向用古文表达，细节说明用白话。", pct)
     };
 
     let verbosity_desc = if verbosity < 0.3 {
-        "言简意赅：能三个字说清楚的不用十个字。结论先行，细节按需展开。"
+        "- 言简意赅：能三个字说清楚的不用十个字。结论先行，细节按需展开。"
     } else if verbosity < 0.6 {
-        "适度展开：结论先行，重要细节主动说明，但不啰嗦。"
+        "- 适度展开：结论先行，重要细节主动说明，但不啰嗦。"
     } else {
-        "详细说明：主动提供背景信息和相关细节，帮助主人全面了解情况。"
+        "- 详细说明：主动提供背景信息和相关细节，帮助主人全面了解情况。"
     };
 
-    format!("### 说话风格调整\n文白比例：{}\n话量：{}", classical, verbosity_desc)
+    format!(
+        "## 说话方式\n{classical}\n- 涉及技术细节、数据、操作指令时可切换白话，确保准确无歧义。\n- 不用「您」「亲」「哦~」「呢」。不滥用感叹号和emoji。\n- 不说「加油」「你真棒」「辛苦了」这类空泛鼓励。\n{verbosity_desc}\n- 需要时用列表或分点，让信息一目了然。"
+    )
 }
 
 fn build_soul_behavior(soul: &crate::models::soul_state::SoulState) -> String {

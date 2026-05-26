@@ -768,6 +768,52 @@ fn create_tables(conn: &Connection) {
             created_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
         CREATE INDEX IF NOT EXISTS idx_mem_extract_user ON memory_extraction_log(user_id);
+
+        -- Work tasks (T-094 / SPEC work-task-table)
+        --   Independent task domain for organizational/recurring work
+        --   (院/所/组 level, responsible person, frequency label).
+        --   Separate from `todos` (which is personal four-quadrant matrix).
+        --   custom_fields stores user-added column values as a JSON object.
+        --   Field naming: SQL snake_case here; API JSON exposes as `due` / `createdAt` etc.
+        CREATE TABLE IF NOT EXISTS work_tasks (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id       TEXT    NOT NULL REFERENCES users(id),
+            title         TEXT    NOT NULL DEFAULT '',
+            desc          TEXT    NOT NULL DEFAULT '',
+            assignee      TEXT    NOT NULL DEFAULT '',
+            level         TEXT    NOT NULL DEFAULT '',
+            freq          TEXT    NOT NULL DEFAULT '',
+            status        TEXT    NOT NULL DEFAULT 'todo',
+            priority      TEXT    NOT NULL DEFAULT 'mid',
+            due_date      TEXT,
+            progress      INTEGER NOT NULL DEFAULT 0,
+            custom_fields TEXT    NOT NULL DEFAULT '{}',
+            sort_order    REAL    NOT NULL DEFAULT 0,
+            created_at    TEXT    NOT NULL,
+            updated_at    TEXT    NOT NULL,
+            deleted       INTEGER NOT NULL DEFAULT 0,
+            deleted_at    TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_work_tasks_user ON work_tasks(user_id, deleted);
+        CREATE INDEX IF NOT EXISTS idx_work_tasks_due  ON work_tasks(user_id, due_date);
+
+        -- Work columns (per-user schema config for the work_tasks table)
+        --   On first access, backend seeds 9 builtin rows (see models::work_column::builtin_seed).
+        --   builtin=1 → cannot be deleted; sys=1 → options semantics fixed (status / priority).
+        CREATE TABLE IF NOT EXISTS work_columns (
+            user_id   TEXT    NOT NULL REFERENCES users(id),
+            key       TEXT    NOT NULL,
+            name      TEXT    NOT NULL,
+            type      TEXT    NOT NULL,
+            options   TEXT    NOT NULL DEFAULT '[]',
+            width     INTEGER,
+            min_width INTEGER,
+            position  INTEGER NOT NULL,
+            builtin   INTEGER NOT NULL DEFAULT 0,
+            sys       INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (user_id, key)
+        );
+        CREATE INDEX IF NOT EXISTS idx_work_columns_user_pos ON work_columns(user_id, position);
         ",
     )
     .expect("Failed to create tables");

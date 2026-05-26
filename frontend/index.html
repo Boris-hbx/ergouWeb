@@ -3,20 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, viewport-fit=cover">
-    <meta name="theme-color" content="#667eea">
+    <meta name="theme-color" content="#7C4DFF">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Next">
     <title>Next - Focus on the Right Thing</title>
-    <link rel="stylesheet" href="assets/css/base.css?v=20260410a">
-    <link rel="stylesheet" href="assets/css/style.css?v=20260410a">
-    <link rel="stylesheet" href="assets/css/components.css?v=20260410a">
-    <link rel="stylesheet" href="assets/css/mobile.css?v=20260410a">
-    <link rel="stylesheet" href="assets/css/abao.css?v=20260410a">
-    <link rel="stylesheet" href="assets/css/english.css?v=20260410a">
-    <link rel="stylesheet" href="assets/css/health.css?v=20260410a">
-    <link rel="stylesheet" href="assets/css/patrol.css?v=20260410a">
-    <link rel="stylesheet" href="assets/css/admin-panel.css?v=20260410a">
+    <link rel="stylesheet" href="assets/css/base.css?v=20260525a">
+    <link rel="stylesheet" href="assets/css/style.css?v=20260525a">
+    <link rel="stylesheet" href="assets/css/components.css?v=20260525a">
+    <link rel="stylesheet" href="assets/css/mobile.css?v=20260525a">
+    <link rel="stylesheet" href="assets/css/abao.css?v=20260525a">
+    <link rel="stylesheet" href="assets/css/english.css?v=20260525a">
+    <link rel="stylesheet" href="assets/css/health.css?v=20260525a">
+    <link rel="stylesheet" href="assets/css/patrol.css?v=20260525a">
+    <link rel="stylesheet" href="assets/css/admin-panel.css?v=20260525a">
+    <link rel="stylesheet" href="assets/css/work.css?v=20260525a">
     <link rel="manifest" href="assets/manifest.json">
     <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
     <script>
@@ -117,6 +118,7 @@
                 <a class="nav-link" data-page="review" onclick="switchPage('review')">例行</a>
                 <a class="nav-link" data-page="english" onclick="switchPage('english')">学习</a>
                 <a class="nav-link" data-page="life" onclick="switchPage('life')">生活</a>
+                <a class="nav-link" data-page="work" onclick="switchPage('work')">工作</a>
                 <a class="nav-link" data-page="admin" onclick="switchPage('admin')" id="admin-nav-link" style="display:none;">管理</a>
             </div>
 
@@ -589,12 +591,93 @@
             </div>
             <!-- 二狗的记忆 -->
             <div class="settings-section" id="settings-memory-section">
-                <h4>二狗的记忆</h4>
-                <p class="setting-desc">二狗在聊天中记住的关于你的信息，你可以随时查看和删除</p>
+                <div class="memory-topbar">
+                    <h4>二狗的记忆</h4>
+                    <div class="memory-topbar-actions">
+                        <button class="memory-action-btn memory-add-btn" id="memory-add-btn" title="手动添加记忆" onclick="MemoryUI.showAddModal()">＋</button>
+                        <button class="memory-action-btn memory-clear-btn" id="memory-clear-btn" title="清空所有记忆" onclick="MemoryUI.startClearAll()">🗑</button>
+                    </div>
+                </div>
+                <div class="memory-search-box">
+                    <input type="text" id="memory-search-input" class="memory-search-input" placeholder="🔍 搜索记忆..." oninput="MemoryUI.onSearchInput(this.value)">
+                </div>
+                <div class="memory-tabs" id="memory-tabs">
+                    <button class="memory-tab active" data-category="" onclick="MemoryUI.switchTab('')">全部</button>
+                    <button class="memory-tab" data-category="fact" onclick="MemoryUI.switchTab('fact')">事实</button>
+                    <button class="memory-tab" data-category="habit" onclick="MemoryUI.switchTab('habit')">习惯</button>
+                    <button class="memory-tab" data-category="personality" onclick="MemoryUI.switchTab('personality')">性格</button>
+                    <button class="memory-tab" data-category="intent" onclick="MemoryUI.switchTab('intent')">意图</button>
+                </div>
+                <div class="memory-stats" id="memory-stats"></div>
                 <div id="memory-list" class="memory-list">
                     <div class="memory-loading">加载中...</div>
                 </div>
-                <button class="btn btn-danger" id="clear-all-memories-btn" style="display:none;margin-top:12px;width:100%" onclick="deleteAllMemories()">清空所有记忆</button>
+            </div>
+            <!-- 记忆编辑/添加弹窗 -->
+            <div class="memory-modal-overlay" id="memory-modal-overlay" style="display:none" onclick="MemoryUI.closeModal()">
+                <div class="memory-modal" onclick="event.stopPropagation()">
+                    <div class="memory-modal-title" id="memory-modal-title">编辑记忆</div>
+                    <input type="hidden" id="memory-edit-id">
+                    <div class="memory-form-group">
+                        <label>内容</label>
+                        <textarea id="memory-edit-content" class="memory-form-textarea" rows="3" maxlength="500" placeholder="记忆内容（1-500字）"></textarea>
+                        <div class="memory-char-count" id="memory-char-count">0/500</div>
+                    </div>
+                    <div class="memory-form-group">
+                        <label>分类</label>
+                        <div class="memory-form-radios" id="memory-edit-category">
+                            <label><input type="radio" name="mem-cat" value="fact" checked> 事实</label>
+                            <label><input type="radio" name="mem-cat" value="habit"> 习惯</label>
+                            <label><input type="radio" name="mem-cat" value="personality"> 性格</label>
+                            <label><input type="radio" name="mem-cat" value="intent"> 意图</label>
+                        </div>
+                    </div>
+                    <div class="memory-form-group">
+                        <label>重要性</label>
+                        <div class="memory-star-picker" id="memory-edit-importance">
+                            <span class="memory-star" data-val="1" onclick="MemoryUI.pickStar(1)">⭐</span>
+                            <span class="memory-star" data-val="2" onclick="MemoryUI.pickStar(2)">⭐</span>
+                            <span class="memory-star" data-val="3" onclick="MemoryUI.pickStar(3)">⭐</span>
+                            <span class="memory-star" data-val="4" onclick="MemoryUI.pickStar(4)">⭐</span>
+                            <span class="memory-star" data-val="5" onclick="MemoryUI.pickStar(5)">⭐</span>
+                        </div>
+                    </div>
+                    <div class="memory-modal-actions">
+                        <button class="btn btn-secondary" onclick="MemoryUI.closeModal()">取消</button>
+                        <button class="btn btn-primary" id="memory-save-btn" onclick="MemoryUI.saveModal()">保存</button>
+                    </div>
+                </div>
+            </div>
+            <!-- 清空二次确认弹窗 -->
+            <div class="memory-modal-overlay" id="memory-clear-overlay" style="display:none" onclick="MemoryUI.closeClearModal()">
+                <div class="memory-modal" onclick="event.stopPropagation()">
+                    <div class="memory-modal-title">⚠️ 清空所有记忆</div>
+                    <p style="margin:12px 0;color:var(--text-secondary);" id="memory-clear-msg"></p>
+                    <div class="memory-form-group" id="memory-clear-input-group" style="display:none">
+                        <label>请输入"清空"以确认</label>
+                        <input type="text" id="memory-clear-confirm-input" class="memory-form-input" placeholder="输入 清空">
+                    </div>
+                    <div class="memory-modal-actions">
+                        <button class="btn btn-secondary" onclick="MemoryUI.closeClearModal()">取消</button>
+                        <button class="btn btn-danger" id="memory-clear-confirm-btn" onclick="MemoryUI.confirmClear()">确定清空</button>
+                    </div>
+                </div>
+            </div>
+            <!-- 二狗的灵魂（T-092） -->
+            <div class="settings-section" id="settings-soul-section">
+                <div class="soul-topbar">
+                    <h4>二狗的灵魂</h4>
+                </div>
+                <div class="soul-tabs">
+                    <button class="soul-tab active" data-tab="params" onclick="SoulUI.switchTab('params')">参数面板</button>
+                    <button class="soul-tab" data-tab="logs" onclick="SoulUI.switchTab('logs')">演化日志</button>
+                </div>
+                <div id="soul-params-panel" class="soul-panel">
+                    <div class="soul-loading">加载中...</div>
+                </div>
+                <div id="soul-logs-panel" class="soul-panel" style="display:none">
+                    <div class="soul-loading">加载中...</div>
+                </div>
             </div>
             <!-- 推送通知 -->
             <div class="settings-section">
@@ -1057,6 +1140,84 @@
         </div>
     </div>
 
+    <!-- 工作 Hub (T-094 / SPEC work-task-table) -->
+    <div class="work-main-layout" id="work-view" style="display:none;">
+        <!-- Hub 页面 -->
+        <div class="life-hub" id="work-hub">
+            <div class="life-hub-header"><h2>工作</h2></div>
+            <div class="life-hub-grid">
+                <div class="life-hub-card" onclick="Work.openFeature('table')">
+                    <div class="life-hub-card-icon">📋</div>
+                    <div class="life-hub-card-title">任务表</div>
+                    <div class="life-hub-card-desc">表格 · 看板 · 日历 多视图</div>
+                </div>
+                <div class="life-hub-card life-hub-card-disabled">
+                    <div class="life-hub-card-icon">📊</div>
+                    <div class="life-hub-card-title">周报</div>
+                    <div class="life-hub-card-desc">自动汇总本周进展</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 任务表子视图(三视图共用此容器，由 Work.setView 切换) -->
+        <div id="work-table-view" style="display:none;">
+            <button class="wt-back-btn" onclick="Work.showHub()">&larr; 工作</button>
+            <div class="wt-toolbar">
+                <h2>任务表</h2>
+                <span class="wt-total" id="wt-total">共 0 项</span>
+                <div class="wt-seg">
+                    <button id="wt-seg-table" class="active" onclick="Work.setView('table')">▦ 表格</button>
+                    <button id="wt-seg-board" onclick="Work.setView('board')">▤ 看板</button>
+                    <button id="wt-seg-cal"   onclick="Work.setView('cal')">▥ 日历</button>
+                </div>
+                <select class="wt-select" id="wt-filter" onchange="Work.render()">
+                    <option value="">全部责任人</option>
+                </select>
+                <select class="wt-select" id="wt-group" onchange="Work.render()">
+                    <option value="">不分组</option>
+                    <option value="level">按层级分组</option>
+                    <option value="assignee">按责任人分组</option>
+                    <option value="status">按状态分组</option>
+                </select>
+                <button class="wt-select" onclick="WorkColumnCfg.open()" title="编辑表头、列类型、增删列">⚙ 列设置</button>
+                <button class="wt-newbtn" onclick="WorkTable.addRow()">+ 新建任务</button>
+            </div>
+
+            <div id="wt-table-view" class="wt-table-wrap"></div>
+            <div id="wt-board-view" class="wt-board wt-hidden"></div>
+            <div id="wt-cal-view" class="wt-hidden"></div>
+        </div>
+    </div>
+
+    <!-- 工作:长文本弹层(简介编辑) -->
+    <div class="wt-modal-overlay" id="wt-text-modal" onclick="if(event.target===this)WorkTable.closeText()">
+        <div class="wt-modal">
+            <div class="wt-modal-title" id="wt-text-title">任务标题</div>
+            <div class="wt-modal-sub" id="wt-text-sub">长文本 · 可输入大段说明、背景、要点</div>
+            <textarea id="wt-text-area" placeholder="在这里写详细内容……"></textarea>
+            <div class="wt-modal-actions">
+                <button class="wt-mbtn" onclick="WorkTable.closeText()">取消</button>
+                <button class="wt-mbtn primary" onclick="WorkTable.saveText()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 工作:列设置弹层 -->
+    <div class="wt-modal-overlay" id="wt-col-modal" onclick="if(event.target===this)WorkColumnCfg.close()">
+        <div class="wt-modal" style="max-width:640px">
+            <div class="wt-modal-title">列设置</div>
+            <div class="wt-modal-sub">拖动 ≡ 调整列顺序 · 改列名 / 设类型 / 增删选项 · 底部可新增列</div>
+            <div id="wt-col-list"></div>
+            <div class="wt-modal-actions">
+                <button class="wt-mbtn primary" onclick="WorkColumnCfg.close()">完成</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 工作:单选/多选弹候选 -->
+    <div class="wt-pick-bd" id="wt-pick-bd" onclick="WorkPick.close()"></div>
+    <div class="wt-pick" id="wt-pick"></div>
+
     <!-- 差旅弹窗 -->
     <div class="trip-modal-overlay" id="trip-modal-overlay" style="display:none;"></div>
     <div class="trip-modal-overlay" id="trip-item-modal-overlay" style="display:none;"></div>
@@ -1416,39 +1577,46 @@
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
 
     <!-- JS Modules -->
-    <script src="assets/js/observability.js?v=20260410a"></script>
-    <script src="assets/js/api.js?v=20260410a"></script>
-    <script src="assets/js/utils.js?v=20260410a"></script>
-    <script src="assets/js/jelly-indicator.js?v=20260410a"></script>
-    <script src="assets/js/app.js?v=20260410a"></script>
-    <script src="assets/js/tasks.js?v=20260410a"></script>
-    <script src="assets/js/modal.js?v=20260410a"></script>
-    <script src="assets/js/datepicker.js?v=20260410a"></script>
-    <script src="assets/js/drag.js?v=20260410a"></script>
-    <script src="assets/js/actionsheet.js?v=20260410a"></script>
-    <script src="assets/js/share-modal.js?v=20260410a"></script>
-    <script src="assets/js/review.js?v=20260410a"></script>
-    <script src="assets/js/routines.js?v=20260410a"></script>
-    <script src="assets/js/features.js?v=20260410a"></script>
-    <script src="assets/js/particles.js?v=20260410a"></script>
-    <script src="assets/js/living-line.js?v=20260410a"></script>
-    <script src="assets/js/abao.js?v=20260410a"></script>
-    <script src="assets/js/english.js?v=20260410a"></script>
-    <script src="assets/js/life.js?v=20260410a"></script>
-    <script src="assets/js/expense.js?v=20260410a"></script>
-    <script src="assets/js/expense-analytics.js?v=20260410a"></script>
-    <script src="assets/js/trip.js?v=20260410a"></script>
-    <script src="assets/js/health-data.js?v=20260410a"></script>
-    <script src="assets/js/health-renderer.js?v=20260410a"></script>
-    <script src="assets/js/health.js?v=20260410a"></script>
-    <script src="assets/js/friends.js?v=20260410a"></script>
-    <script src="assets/js/notifications.js?v=20260410a"></script>
-    <script src="assets/js/settings.js?v=20260410a"></script>
-    <script src="assets/js/admin-panel.js?v=20260410a"></script>
-    <script src="assets/js/patrol-utils.js?v=20260410a"></script>
-    <script src="assets/js/patrol-terrain.js?v=20260410a"></script>
-    <script src="assets/js/patrol-debug.js?v=20260410a"></script>
-    <script src="assets/js/patrol.js?v=20260410a"></script>
+    <script src="assets/js/observability.js?v=20260525a"></script>
+    <script src="assets/js/api.js?v=20260525a"></script>
+    <script src="assets/js/utils.js?v=20260525a"></script>
+    <script src="assets/js/jelly-indicator.js?v=20260525a"></script>
+    <script src="assets/js/app.js?v=20260525a"></script>
+    <script src="assets/js/tasks.js?v=20260525a"></script>
+    <script src="assets/js/modal.js?v=20260525a"></script>
+    <script src="assets/js/datepicker.js?v=20260525a"></script>
+    <script src="assets/js/drag.js?v=20260525a"></script>
+    <script src="assets/js/actionsheet.js?v=20260525a"></script>
+    <script src="assets/js/share-modal.js?v=20260525a"></script>
+    <script src="assets/js/review.js?v=20260525a"></script>
+    <script src="assets/js/routines.js?v=20260525a"></script>
+    <script src="assets/js/features.js?v=20260525a"></script>
+    <script src="assets/js/particles.js?v=20260525a"></script>
+    <script src="assets/js/living-line.js?v=20260525a"></script>
+    <script src="assets/js/abao.js?v=20260525a"></script>
+    <script src="assets/js/english.js?v=20260525a"></script>
+    <script src="assets/js/life.js?v=20260525a"></script>
+    <script src="assets/js/expense.js?v=20260525a"></script>
+    <script src="assets/js/expense-analytics.js?v=20260525a"></script>
+    <script src="assets/js/trip.js?v=20260525a"></script>
+    <script src="assets/js/health-data.js?v=20260525a"></script>
+    <script src="assets/js/health-renderer.js?v=20260525a"></script>
+    <script src="assets/js/health.js?v=20260525a"></script>
+    <script src="assets/js/friends.js?v=20260525a"></script>
+    <script src="assets/js/notifications.js?v=20260525a"></script>
+    <script src="assets/js/settings.js?v=20260525a"></script>
+    <script src="assets/js/admin-panel.js?v=20260525a"></script>
+    <!-- Work module (T-094 / SPEC work-task-table) -->
+    <script src="assets/js/work-pick.js?v=20260525a"></script>
+    <script src="assets/js/work-table.js?v=20260525a"></script>
+    <script src="assets/js/work-column-cfg.js?v=20260525a"></script>
+    <script src="assets/js/work-board.js?v=20260525a"></script>
+    <script src="assets/js/work-calendar.js?v=20260525a"></script>
+    <script src="assets/js/work.js?v=20260525a"></script>
+    <script src="assets/js/patrol-utils.js?v=20260525a"></script>
+    <script src="assets/js/patrol-terrain.js?v=20260525a"></script>
+    <script src="assets/js/patrol-debug.js?v=20260525a"></script>
+    <script src="assets/js/patrol.js?v=20260525a"></script>
 
     <script>
     // Initialize

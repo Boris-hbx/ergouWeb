@@ -2120,7 +2120,8 @@ body {
     align-items: center;
     gap: 0.6rem;
     padding: 0.6rem 0.8rem;
-    background: rgba(var(--primary-color-rgb), 0.05);
+    background: rgba(var(--primary-color-rgb), 0.06);
+    border: 1px solid rgba(var(--primary-color-rgb), 0.14);
     border-radius: 8px;
     cursor: grab;
     transition: all 0.2s ease;
@@ -2136,13 +2137,14 @@ body {
 }
 
 .task-item:hover {
-    background: rgba(var(--primary-color-rgb), 0.1);
+    background: rgba(var(--primary-color-rgb), 0.12);
+    border-color: rgba(var(--primary-color-rgb), 0.28);
 }
 
 .task-item.dragging {
     opacity: 0.3;
     cursor: grabbing;
-    background: rgba(var(--primary-color-rgb), 0.1);
+    background: rgba(var(--primary-color-rgb), 0.12);
 }
 
 /* Drag handle */
@@ -9882,27 +9884,129 @@ body.dark-mode .action-sheet-cancel {
 }
 
 /* ─── Memory management ─── */
-.memory-list {
-    margin-top: 8px;
+/* ===== 记忆管理 UI (T-081) ===== */
+.memory-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
 }
+.memory-topbar h4 { margin: 0; }
+.memory-topbar-actions {
+    display: flex;
+    gap: 6px;
+}
+.memory-action-btn {
+    width: 32px; height: 32px;
+    border: 1.5px solid var(--primary-color);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--primary-color);
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+}
+.memory-action-btn:hover {
+    background: var(--primary-color);
+    color: #fff;
+}
+.memory-clear-btn { border-color: var(--danger-color); color: var(--danger-color); }
+.memory-clear-btn:hover { background: var(--danger-color); color: #fff; }
+
+.memory-search-box { margin-bottom: 8px; }
+.memory-search-input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1.5px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-input);
+    color: var(--text-primary);
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.15s;
+}
+.memory-search-input:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(var(--primary-color-rgb), 0.12);
+}
+
+.memory-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 8px;
+    overflow-x: auto;
+}
+.memory-tab {
+    padding: 5px 12px;
+    border: 1.5px solid var(--border-color);
+    border-radius: 16px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 12px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s;
+}
+.memory-tab:hover { border-color: var(--primary-color); color: var(--primary-color); }
+.memory-tab.active {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    color: #fff;
+}
+
+.memory-stats {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+}
+
+.memory-list { margin-top: 4px; }
 .memory-item {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
     gap: 8px;
-    padding: 10px 0;
-    border-bottom: 1px solid var(--border-color, #30363d);
+    padding: 10px 12px;
+    margin-bottom: 6px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: var(--bg-card);
+    transition: border-color 0.15s;
 }
-.memory-item:last-child {
-    border-bottom: none;
+.memory-item:hover {
+    border-color: rgba(var(--primary-color-rgb), 0.35);
 }
 .memory-content {
     flex: 1;
     min-width: 0;
+}
+.memory-content-text {
+    font-size: 13px;
+    color: var(--text-primary);
+    word-break: break-word;
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.memory-content-text mark {
+    background: rgba(var(--primary-color-rgb), 0.25);
+    color: inherit;
+    border-radius: 2px;
+    padding: 0 2px;
+}
+.memory-meta {
     display: flex;
     flex-wrap: wrap;
-    align-items: baseline;
+    align-items: center;
     gap: 6px;
+    margin-top: 4px;
+    font-size: 11px;
+    color: var(--text-muted);
 }
 .memory-category {
     font-size: 11px;
@@ -9911,52 +10015,267 @@ body.dark-mode .action-sheet-cancel {
     white-space: nowrap;
     flex-shrink: 0;
 }
-.memory-cat-habit {
-    background: rgba(72, 187, 120, 0.15);
-    color: #48bb78;
+.memory-cat-habit { background: rgba(72, 187, 120, 0.15); color: #27ae60; }
+.memory-cat-fact { background: rgba(var(--primary-color-rgb), 0.15); color: var(--primary-color); }
+.memory-cat-personality { background: rgba(237, 137, 54, 0.15); color: #e67e22; }
+.memory-cat-intent { background: rgba(159, 122, 234, 0.15); color: #9f7aea; }
+.memory-importance { font-size: 10px; letter-spacing: -1px; }
+.memory-time { color: var(--text-muted); }
+
+.memory-item-actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
 }
-.memory-cat-fact {
-    background: rgba(102, 126, 234, 0.15);
-    color: #667eea;
+.memory-edit-btn, .memory-delete-btn {
+    padding: 3px 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: transparent;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
 }
-.memory-cat-personality {
-    background: rgba(237, 137, 54, 0.15);
-    color: #ed8936;
+.memory-edit-btn {
+    color: var(--primary-color);
+    border-color: rgba(var(--primary-color-rgb), 0.3);
 }
-.memory-cat-intent {
-    background: rgba(159, 122, 234, 0.15);
-    color: #9f7aea;
-}
-.memory-text {
-    font-size: 13px;
-    color: var(--text-primary, #e6edf3);
-    word-break: break-word;
+.memory-edit-btn:hover {
+    background: var(--primary-color);
+    color: #fff;
 }
 .memory-delete-btn {
-    background: none;
-    border: none;
-    color: var(--text-muted, #666);
-    font-size: 18px;
-    cursor: pointer;
-    padding: 0 4px;
-    line-height: 1;
-    flex-shrink: 0;
-    opacity: 0.6;
-    transition: opacity 0.2s;
+    color: var(--danger-color);
+    border-color: rgba(231, 76, 60, 0.3);
 }
 .memory-delete-btn:hover {
-    opacity: 1;
-    color: #f85149;
+    background: var(--danger-color);
+    color: #fff;
 }
 .memory-empty {
     text-align: center;
-    color: var(--text-muted, #666);
+    color: var(--text-muted);
     font-size: 13px;
-    padding: 16px 0;
+    padding: 24px 0;
+}
+.memory-retry-btn {
+    margin-left: 8px;
+    color: var(--primary-color);
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-decoration: underline;
 }
 .memory-loading {
     text-align: center;
-    color: var(--text-muted, #666);
+    color: var(--text-muted);
+    font-size: 13px;
+    padding: 16px 0;
+}
+
+/* Memory Modal */
+.memory-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: var(--overlay-bg);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: abao-fade-in 0.15s ease;
+}
+.memory-modal {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 24px;
+    width: 420px;
+    max-width: 92vw;
+    box-shadow: var(--shadow-medium);
+}
+.memory-modal-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 16px;
+}
+.memory-form-group {
+    margin-bottom: 14px;
+}
+.memory-form-group label {
+    display: block;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+}
+.memory-form-textarea, .memory-form-input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1.5px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-input);
+    color: var(--text-primary);
+    font-size: 13px;
+    font-family: inherit;
+    resize: vertical;
+    outline: none;
+    box-sizing: border-box;
+}
+.memory-form-textarea:focus, .memory-form-input:focus {
+    border-color: var(--primary-color);
+}
+.memory-char-count {
+    text-align: right;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+.memory-form-radios {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.memory-form-radios label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 13px;
+    color: var(--text-primary);
+    cursor: pointer;
+}
+.memory-star-picker {
+    display: flex;
+    gap: 4px;
+    font-size: 18px;
+}
+.memory-star {
+    cursor: pointer;
+    transition: opacity 0.1s;
+}
+.memory-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 16px;
+}
+.memory-modal-actions .btn {
+    min-width: 72px;
+}
+
+/* ===== 灵魂演进 UI (T-092) ===== */
+.soul-topbar {
+    margin-bottom: 8px;
+}
+.soul-topbar h4 { margin: 0; }
+
+.soul-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 12px;
+}
+.soul-tab {
+    padding: 5px 14px;
+    border: 1.5px solid var(--border-color);
+    border-radius: 16px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.soul-tab:hover { border-color: var(--primary-color); color: var(--primary-color); }
+.soul-tab.active {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    color: #fff;
+}
+
+.soul-panel { min-height: 60px; }
+
+.soul-relationship {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: rgba(var(--primary-color-rgb), 0.08);
+    border: 1px solid rgba(var(--primary-color-rgb), 0.2);
+}
+.soul-stage {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--primary-color);
+}
+.soul-interactions {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.soul-param {
+    margin-bottom: 10px;
+}
+.soul-param-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+.soul-param-value {
+    font-weight: 600;
+    color: var(--primary-color);
+    font-size: 13px;
+}
+.soul-bar {
+    height: 8px;
+    background: rgba(var(--primary-color-rgb), 0.12);
+    border-radius: 4px;
+    overflow: hidden;
+}
+.soul-bar-fill {
+    height: 100%;
+    background: var(--primary-gradient);
+    border-radius: 4px;
+    transition: width 0.4s ease;
+}
+
+.soul-log-item {
+    padding: 8px 10px;
+    margin-bottom: 6px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-card);
+}
+.soul-log-main {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+.soul-log-param {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+.soul-log-change {
+    font-size: 12px;
+    font-family: monospace;
+    color: var(--text-secondary);
+}
+.soul-log-up { color: #27ae60; }
+.soul-log-down { color: #e74c3c; }
+.soul-log-meta {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 3px;
+}
+
+.soul-empty, .soul-loading {
+    text-align: center;
+    color: var(--text-muted);
     font-size: 13px;
     padding: 16px 0;
 }

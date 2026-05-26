@@ -629,6 +629,13 @@ var Abao = (function() {
         else open();
     }
 
+    document.addEventListener('mousedown', function(e) {
+        if (!isOpen || !panel || _isMobile) return;
+        if (!panel.contains(e.target) && !e.target.closest('#header-avatar') && !e.target.closest('.abao-tab')) {
+            close();
+        }
+    });
+
     // ─── Messages ───
     var _isMobile = window.matchMedia('(max-width: 768px)').matches;
 

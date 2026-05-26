@@ -189,3 +189,48 @@ pub async fn update_soul_state(
         soul_state: updated,
     }))
 }
+
+/// GET /api/soul-state/logs — evolution log entries
+pub async fn get_evolution_logs(
+    State(state): State<AppState>,
+    UserId(user_id): UserId,
+) -> (StatusCode, Json<serde_json::Value>) {
+    let db = state.db.lock();
+
+    let mut logs: Vec<serde_json::Value> = Vec::new();
+
+    if let Ok(mut stmt) = db.prepare(
+        "SELECT id, parameter, old_value, new_value, trigger_type, created_at FROM soul_evolution_log WHERE user_id=?1 ORDER BY created_at DESC LIMIT 100",
+    ) {
+        if let Ok(rows) = stmt.query_map([&user_id], |row| {
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, f64>(2)?,
+                row.get::<_, f64>(3)?,
+                row.get::<_, String>(4)?,
+                row.get::<_, String>(5)?,
+            ))
+        }) {
+            for row in rows.flatten() {
+                logs.push(json!({
+                    "id": row.0,
+                    "parameter": row.1,
+                    "old_value": row.2,
+                    "new_value": row.3,
+                    "trigger_type": row.4,
+                    "created_at": row.5,
+                }));
+            }
+        }
+    }
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "success": true,
+            "logs": logs,
+            "count": logs.len(),
+        })),
+    )
+}

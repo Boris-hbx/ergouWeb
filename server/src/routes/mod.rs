@@ -19,3 +19,5 @@ pub mod routines;
 pub mod soul_state;
 pub mod todos;
 pub mod trips;
+pub mod work_columns;
+pub mod work_tasks;

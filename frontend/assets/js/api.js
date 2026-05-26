@@ -572,18 +572,53 @@ var API = (function() {
             return await request(method, path, body);
         },
 
+        // ===== Soul State APIs =====
+        getSoulState: async function() {
+            return await request('GET', '/soul-state');
+        },
+        getEvolutionLogs: async function() {
+            return await request('GET', '/soul-state/logs');
+        },
+
         // ===== Memory APIs =====
-        getMemories: async function() {
-            return await request('GET', '/settings/memories');
+        getMemories: async function(opts) {
+            opts = opts || {};
+            var params = [];
+            if (opts.category) params.push('category=' + encodeURIComponent(opts.category));
+            if (opts.limit) params.push('limit=' + opts.limit);
+            if (opts.offset) params.push('offset=' + opts.offset);
+            var qs = params.length ? '?' + params.join('&') : '';
+            return await request('GET', '/memories' + qs);
+        },
+        searchMemories: async function(q, category) {
+            var params = ['q=' + encodeURIComponent(q)];
+            if (category) params.push('category=' + encodeURIComponent(category));
+            return await request('GET', '/memories/search?' + params.join('&'));
+        },
+        createMemory: async function(data) {
+            return await request('POST', '/memories', data);
+        },
+        updateMemory: async function(id, data) {
+            return await request('PUT', '/memories/' + encodeURIComponent(id), data);
         },
         deleteMemory: async function(id) {
-            return await request('DELETE', '/settings/memories/' + encodeURIComponent(id));
+            return await request('DELETE', '/memories/' + encodeURIComponent(id));
         },
         deleteAllMemories: async function() {
-            return await request('DELETE', '/settings/memories');
+            return await request('DELETE', '/memories');
         },
 
         // 环境检测 (always web now)
-        isTauri: function() { return false; }
+        isTauri: function() { return false; },
+
+        // ===== Work task table (T-094 / SPEC work-task-table) =====
+        workListTasks:    async function()         { return await request('GET',    '/work/tasks'); },
+        workCreateTask:   async function(data)     { return await request('POST',   '/work/tasks', data); },
+        workUpdateTask:   async function(id, data) { return await request('PATCH',  '/work/tasks/' + id, data); },
+        workDeleteTask:   async function(id)       { return await request('DELETE', '/work/tasks/' + id); },
+        workListColumns:  async function()         { return await request('GET',    '/work/columns'); },
+        workSaveColumns:  async function(patches)  { return await request('PUT',    '/work/columns', { columns: patches }); },
+        workAddColumn:    async function(data)     { return await request('POST',   '/work/columns', data); },
+        workDeleteColumn: async function(key)      { return await request('DELETE', '/work/columns/' + encodeURIComponent(key)); },
     };
 })();

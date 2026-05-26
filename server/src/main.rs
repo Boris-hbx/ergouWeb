@@ -19,6 +19,7 @@ use http::HeaderValue;
 use parking_lot::Mutex;
 use state::AppState;
 use std::sync::Arc;
+use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::set_header::SetResponseHeaderLayer;
 use tower_http::trace::TraceLayer;
 
@@ -303,13 +304,17 @@ pub fn build_app(state: AppState) -> Router {
         .nest("/share", share_routes)
         .nest("/contacts", contacts_routes)
         .nest("/collaborate", collaborate_routes)
+        // Work module (T-094 / SPEC work-task-table) — registered flat to avoid
+        // an Axum 0.8 nest issue we hit when nesting another Router inside api_routes.
         .nest(
             "/soul-state",
-            Router::new().route(
-                "/",
-                get(routes::soul_state::get_soul_state)
-                    .put(routes::soul_state::update_soul_state),
-            ),
+            Router::new()
+                .route(
+                    "/",
+                    get(routes::soul_state::get_soul_state)
+                        .put(routes::soul_state::update_soul_state),
+                )
+                .route("/logs", get(routes::soul_state::get_evolution_logs)),
         )
         .nest(
             "/memories",
@@ -401,6 +406,33 @@ pub fn build_app(state: AppState) -> Router {
         ))
         .layer(DefaultBodyLimit::max(1_048_576)) // 1MB global body size limit
         .layer(TraceLayer::new_for_http())
+        .layer(
+            CorsLayer::new()
+                .allow_origin(AllowOrigin::predicate(|origin, _| {
+                    if let Ok(s) = origin.to_str() {
+                        s == "https://next-boris.fly.dev"
+                            || s == "https://next-boris-staging.fly.dev"
+                            || s.starts_with("http://localhost:")
+                            || s.starts_with("http://127.0.0.1:")
+                    } else {
+                        false
+                    }
+                }))
+                .allow_methods([
+                    http::Method::GET,
+                    http::Method::POST,
+                    http::Method::PUT,
+                    http::Method::DELETE,
+                    http::Method::OPTIONS,
+                ])
+                .allow_headers([
+                    http::header::CONTENT_TYPE,
+                    http::header::COOKIE,
+                    http::header::AUTHORIZATION,
+                ])
+                .allow_credentials(true)
+                .max_age(std::time::Duration::from_secs(3600)),
+        )
         .with_state(state)
 }
 

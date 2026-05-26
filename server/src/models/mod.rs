@@ -10,3 +10,5 @@ pub mod routine;
 pub mod soul_state;
 pub mod todo;
 pub mod trip;
+pub mod work_column;
+pub mod work_task;

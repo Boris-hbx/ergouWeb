@@ -101,7 +101,7 @@ async fn run_evolution_analysis(
         .filter_map(|m| {
             let role = m.get("role")?.as_str()?;
             let content = m.get("content")?.as_str()?;
-            Some(format!("{}: {}", role, &content[..content.len().min(200)]))
+            Some(format!("{}: {}", role, content.chars().take(200).collect::<String>()))
         })
         .collect();
 

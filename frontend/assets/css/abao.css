@@ -49,7 +49,7 @@
     width: 28px;
     height: 28px;
     border-radius: 50%;
-    background: var(--primary-color, #667eea);
+    background: var(--primary-color, #7C4DFF);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -122,16 +122,18 @@
 
 .abao-msg.user {
     align-self: flex-end;
-    background: rgba(var(--primary-rgb, 102,126,234), 0.2);
-    color: var(--text-primary);
+    background: var(--primary-color, #7C4DFF);
+    color: #ffffff;
     border-bottom-right-radius: 4px;
+    box-shadow: 0 2px 8px rgba(var(--primary-rgb, 124, 77, 255), 0.25);
 }
 
 .abao-msg.assistant {
     align-self: flex-start;
-    background: rgba(255,255,255,0.06);
-    color: var(--text-primary);
+    background: #4A2A9E;
+    color: #ffffff;
     border-bottom-left-radius: 4px;
+    box-shadow: 0 2px 8px rgba(74, 42, 158, 0.25);
 }
 
 .abao-msg.error {
@@ -165,7 +167,7 @@
 
 /* --- 提醒卡片 --- */
 .abao-reminder-card {
-    border-left: 3px solid var(--primary-color, #667eea);
+    border-left: 3px solid var(--primary-color, #7C4DFF);
 }
 .abao-reminder-actions {
     margin-top: 8px;
@@ -193,7 +195,7 @@
     border-left: 3px solid #f0883e;
 }
 .abao-push-enable-btn {
-    background: var(--primary-color, #667eea);
+    background: var(--primary-color, #7C4DFF);
     color: #fff;
     border: none;
     padding: 5px 14px;
@@ -264,19 +266,23 @@
     flex-shrink: 0;
     padding: 6px 14px;
     border-radius: 16px;
-    border: 1px solid var(--border-color, rgba(255,255,255,0.12));
-    background: transparent;
-    color: var(--text-muted, #8b949e);
+    border: 1.5px solid var(--primary-color, #7C4DFF);
+    background: var(--primary-color, #7C4DFF);
+    color: #ffffff;
     font-size: 12px;
+    font-weight: 500;
     cursor: pointer;
     transition: all 0.15s;
     white-space: nowrap;
+    box-shadow: 0 1px 3px rgba(var(--primary-rgb, 124, 77, 255), 0.2);
 }
 
 .abao-shortcut-btn:hover {
-    border-color: var(--primary-color, #667eea);
-    color: var(--primary-color, #667eea);
-    background: rgba(var(--primary-rgb, 102,126,234), 0.08);
+    background: var(--primary-hover, #6A3FE0);
+    border-color: var(--primary-hover, #6A3FE0);
+    color: #ffffff;
+    transform: translateY(-1px);
+    box-shadow: 0 3px 10px rgba(var(--primary-rgb, 124, 77, 255), 0.35);
 }
 
 /* --- 输入区 --- */
@@ -306,11 +312,12 @@
 }
 
 .abao-input:focus {
-    border-color: var(--primary-color, #667eea);
+    border-color: var(--primary-color, #7C4DFF);
 }
 
 .abao-input::placeholder {
-    color: var(--text-muted, #8b949e);
+    color: var(--text-secondary, #49454F);
+    opacity: 1;
 }
 
 .abao-send-btn {
@@ -318,7 +325,7 @@
     height: 36px;
     border-radius: 50%;
     border: none;
-    background: var(--primary-color, #667eea);
+    background: var(--primary-color, #7C4DFF);
     color: white;
     cursor: pointer;
     display: flex;
@@ -344,7 +351,7 @@
     border-radius: 50%;
     border: none;
     background: transparent;
-    color: var(--text-muted, #8b949e);
+    color: var(--primary-color, #7C4DFF);
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -354,12 +361,12 @@
 }
 
 .abao-img-btn:hover {
-    color: var(--primary-color, #667eea);
-    background: rgba(255,255,255,0.06);
+    color: #ffffff;
+    background: var(--primary-color, #7C4DFF);
 }
 
 .abao-img-btn.has-images {
-    color: var(--primary-color, #667eea);
+    color: var(--primary-color, #7C4DFF);
 }
 
 .abao-image-preview {
@@ -427,14 +434,14 @@
     content: '拖放图片到此处';
     position: absolute;
     inset: 0;
-    background: rgba(var(--primary-rgb, 102,126,234), 0.15);
-    border: 2px dashed var(--primary-color, #667eea);
+    background: rgba(var(--primary-rgb, 124, 77, 255), 0.15);
+    border: 2px dashed var(--primary-color, #7C4DFF);
     border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 16px;
-    color: var(--primary-color, #667eea);
+    color: var(--primary-color, #7C4DFF);
     pointer-events: none;
     z-index: 10;
 }
@@ -556,20 +563,24 @@
 
 /* --- 浅色主题 --- */
 [data-theme="light"] .abao-panel {
-    background: rgba(255, 255, 255, 0.88);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border-left-color: #e1e4e8;
+    background: #ffffff;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-left: 1px solid #e1e4e8;
+    box-shadow: -4px 0 24px rgba(28, 27, 31, 0.06);
 }
 
 [data-theme="light"] .abao-msg.user {
-    background: rgba(var(--primary-rgb, 102,126,234), 0.18);
-    color: #1a1a2e;
+    background: var(--primary-color, #7C4DFF);
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(var(--primary-rgb, 124, 77, 255), 0.28);
 }
 
 [data-theme="light"] .abao-msg.assistant {
-    background: #e8e8ee;
-    color: #1a1a2e;
+    background: #4A2A9E;
+    color: #ffffff;
+    border: none;
+    box-shadow: 0 2px 8px rgba(74, 42, 158, 0.25);
 }
 
 [data-theme="light"] .abao-input {
@@ -953,7 +964,7 @@
         color: #1a1a2e;
     }
     [data-theme="light"] .abao-msg-row.user .abao-msg {
-        background: linear-gradient(135deg, rgba(102,126,234,0.85), rgba(118,75,162,0.85));
+        background: linear-gradient(135deg, #7C4DFF, #5B2FD6);
         color: #fff;
     }
     [data-theme="light"] .abao-msg.assistant {
@@ -961,15 +972,16 @@
         color: #1a1a2e;
     }
     [data-theme="light"] .abao-msg.user {
-        background: linear-gradient(135deg, rgba(102,126,234,0.85), rgba(118,75,162,0.85));
+        background: linear-gradient(135deg, #7C4DFF, #5B2FD6);
         color: #fff;
     }
     [data-theme="light"] .abao-msg.error {
         background: rgba(248,81,73,0.12);
     }
     [data-theme="light"] .abao-shortcut-btn {
-        color: rgba(0,0,0,0.45);
-        border-color: rgba(0,0,0,0.1);
+        background: var(--primary-color, #7C4DFF);
+        color: #ffffff;
+        border-color: var(--primary-color, #7C4DFF);
     }
     [data-theme="light"] .abao-input {
         background: rgba(255,255,255,0.55);
@@ -977,7 +989,8 @@
         color: #24292f;
     }
     [data-theme="light"] .abao-input::placeholder {
-        color: rgba(0,0,0,0.35);
+        color: rgba(0,0,0,0.55);
+        opacity: 1;
     }
     [data-theme="light"] .abao-input-area {
         border-top-color: rgba(0,0,0,0.06);
@@ -1056,7 +1069,7 @@
     opacity: 0.85;
 }
 .abao-msg.abao-md a {
-    color: var(--primary-color, #667eea);
+    color: var(--primary-color, #7C4DFF);
     text-decoration: underline;
 }
 .abao-msg.abao-md h1, .abao-msg.abao-md h2, .abao-msg.abao-md h3, .abao-msg.abao-md h4 {
@@ -1132,10 +1145,10 @@
     background: rgba(0,0,0,0.05);
 }
 .abao-action-btn.active {
-    color: var(--primary-color, #667eea);
+    color: var(--primary-color, #7C4DFF);
 }
 [data-theme="light"] .abao-action-btn.active {
-    color: var(--primary-color, #667eea);
+    color: var(--primary-color, #7C4DFF);
 }
 
 /* ========== Suggestion chips ========== */
@@ -1147,19 +1160,33 @@
     animation: abao-fade-in 0.3s ease;
 }
 .abao-suggestion-chip {
-    background: rgba(var(--primary-rgb, 102,126,234), 0.15);
-    color: var(--primary-color, #667eea);
-    border: 1px solid rgba(var(--primary-rgb, 102,126,234), 0.25);
+    background: #ffffff;
+    color: var(--primary-color, #7C4DFF);
+    border: 1.5px solid var(--primary-color, #7C4DFF);
     border-radius: 16px;
     padding: 6px 14px;
     font-size: 13px;
+    font-weight: 500;
     cursor: pointer;
-    transition: background 0.15s, transform 0.1s;
+    transition: all 0.15s;
     white-space: nowrap;
+    box-shadow: 0 1px 3px rgba(var(--primary-rgb, 124, 77, 255), 0.12);
 }
 .abao-suggestion-chip:hover {
-    background: rgba(var(--primary-rgb, 102,126,234), 0.25);
+    background: var(--primary-color, #7C4DFF);
+    color: #ffffff;
     transform: translateY(-1px);
+    box-shadow: 0 3px 10px rgba(var(--primary-rgb, 124, 77, 255), 0.35);
+}
+[data-theme="dark"] .abao-suggestion-chip {
+    background: rgba(var(--primary-rgb, 179, 157, 255), 0.12);
+    color: var(--primary-color, #B39DFF);
+    border-color: var(--primary-color, #B39DFF);
+    box-shadow: none;
+}
+[data-theme="dark"] .abao-suggestion-chip:hover {
+    background: var(--primary-color, #B39DFF);
+    color: #1C1B1F;
 }
 .abao-suggestion-chip:active {
     transform: scale(0.97);

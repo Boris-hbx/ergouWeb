@@ -292,6 +292,26 @@ pub fn build_app(state: state::AppState) -> Router {
         .route(
             "/uploads/{user_id}/{filename}",
             get(routes::expenses::serve_photo),
+        )
+        // Work module (T-094 / SPEC work-task-table)
+        .route(
+            "/work/tasks",
+            get(routes::work_tasks::list_tasks).post(routes::work_tasks::create_task),
+        )
+        .route(
+            "/work/tasks/{id}",
+            axum::routing::patch(routes::work_tasks::update_task)
+                .delete(routes::work_tasks::delete_task),
+        )
+        .route(
+            "/work/columns",
+            get(routes::work_columns::list_columns)
+                .put(routes::work_columns::batch_save_columns)
+                .post(routes::work_columns::create_column),
+        )
+        .route(
+            "/work/columns/{key}",
+            delete(routes::work_columns::delete_column),
         );
 
     Router::new()
