@@ -160,12 +160,18 @@ var Work = (function() {
     }
 
     // T-098:把任务列表按当前 Tab 过滤;表格视图和看板视图共用同一份逻辑。
-    // 语义(spec § 6.1):
-    //   all   = 所有未删除
-    //   today = due == today  ∪  (due < today AND status != done) ← 含逾期未完成强制冒头
+    // T-113:统一入口先排除 done(已完成任务归 T-111 已完成档案);所有视图都通过本函数
+    //        自动生效,不要在每个视图各自实现 done 过滤。
+    //        已完成档案 WorkDone 直接调 Work.rows() 拿原始数据 + 自己 filter done,
+    //        不走 applyTimeTabFilter,因此不受本变更影响。
+    // 语义(spec § 6.1 / T-113 修订):
+    //   all   = 所有未删除 **且 status != 'done'**
+    //   today = (due == today  ∪  due < today 逾期) AND status != 'done'
     //   week  = due in 本周(ISO,周一首日)  ∪  逾期未完成
     //   month = due in 本月  ∪  逾期未完成
     function applyTimeTabFilter(rows) {
+        // T-113:统一排除 done(主任务表所有视图的中心过滤点)
+        rows = rows.filter(function(t) { return t.status !== 'done'; });
         // T-103 B.1:单日过滤优先(覆盖时间 tab 语义)
         if (_dateFilter) {
             return rows.filter(function(t) {
@@ -178,7 +184,7 @@ var Work = (function() {
                   : (_timeTab === 'month') ? _monthRange(today) : null;
         return rows.filter(function(t) {
             var due = _normalizeDue(t.due);
-            // 逾期未完成永远纳入(强制冒头)
+            // 逾期未完成永远纳入(强制冒头);done 上面已排除,这里 status !== 'done' 守护
             if (due && due < today && t.status !== 'done') return true;
             if (!due) return false;
             if (_timeTab === 'today') return due === today;
@@ -219,15 +225,17 @@ var Work = (function() {
     }
 
     // T-098:每次 render 时刷新 4 个 Tab 的实时计数 + 逾期 ⚠ 徽章
+    // T-113:计数也排除 done(与 applyTimeTabFilter 一致;done 任务归 T-111 已完成档案)
     function _updateTabCounts() {
         var today = _todayYMD();
         var wk = _weekRange(today);
         var mo = _monthRange(today);
         var c = { all: 0, today: 0, week: 0, month: 0, overdue: 0 };
         _rows.forEach(function(t) {
+            if (t.status === 'done') return;   // T-113
             c.all++;
             var due = _normalizeDue(t.due);
-            var isOverdue = (due && due < today && t.status !== 'done');
+            var isOverdue = (due && due < today);
             if (isOverdue) c.overdue++;
             if (isOverdue || due === today) c.today++;
             if (isOverdue || (due && due >= wk.start && due <= wk.end)) c.week++;
@@ -414,13 +422,15 @@ var Work = (function() {
             days.push({ ymd: ymd, count: 0, overdue: 0 });
         }
         // 按 due 日期落入对应槽(超 30 天的不算)
+        // T-113:done 任务不在主任务表心电图体现(已完成档案 T-111 是 done 的去处)
         _rows.forEach(function(t) {
+            if (t.status === 'done') return;
             var due = _normalizeDue(t.due);
             if (!due) return;
             for (var j = 0; j < 30; j++) {
                 if (days[j].ymd === due) {
                     days[j].count++;
-                    if (due < today && t.status !== 'done') days[j].overdue++;
+                    if (due < today) days[j].overdue++;
                     break;
                 }
             }

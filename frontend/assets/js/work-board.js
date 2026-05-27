@@ -17,6 +17,10 @@ var WorkBoard = (function() {
         var STATUS = WorkTable._STATUS;
         host.innerHTML = '';
         STATUS.forEach(function(col) {
+            // T-113:看板砍'已完成'列,只保留 3 列(待办 / 进行中 / 阻塞)
+            //   完成路径走单元格 ☐ → progress dialog → 100% → 二次确认 → 彩纸(保护 B.3 完成确认链)
+            //   不允许通过拖动改 status=done 绕过确认链
+            if (col.key === 'done') return;
             var items = rows.filter(function(t) { return t.status === col.key; });
             var div = document.createElement('div');
             div.className = 'wt-col';
