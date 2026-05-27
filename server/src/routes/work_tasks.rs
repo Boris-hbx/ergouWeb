@@ -94,6 +94,8 @@ fn parse_custom_fields(raw: &str) -> Map<String, JsonValue> {
 /// Map a SELECT row to a `WorkTask`. Column order MUST match `SELECT_COLS`.
 fn row_to_task(row: &rusqlite::Row) -> rusqlite::Result<WorkTask> {
     let custom_raw: String = row.get(11)?;
+    let tags_raw: String = row.get(14)?;
+    let tags: Vec<String> = serde_json::from_str(&tags_raw).unwrap_or_default();
     Ok(WorkTask {
         id: row.get(0)?,
         title: row.get(1)?,
@@ -109,11 +111,13 @@ fn row_to_task(row: &rusqlite::Row) -> rusqlite::Result<WorkTask> {
         custom_fields: parse_custom_fields(&custom_raw),
         created_at: row.get(12)?,
         updated_at: row.get(13)?,
+        tags,
     })
 }
 
+// T-110:SELECT_COLS 末尾追加 tags(放最后避免重排其它列索引)
 const SELECT_COLS: &str =
-    "id, title, desc, assignee, level, freq, status, priority, due_date, progress, sort_order, custom_fields, created_at, updated_at";
+    "id, title, desc, assignee, level, freq, status, priority, due_date, progress, sort_order, custom_fields, created_at, updated_at, tags";
 
 // ============ impl 函数(给 HTTP + 工具复用) ============
 
@@ -243,6 +247,9 @@ pub fn create_task_impl(
     )
     .unwrap_or_else(|_| "{}".to_string());
 
+    // T-110:tags 也存为 JSON 字符串
+    let tags_str = serde_json::to_string(&req.tags).unwrap_or_else(|_| "[]".to_string());
+
     let next_sort: f64 = db
         .query_row(
             "SELECT COALESCE(MAX(sort_order), 0) + 1 FROM work_tasks WHERE user_id = ?1",
@@ -256,8 +263,8 @@ pub fn create_task_impl(
     db.execute(
         "INSERT INTO work_tasks
            (user_id, title, desc, assignee, level, freq, status, priority,
-            due_date, progress, custom_fields, sort_order, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?13)",
+            due_date, progress, custom_fields, tags, sort_order, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?14)",
         params![
             user_id,
             &req.title,
@@ -270,6 +277,7 @@ pub fn create_task_impl(
             &req.due_date,
             req.progress,
             &custom_str,
+            &tags_str,
             next_sort,
             &now,
         ],
@@ -366,6 +374,13 @@ pub fn update_task_impl(
         }
         let s = serde_json::to_string(&JsonValue::Object(merged)).unwrap_or_else(|_| "{}".into());
         sets.push("custom_fields = ?");
+        vals.push(Box::new(s));
+    }
+
+    // T-110:tags(内置「标签」列)整体替换,不 merge。空数组 → 清空。
+    if let Some(patch_tags) = patch.tags {
+        let s = serde_json::to_string(&patch_tags).unwrap_or_else(|_| "[]".into());
+        sets.push("tags = ?");
         vals.push(Box::new(s));
     }
 
@@ -731,6 +746,181 @@ mod tests {
         let cf = j["item"]["customFields"].as_object().unwrap();
         assert_eq!(cf.get("a"), Some(&json!("1")));
         assert_eq!(cf.get("b"), Some(&json!("2")));
+    }
+
+    // ============ T-110:tags 字段持久化测试 ============
+    // 根因复盘:T-108 把内置「标签」列种成 builtin=true(前端走顶层 patch.tags),
+    //          但 UpdateWorkTaskRequest 没 tags 字段 → serde 静默丢弃。
+    // 修复:补 work_tasks.tags 列 + WorkTask/Create/Update 加字段 + INSERT/UPDATE 走 schema。
+
+    #[tokio::test]
+    async fn create_with_tags_persists() {
+        let state = test_state();
+        let (_uid, token) = create_test_user(&state, "t110a", "Pa55word1");
+        let session_cookie = auth_cookie(&token);
+        let app = crate::build_app(state);
+
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/work/tasks")
+                    .header("Cookie", &session_cookie)
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(r#"{"title":"x","tags":["基金","论文"]}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let j = body_json(resp).await;
+        assert_eq!(j["success"], true);
+        let tags = j["item"]["tags"].as_array().unwrap();
+        assert_eq!(tags.len(), 2);
+        assert_eq!(tags[0], "基金");
+        assert_eq!(tags[1], "论文");
+    }
+
+    #[tokio::test]
+    async fn patch_tags_persists_and_reloads() {
+        // 这是 T-110 修复的核心 bug 用例:多选标签 + PATCH + GET 验证持久化
+        let state = test_state();
+        let (_uid, token) = create_test_user(&state, "t110b", "Pa55word1");
+        let session_cookie = auth_cookie(&token);
+        let app = crate::build_app(state);
+
+        // 1) 建任务
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/work/tasks")
+                    .header("Cookie", &session_cookie)
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(r#"{"title":"y"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let id = body_json(resp).await["item"]["id"].as_i64().unwrap();
+
+        // 2) PATCH tags(模拟前端选标签 confirm)
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("PATCH")
+                    .uri(format!("/api/work/tasks/{id}"))
+                    .header("Cookie", &session_cookie)
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(r#"{"tags":["行政","教学"]}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let j = body_json(resp).await;
+        // 关键断言:PATCH 响应里 tags 已落实(在 T-110 修复前这里会是空数组,bug)
+        let tags = j["item"]["tags"].as_array().unwrap();
+        assert_eq!(tags.len(), 2);
+        assert!(tags.contains(&json!("行政")));
+        assert!(tags.contains(&json!("教学")));
+
+        // 3) GET list 再确认(模拟刷新页面)
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/work/tasks")
+                    .header("Cookie", &session_cookie)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let j = body_json(resp).await;
+        let item = &j["items"][0];
+        let tags = item["tags"].as_array().unwrap();
+        assert_eq!(tags.len(), 2, "刷新后 tags 必须还在(T-110 修复点)");
+    }
+
+    #[tokio::test]
+    async fn patch_tags_replaces_not_merges() {
+        // tags 整体替换语义(与 custom_fields merge 不同) — 选完整集合
+        let state = test_state();
+        let (_uid, token) = create_test_user(&state, "t110c", "Pa55word1");
+        let session_cookie = auth_cookie(&token);
+        let app = crate::build_app(state);
+
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/work/tasks")
+                    .header("Cookie", &session_cookie)
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(r#"{"title":"z","tags":["a","b","c"]}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let id = body_json(resp).await["item"]["id"].as_i64().unwrap();
+
+        // PATCH 替换为 ["x"]
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("PATCH")
+                    .uri(format!("/api/work/tasks/{id}"))
+                    .header("Cookie", &session_cookie)
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(r#"{"tags":["x"]}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let j = body_json(resp).await;
+        let tags = j["item"]["tags"].as_array().unwrap();
+        assert_eq!(tags.len(), 1);
+        assert_eq!(tags[0], "x");
+    }
+
+    #[tokio::test]
+    async fn patch_tags_empty_array_clears() {
+        // 空数组 → 清空 tags
+        let state = test_state();
+        let (_uid, token) = create_test_user(&state, "t110d", "Pa55word1");
+        let session_cookie = auth_cookie(&token);
+        let app = crate::build_app(state);
+
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/work/tasks")
+                    .header("Cookie", &session_cookie)
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(r#"{"title":"w","tags":["k1","k2"]}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let id = body_json(resp).await["item"]["id"].as_i64().unwrap();
+
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("PATCH")
+                    .uri(format!("/api/work/tasks/{id}"))
+                    .header("Cookie", &session_cookie)
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(r#"{"tags":[]}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let j = body_json(resp).await;
+        assert_eq!(j["item"]["tags"].as_array().unwrap().len(), 0);
     }
 
     // ============ T-101:query 过滤器测试 ============

@@ -314,6 +314,20 @@ fn run_migrations(conn: &Connection) {
         .ok();
     }
 
+    // T-110:work_tasks.tags 字段(内置「标签」列对应的独立 schema 字段)。
+    // 根因:T-108 把内置「标签」列种成 builtin=true(前端走 t.tags 顶层路径),
+    //       但当时漏加 work_tasks.tags 字段 + UpdateWorkTaskRequest.tags 字段,
+    //       导致 PATCH 顶层的 tags=[...] 被 serde 静默丢弃。本 migration 补 schema 字段。
+    let has_work_tags: bool = conn
+        .prepare("SELECT tags FROM work_tasks LIMIT 1")
+        .is_ok();
+    if !has_work_tags {
+        conn.execute_batch(
+            "ALTER TABLE work_tasks ADD COLUMN tags TEXT NOT NULL DEFAULT '[]';",
+        )
+        .ok();
+    }
+
     // T-107 v0.2:status enum 迁移 'drafting' → 'collecting'(无报告) / 'editing'(有报告)。
     // 幂等:跑过后 drafting 已被替换,WHERE 不再命中。
     // 注:SQLite 不强制 enum,这里只是把字符串值改对。
@@ -856,6 +870,7 @@ fn create_tables(conn: &Connection) {
             priority      TEXT    NOT NULL DEFAULT 'mid',
             due_date      TEXT,
             progress      INTEGER NOT NULL DEFAULT 0,
+            tags          TEXT    NOT NULL DEFAULT '[]',
             custom_fields TEXT    NOT NULL DEFAULT '{}',
             sort_order    REAL    NOT NULL DEFAULT 0,
             created_at    TEXT    NOT NULL,
