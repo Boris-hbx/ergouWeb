@@ -228,6 +228,57 @@
   cursor: pointer;
 }
 .ins-cap-add:hover { border-color: var(--ins-primary); color: var(--ins-primary); background: var(--ins-primary-soft); }
+
+/* T-112:短文本警示二选一(spec § 5.4.1) */
+.ins-cap-warn {
+  background: var(--ins-primary-soft);
+  border: 1px solid var(--ins-primary);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  animation: ins-cap-warn-in .2s ease-out;
+}
+@keyframes ins-cap-warn-in {
+  from { opacity: 0; transform: translateY(-3px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.ins-cap-warn-head {
+  display: flex; align-items: flex-start; gap: 6px;
+  margin-bottom: 6px;
+}
+.ins-cap-warn-icon { font-size: 14px; line-height: 1.2; flex-shrink: 0; }
+.ins-cap-warn-msg {
+  flex: 1; font-size: 12px; color: var(--ins-text);
+  line-height: 1.45;
+}
+.ins-cap-warn-x {
+  background: transparent; border: 0;
+  color: var(--ins-text-mute);
+  font-size: 11px; padding: 0 4px;
+  cursor: pointer; border-radius: 3px;
+}
+.ins-cap-warn-x:hover { background: rgba(0,0,0,0.05); color: var(--ins-text); }
+
+.ins-cap-warn-actions {
+  display: flex; gap: 6px;
+}
+.ins-cap-warn-primary {
+  flex: 1;
+  background: var(--ins-primary); color: #fff;
+  border: 0; padding: 5px 10px;
+  font-size: 12px; border-radius: 4px;
+  cursor: pointer; font-weight: 500;
+}
+.ins-cap-warn-primary:hover { background: #6B3FE6; }
+.ins-cap-warn-ghost {
+  flex: 2;
+  background: #fff; color: var(--ins-text-mute);
+  border: 1px solid var(--ins-border);
+  padding: 5px 10px;
+  font-size: 12px; border-radius: 4px;
+  cursor: pointer;
+}
+.ins-cap-warn-ghost:hover { background: var(--ins-bg-elev); color: var(--ins-text); border-color: var(--ins-border-strong); }
 .ins-cap-poll {
   font-size: 11px; color: var(--ins-warn);
   padding: 4px 8px; background: var(--ins-warn-soft);

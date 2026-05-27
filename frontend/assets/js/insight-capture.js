@@ -19,6 +19,7 @@ var InsightCapture = (function() {
     var _insights = [];
     var _refreshTimer = null;
     var _expandedSourceId = null;   // 当前展开归属 select 的 source id
+    var _pendingShortText = '';     // T-112:短文本警示二选一暂存(spec § 5.4.1)
 
     function _esc(s) {
         return ('' + (s == null ? '' : s))
@@ -49,6 +50,14 @@ var InsightCapture = (function() {
         try { var url = new URL(u); return url.hostname + url.pathname.slice(0, 30); }
         catch (_) { return u; }
     }
+    // T-112 / spec § 5.4.2:无 title 时 content[:60]+"…"
+    //   normalize 多行空白成单空格,避免渲染时换行撑高卡片
+    function _previewContent(c) {
+        if (!c) return '';
+        var s = ('' + c).replace(/\s+/g, ' ').trim();
+        if (!s) return '';
+        return s.length > 60 ? s.slice(0, 60) + '…' : s;
+    }
 
     function render() {
         var host = document.getElementById('insight-capture-sidebar');
@@ -60,7 +69,8 @@ var InsightCapture = (function() {
           +   '<span class="ins-cap-count">' + _items.length + ' 项</span>'
           + '</div>'
           + '<div class="ins-cap-input">'
-          +   '<textarea id="ins-cap-text" placeholder="粘贴 URL(一行一个)或一段文本&#10;回车提交;Shift+Enter 换行"></textarea>'
+          +   '<textarea id="ins-cap-text" placeholder="粘贴 URL(每行一个)或素材原文片段。&#10;想新建洞察请点上方「+ 新建洞察」。"></textarea>'
+          +   _shortTextWarnHtml()
           +   '<button class="ins-cap-add" onclick="InsightCapture.submit()">+ 添加到候选池</button>'
           + '</div>'
           + (pendingCount ? '<div class="ins-cap-poll">⏳ 抓取中(' + pendingCount + ')...</div>' : '')
@@ -82,8 +92,33 @@ var InsightCapture = (function() {
         }
     }
 
+    // T-112 / spec § 5.4.1:短文本警示二选一 inline 提示条
+    //   单次粘贴 < 20 字 + 无 URL 形态时触发;用户必须明示二选一才入库,不强制拦截
+    function _shortTextWarnHtml() {
+        if (!_pendingShortText) return '';
+        return '<div class="ins-cap-warn">'
+          + '<div class="ins-cap-warn-head">'
+          +   '<span class="ins-cap-warn-icon">💭</span>'
+          +   '<span class="ins-cap-warn-msg">看起来像研究主题而非素材。要不要新建洞察?</span>'
+          +   '<button class="ins-cap-warn-x" onclick="InsightCapture.dismissShortWarn()" title="关闭(保留编辑)">✕</button>'
+          + '</div>'
+          + '<div class="ins-cap-warn-actions">'
+          +   '<button class="ins-cap-warn-primary" onclick="InsightCapture.shortToInsight()">+ 新建洞察</button>'
+          +   '<button class="ins-cap-warn-ghost" onclick="InsightCapture.shortAsTextSource()">就这样添加为 text source</button>'
+          + '</div>'
+          + '</div>';
+    }
+
     function _cardHtml(s) {
-        var title = s.title || (s.url ? _shortUrl(s.url) : '(无标题)');
+        // T-112 / spec § 5.4.2:候选卡铁律——绝不允许整张视觉空白
+        //   有 title → 用 title
+        //   无 title 但有 content → content[:60]+"…"(粘贴的 text source 走这条)
+        //   都无但有 url → shortUrl
+        //   全无 → '(无标题)'
+        var title = s.title
+            || (s.content ? _previewContent(s.content) : '')
+            || (s.url ? _shortUrl(s.url) : '')
+            || '(无标题)';
         var expanded = (_expandedSourceId === s.id);
         var insightOpts = _insights.map(function(i) {
             return '<option value="' + i.id + '">' + _esc(i.title || '(无标题)') + '</option>';
@@ -152,6 +187,16 @@ var InsightCapture = (function() {
         if (!ta) return;
         var text = (ta.value || '').trim();
         if (!text) return;
+
+        // T-112 / spec § 5.4.1:短文本警示二选一
+        //   单条 < 20 字 + 不含 http(s):// → 不直接入库,弹 inline 提示条让用户明示二选一
+        var hasUrl = /https?:\/\//i.test(text);
+        if (!hasUrl && text.length < 20) {
+            _pendingShortText = text;
+            render();
+            return;
+        }
+
         var lines = text.split(/\n+/).map(function(l) { return l.trim(); }).filter(Boolean);
         if (lines.length === 0) return;
 
@@ -224,6 +269,57 @@ var InsightCapture = (function() {
         }
     }
 
+    // ============ T-112 短文本警示二选一处理(spec § 5.4.1) ============
+
+    // 用户选「新建洞察」→ 打开 Insight.toggleNewForm + 预填 title
+    function shortToInsight() {
+        var text = _pendingShortText;
+        _pendingShortText = '';
+        var ta = document.getElementById('ins-cap-text');
+        if (ta) ta.value = '';
+        render();
+        if (typeof Insight !== 'undefined' && Insight.toggleNewForm) {
+            // 确保新建表单是打开的
+            // 预填 title:用 setTimeout 等 render 完再写 DOM
+            setTimeout(function() {
+                var ti = document.getElementById('ins-new-title');
+                if (!ti) {
+                    Insight.toggleNewForm();
+                    setTimeout(function() {
+                        var ti2 = document.getElementById('ins-new-title');
+                        if (ti2) { ti2.value = text; ti2.focus(); }
+                    }, 30);
+                } else {
+                    ti.value = text;
+                    ti.focus();
+                }
+            }, 0);
+        }
+    }
+
+    // 用户选「就这样添加为 text source」→ 走原 sourceCreate(content)
+    async function shortAsTextSource() {
+        var text = _pendingShortText;
+        _pendingShortText = '';
+        var ta = document.getElementById('ins-cap-text');
+        if (ta) ta.value = '';
+        try {
+            await API.sourceCreate({ content: text });
+            if (typeof showToast === 'function') showToast('已作为 text source 添加', 'success');
+            refresh();
+        } catch (e) {
+            console.error('[InsightCapture] shortAsTextSource failed', e);
+            if (typeof showToast === 'function') showToast('添加失败', 'error');
+            render();
+        }
+    }
+
+    // ✕ 关闭警示但保留 textarea 内容(允许用户继续编辑后再提交)
+    function dismissShortWarn() {
+        _pendingShortText = '';
+        render();
+    }
+
     return {
         refresh: refresh,
         submit: submit,
@@ -231,5 +327,9 @@ var InsightCapture = (function() {
         toggleAssign: toggleAssign,
         doAssign: doAssign,
         refetch: refetch,
+        // T-112
+        shortToInsight: shortToInsight,
+        shortAsTextSource: shortAsTextSource,
+        dismissShortWarn: dismissShortWarn,
     };
 })();

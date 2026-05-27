@@ -351,7 +351,11 @@ var InsightDetail = (function() {
     }
 
     function _sourceRowHtml(s, editable) {
-        var title = s.title || (s.url ? _shortUrl(s.url) : '(无标题)');
+        // T-112 / spec § 5.4.2:title 为空回退 content 预览,候选卡铁律
+        var title = s.title
+            || (s.content ? _previewContent(s.content) : '')
+            || (s.url ? _shortUrl(s.url) : '')
+            || '(无标题)';
         var statusBadge = _sourceStatusBadge(s);
         var urlLink = s.url ? '<a class="ins-src-url" href="' + _esc(s.url) + '" target="_blank">↗</a>' : '';
         var starredCls = s.starred ? ' ins-src-starred' : '';
@@ -394,6 +398,13 @@ var InsightDetail = (function() {
     function _shortUrl(u) {
         try { var url = new URL(u); return url.hostname + url.pathname.slice(0, 30); }
         catch (_) { return u; }
+    }
+    // T-112 / spec § 5.4.2:无 title 时 content[:60]+"…"
+    function _previewContent(c) {
+        if (!c) return '';
+        var s = ('' + c).replace(/\s+/g, ' ').trim();
+        if (!s) return '';
+        return s.length > 60 ? s.slice(0, 60) + '…' : s;
     }
     function _shortTime(iso) {
         if (!iso) return '';
