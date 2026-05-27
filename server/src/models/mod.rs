@@ -12,3 +12,10 @@ pub mod todo;
 pub mod trip;
 pub mod work_column;
 pub mod work_task;
+// T-105 SPEC insight
+pub mod insight;
+pub mod report;
+pub mod share_link;
+pub mod source;
+// T-107 SPEC insight v0.2
+pub mod annotation;

@@ -57,7 +57,7 @@ var Work = (function() {
         }
     }
 
-    // 视图切换 (table / board / cal / person)
+    // 视图切换 (table / board / cal / person / distribution)
     function setView(v, skipBtnSync) {
         // T-100:切视图自动关闭详情抽屉(spec § 7.6 关闭方式之一)
         if (typeof WorkDetail !== 'undefined' && WorkDetail.isOpen() && v !== _view) {
@@ -69,19 +69,23 @@ var Work = (function() {
             var b = document.getElementById('wt-seg-board');
             var c = document.getElementById('wt-seg-cal');
             var pp = document.getElementById('wt-seg-person');  // T-099
+            var dd = document.getElementById('wt-seg-distribution');  // T-108
             if (t)  t.classList.toggle('active', v === 'table');
             if (b)  b.classList.toggle('active', v === 'board');
             if (c)  c.classList.toggle('active', v === 'cal');
             if (pp) pp.classList.toggle('active', v === 'person');
+            if (dd) dd.classList.toggle('active', v === 'distribution');
         }
         var t  = document.getElementById('wt-table-view');
         var bv = document.getElementById('wt-board-view');
         var cv = document.getElementById('wt-cal-view');
         var pv = document.getElementById('wt-person-view');  // T-099
+        var dv = document.getElementById('wt-distribution-view');  // T-108
         if (t)  t.classList.toggle('wt-hidden',  v !== 'table');
         if (bv) bv.classList.toggle('wt-hidden', v !== 'board');
         if (cv) cv.classList.toggle('wt-hidden', v !== 'cal');
         if (pv) pv.classList.toggle('wt-hidden', v !== 'person');
+        if (dv) dv.classList.toggle('wt-hidden', v !== 'distribution');
         // T-098:日历视图下时间镜头 Tab 自动隐藏(日历本身按 due_date 排,叠加筛选语义重复)
         var tabBar = document.getElementById('wt-time-tabs');
         if (tabBar) tabBar.style.display = (v === 'cal') ? 'none' : '';
@@ -247,6 +251,7 @@ var Work = (function() {
         else if (_view === 'board') WorkBoard.render();
         else if (_view === 'cal') WorkCalendar.render();
         else if (_view === 'person') WorkPerson.render();   // T-099
+        else if (_view === 'distribution') WorkDistribution.render();   // T-108
         // T-103 B.2:渲完才能拿到 active tab 的几何位置,延迟一帧再放指示条
         requestAnimationFrame(_updateTabIndicator);
         // T-100:抽屉打开时,数据改完同步刷新抽屉里的字段

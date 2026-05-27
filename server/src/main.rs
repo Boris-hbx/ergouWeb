@@ -327,6 +327,82 @@ pub fn build_app(state: AppState) -> Router {
             "/work/columns/{key}",
             delete(routes::work_columns::delete_column),
         )
+        // Insight module (T-105 / SPEC insight) — Hybrid 架构:Web 后端只做收件箱/抓取/存储,
+        // 报告生成在 Claude Code(Boris 本机)写回,公开 /r/{token} 不在 /api 下,见 build_app 末尾。
+        .route(
+            "/insights",
+            get(routes::insights::list_insights).post(routes::insights::create_insight),
+        )
+        .route(
+            "/insights/{id}",
+            get(routes::insights::get_insight)
+                .patch(routes::insights::update_insight)
+                .delete(routes::insights::delete_insight),
+        )
+        .route(
+            "/insights/{id}/claim",
+            axum::routing::post(routes::insights::claim_insight),
+        )
+        .route(
+            "/insights/{id}/release",
+            axum::routing::post(routes::insights::release_insight),
+        )
+        .route(
+            "/insights/{id}/reports",
+            get(routes::reports::list_reports).post(routes::reports::create_report),
+        )
+        // T-107 v0.2:`/latest` 必须在 `/{version}` 之前注册(静态优先于动态)
+        .route(
+            "/insights/{id}/reports/latest",
+            get(routes::reports::get_latest_report),
+        )
+        .route(
+            "/insights/{id}/reports/{version}",
+            get(routes::reports::get_report_by_version)
+                .patch(routes::reports::update_report),
+        )
+        .route(
+            "/insights/{id}/regenerate",
+            axum::routing::post(routes::insights::regenerate_insight),
+        )
+        // T-107 v0.2:share 端点保留 GET(查 active);POST/DELETE 物理删除(前端 T-106 没开工,无调用方)
+        // 业务统一走 publish/retract(事务化,见 spec § 8.4)
+        .route(
+            "/insights/{id}/share",
+            get(routes::share_links::list_shares_for_insight),
+        )
+        .route(
+            "/insights/{id}/publish",
+            axum::routing::post(routes::share_links::publish_insight),
+        )
+        .route(
+            "/insights/{id}/retract",
+            axum::routing::post(routes::share_links::retract_insight),
+        )
+        .route(
+            "/sources",
+            get(routes::sources::list_sources).post(routes::sources::create_source),
+        )
+        .route(
+            "/sources/{id}",
+            axum::routing::patch(routes::sources::update_source)
+                .delete(routes::sources::delete_source),
+        )
+        .route(
+            "/sources/{id}/refetch",
+            axum::routing::post(routes::sources::refetch_source),
+        )
+        // T-107 v0.2:Annotations
+        .route(
+            "/insights/{id}/annotations",
+            get(routes::annotations::list_annotations)
+                .post(routes::annotations::create_annotation),
+        )
+        .route(
+            "/annotations/{id}",
+            axum::routing::patch(routes::annotations::update_annotation)
+                .delete(routes::annotations::delete_annotation),
+        )
         .nest(
             "/soul-state",
             Router::new()
@@ -407,6 +483,9 @@ pub fn build_app(state: AppState) -> Router {
             }))
         }))
         .nest("/api", api_routes)
+        // T-105 SPEC insight:公开分享页 /r/{token}(无需 session)
+        .route("/r/{token}", get(routes::share_links::public_share_page))
+        .route("/r/{token}/data", get(routes::share_links::public_share_data))
         .layer(SetResponseHeaderLayer::overriding(
             http::header::CONTENT_SECURITY_POLICY,
             HeaderValue::from_static("default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'"),

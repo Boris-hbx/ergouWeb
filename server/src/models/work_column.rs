@@ -201,6 +201,19 @@ pub fn builtin_seed() -> Vec<WorkColumn> {
             builtin: true,
             sys: false,
         },
+        WorkColumn {
+            // T-108: 内置「标签」列(multi 类型),为分布视图开箱即用。
+            // 老用户通过 `ensure_builtin_present` 幂等补行(routes/work_columns.rs)。
+            key: "tags".into(),
+            name: "标签".into(),
+            col_type: "multi".into(),
+            options: vec![],
+            width: Some(140),
+            min_width: Some(80),
+            position: next(),
+            builtin: true,
+            sys: false,
+        },
     ]
 }
 
@@ -209,9 +222,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn seed_has_9_columns() {
+    fn seed_has_10_columns() {
         let s = builtin_seed();
-        assert_eq!(s.len(), 9);
+        assert_eq!(s.len(), 10);
+    }
+
+    #[test]
+    fn tags_column_is_multi_with_empty_options() {
+        let s = builtin_seed();
+        let tags = s.iter().find(|c| c.key == "tags").expect("tags not seeded");
+        assert_eq!(tags.col_type, "multi");
+        assert!(tags.options.is_empty());
+        assert!(tags.builtin);
+        assert!(!tags.sys);
+        assert_eq!(tags.position, 9);
     }
 
     #[test]
