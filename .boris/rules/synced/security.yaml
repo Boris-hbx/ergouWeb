@@ -1,0 +1,13 @@
+- id: no-hardcoded-secrets
+  name: No Hardcoded Secrets
+  display_name: 禁止硬编码密钥
+  description: 检测代码中可能存在的硬编码 API Key、密码和 Token
+  severity: error
+  rule_type: pattern
+  governance_layer: observer
+  tags: [security, essential, universal]
+  ut_ref: "1.2.1"
+  ut_category: "Agent 个体行为 > 违反显式规则"
+  pattern: (?i)(api[_-]?key|password|secret|token)\s*[:=]\s*['\"][^'\"]{8,}['\"]
+  file_glob: "*.py"
+  expect: absent

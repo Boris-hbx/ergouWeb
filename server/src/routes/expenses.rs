@@ -9,7 +9,7 @@ use chrono::Datelike;
 use serde::Serialize;
 use serde_json::json;
 
-use crate::auth::{check_guest_ai_quota, ActiveUserId, UserId};
+use crate::auth::{check_guest_ai_quota, extract_client_ip, ActiveUserId, UserId};
 use crate::models::expense::*;
 use crate::state::AppState;
 
@@ -41,12 +41,6 @@ pub struct ExpenseSimpleResponse {
 pub struct TagsResponse {
     pub success: bool,
     pub tags: Vec<String>,
-}
-
-#[derive(Debug, Serialize)]
-pub struct SummaryResponse {
-    pub success: bool,
-    pub summary: ExpenseSummary,
 }
 
 #[derive(Debug, Serialize)]
@@ -548,26 +542,33 @@ pub async fn delete_entry(
     }
 }
 
-// ===== Summary =====
-pub async fn get_summary(
+// ===== Stats (unified) =====
+pub async fn get_stats(
     State(state): State<AppState>,
     user_id: UserId,
-    Query(query): Query<ExpenseSummaryQuery>,
-) -> (StatusCode, Json<SummaryResponse>) {
-    let db = state.db.lock();
+    Query(query): Query<ExpenseStatsQuery>,
+) -> (StatusCode, Json<serde_json::Value>) {
     let today = chrono::Local::now().date_naive();
-    let ref_date = query
-        .date
-        .as_ref()
-        .and_then(|d| chrono::NaiveDate::parse_from_str(d, "%Y-%m-%d").ok())
-        .unwrap_or(today);
+    let ref_date = match query.date.as_ref() {
+        Some(d) => match chrono::NaiveDate::parse_from_str(d, "%Y-%m-%d") {
+            Ok(date) => date,
+            Err(_) => {
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(json!({ "error": "invalid date format, expected YYYY-MM-DD" })),
+                );
+            }
+        },
+        None => today,
+    };
 
-    let (from, to) = match query.period.as_str() {
+    let (from_date, to_date) = match query.period.as_str() {
+        "day" => (ref_date, ref_date),
         "week" => {
             let weekday = ref_date.weekday().num_days_from_monday();
             let start = ref_date - chrono::Duration::days(weekday as i64);
             let end = start + chrono::Duration::days(6);
-            (start.to_string(), end.to_string())
+            (start, end)
         }
         "month" => {
             let start = chrono::NaiveDate::from_ymd_opt(ref_date.year(), ref_date.month(), 1)
@@ -579,50 +580,66 @@ pub async fn get_summary(
             }
             .map(|d| d - chrono::Duration::days(1))
             .unwrap_or(ref_date);
-            (start.to_string(), end.to_string())
+            (start, end)
         }
         _ => {
-            // day
-            (ref_date.to_string(), ref_date.to_string())
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": "invalid period, must be day/week/month" })),
+            );
         }
     };
 
-    let total_amount: f64 = db
-        .query_row(
-            "SELECT COALESCE(SUM(amount), 0) FROM expense_entries WHERE user_id = ?1 AND date >= ?2 AND date <= ?3",
-            rusqlite::params![user_id.0, from, to],
-            |row| row.get(0),
-        )
-        .unwrap_or(0.0);
+    let from = from_date.to_string();
+    let to = to_date.to_string();
 
-    let entry_count: i64 = db
-        .query_row(
-            "SELECT COUNT(*) FROM expense_entries WHERE user_id = ?1 AND date >= ?2 AND date <= ?3",
-            rusqlite::params![user_id.0, from, to],
-            |row| row.get(0),
-        )
-        .unwrap_or(0);
+    let db = state.db.lock();
 
-    // Compute tag totals
+    // Query all entries in range
     let mut tag_map: std::collections::HashMap<String, (f64, i64)> =
         std::collections::HashMap::new();
+    let mut cat_map: std::collections::HashMap<&str, (f64, i64)> =
+        std::collections::HashMap::new();
+    let mut day_map: std::collections::HashMap<String, f64> = std::collections::HashMap::new();
+    let mut total_amount: f64 = 0.0;
+    let mut entry_count: i64 = 0;
+
     if let Ok(mut stmt) = db.prepare(
-        "SELECT tags, amount FROM expense_entries WHERE user_id = ?1 AND date >= ?2 AND date <= ?3",
+        "SELECT amount, date, tags FROM expense_entries WHERE user_id = ?1 AND date >= ?2 AND date <= ?3",
     ) {
         if let Ok(rows) = stmt.query_map(rusqlite::params![user_id.0, from, to], |row| {
-            Ok((row.get::<_, String>(0)?, row.get::<_, f64>(1)?))
+            Ok((
+                row.get::<_, f64>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+            ))
         }) {
             for row in rows.flatten() {
-                let tags: Vec<String> = serde_json::from_str(&row.0).unwrap_or_default();
-                for tag in tags {
-                    let entry = tag_map.entry(tag).or_insert((0.0, 0));
-                    entry.0 += row.1;
-                    entry.1 += 1;
+                let (amount, date, tags_json) = row;
+                total_amount += amount;
+                entry_count += 1;
+
+                // tag_totals
+                let tags: Vec<String> = serde_json::from_str(&tags_json).unwrap_or_default();
+                for tag in &tags {
+                    let e = tag_map.entry(tag.clone()).or_insert((0.0, 0));
+                    e.0 += amount;
+                    e.1 += 1;
                 }
+
+                // category_totals
+                let cat = entry_category(&tags_json);
+                let e = cat_map.entry(cat).or_insert((0.0, 0));
+                e.0 += amount;
+                e.1 += 1;
+
+                // daily
+                *day_map.entry(date).or_insert(0.0) += amount;
             }
         }
     }
 
+    // Build tag_totals sorted by amount desc
     let mut tag_totals: Vec<TagTotal> = tag_map
         .into_iter()
         .map(|(tag, (amount, count))| TagTotal { tag, amount, count })
@@ -633,20 +650,95 @@ pub async fn get_summary(
             .unwrap_or(std::cmp::Ordering::Equal)
     });
 
-    (
-        StatusCode::OK,
-        Json(SummaryResponse {
-            success: true,
-            summary: ExpenseSummary {
-                total_amount,
-                entry_count,
-                period: query.period,
-                from,
-                to,
-                tag_totals,
-            },
-        }),
-    )
+    // Build category_totals sorted by amount desc
+    let mut category_totals: Vec<CategoryTotal> = cat_map
+        .into_iter()
+        .map(|(cat, (amount, count))| {
+            let percentage = if total_amount > 0.0 {
+                (amount / total_amount * 1000.0).round() / 10.0
+            } else {
+                0.0
+            };
+            CategoryTotal {
+                category: cat.to_string(),
+                amount,
+                count,
+                percentage,
+            }
+        })
+        .collect();
+    category_totals.sort_by(|a, b| {
+        b.amount
+            .partial_cmp(&a.amount)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    // Build daily totals — every date in range, 0 for missing
+    let mut daily: Vec<DailyTotal> = Vec::new();
+    let mut d = from_date;
+    while d <= to_date {
+        let ds = d.to_string();
+        let amt = day_map.get(&ds).copied().unwrap_or(0.0);
+        daily.push(DailyTotal {
+            date: ds,
+            amount: amt,
+        });
+        d += chrono::Duration::days(1);
+    }
+
+    // Comparison: query previous period total
+    let (prev_from, prev_to) = match query.period.as_str() {
+        "day" => {
+            let prev = ref_date - chrono::Duration::days(1);
+            (prev, prev)
+        }
+        "week" => {
+            let prev_start = from_date - chrono::Duration::days(7);
+            let prev_end = from_date - chrono::Duration::days(1);
+            (prev_start, prev_end)
+        }
+        _ => {
+            // month: previous month
+            let prev_end = from_date - chrono::Duration::days(1);
+            let prev_start =
+                chrono::NaiveDate::from_ymd_opt(prev_end.year(), prev_end.month(), 1)
+                    .unwrap_or(prev_end);
+            (prev_start, prev_end)
+        }
+    };
+
+    let prev_total: f64 = db
+        .query_row(
+            "SELECT COALESCE(SUM(amount), 0) FROM expense_entries WHERE user_id = ?1 AND date >= ?2 AND date <= ?3",
+            rusqlite::params![user_id.0, prev_from.to_string(), prev_to.to_string()],
+            |row| row.get(0),
+        )
+        .unwrap_or(0.0);
+
+    let change_percent = if prev_total == 0.0 && total_amount > 0.0 {
+        100.0
+    } else if prev_total == 0.0 {
+        0.0
+    } else {
+        ((total_amount - prev_total) / prev_total * 1000.0).round() / 10.0
+    };
+
+    let stats = ExpenseStats {
+        period: query.period,
+        from,
+        to,
+        total_amount,
+        entry_count,
+        tag_totals,
+        category_totals,
+        daily,
+        comparison: Comparison {
+            prev_total,
+            change_percent,
+        },
+    };
+
+    (StatusCode::OK, Json(json!({ "success": true, "stats": stats })))
 }
 
 // ===== List tags =====
@@ -729,6 +821,16 @@ pub async fn upload_photos(
             continue;
         }
 
+        // T-089 块1:扩展名白名单(防双扩展名攻击)
+        //   - `rsplit('.').next()` 取最后一个 '.' 之后的部分,所以 `evil.jpg.php` → 'php' → 不在白名单 → 拒绝
+        //   - 配合保留 mime 校验,双重防御
+        let ext = filename.rsplit('.').next().unwrap_or("").to_lowercase();
+        let allowed_exts = ["jpg", "jpeg", "png", "webp", "heic"];
+        if !allowed_exts.contains(&ext.as_str()) {
+            eprintln!("[expenses upload] rejected filename={:?} ext={:?} (extension not in whitelist)", filename, ext);
+            continue;
+        }
+
         let data = match field.bytes().await {
             Ok(d) => d,
             Err(_) => continue,
@@ -739,7 +841,6 @@ pub async fn upload_photos(
         }
 
         let photo_id = uuid::Uuid::new_v4().to_string();
-        let ext = filename.rsplit('.').next().unwrap_or("jpg").to_lowercase();
         let storage_name = format!("{}.{}", photo_id, ext);
         let storage_path = format!("{}/{}", upload_dir, storage_name);
 
@@ -903,10 +1004,12 @@ pub async fn serve_photo(
 pub async fn parse_receipts(
     State(state): State<AppState>,
     user_id: ActiveUserId,
+    headers: http::HeaderMap,
     Path(entry_id): Path<String>,
 ) -> (StatusCode, Json<serde_json::Value>) {
-    // Guest AI quota check
-    let guest_ai_remaining = match check_guest_ai_quota(&state, &user_id.0) {
+    // Guest AI quota check (T-089: IP aggregate)
+    let client_ip = extract_client_ip(&headers);
+    let guest_ai_remaining = match check_guest_ai_quota(&state, &user_id.0, &client_ip) {
         Ok(r) => r,
         Err(e) => return e,
     };
@@ -1064,10 +1167,12 @@ pub async fn parse_receipts(
 pub async fn parse_preview(
     State(state): State<AppState>,
     user_id: ActiveUserId,
+    headers: http::HeaderMap,
     Json(req): Json<ParsePreviewRequest>,
 ) -> (StatusCode, Json<ParsePreviewResponse>) {
-    // Guest AI quota check
-    let guest_ai_remaining = match check_guest_ai_quota(&state, &user_id.0) {
+    // Guest AI quota check (T-089: IP aggregate)
+    let client_ip = extract_client_ip(&headers);
+    let guest_ai_remaining = match check_guest_ai_quota(&state, &user_id.0, &client_ip) {
         Ok(r) => r,
         Err(_) => {
             return (
@@ -1396,133 +1501,6 @@ fn entry_category(tags_json: &str) -> &'static str {
         }
     }
     "其他"
-}
-
-pub async fn get_analytics(
-    State(state): State<AppState>,
-    user_id: UserId,
-    Query(query): Query<crate::models::expense::ExpenseAnalyticsQuery>,
-) -> (StatusCode, Json<serde_json::Value>) {
-    let db = state.db.lock();
-    let today = chrono::Local::now().date_naive();
-    let ref_date = query
-        .date
-        .as_ref()
-        .and_then(|d| chrono::NaiveDate::parse_from_str(d, "%Y-%m-%d").ok())
-        .unwrap_or(today);
-
-    let (from_date, to_date) = match query.period.as_str() {
-        "week" => {
-            let weekday = ref_date.weekday().num_days_from_monday();
-            let start = ref_date - chrono::Duration::days(weekday as i64);
-            let end = start + chrono::Duration::days(6);
-            (start, end)
-        }
-        "month" => {
-            let start = chrono::NaiveDate::from_ymd_opt(ref_date.year(), ref_date.month(), 1)
-                .unwrap_or(ref_date);
-            let end = if ref_date.month() == 12 {
-                chrono::NaiveDate::from_ymd_opt(ref_date.year() + 1, 1, 1)
-            } else {
-                chrono::NaiveDate::from_ymd_opt(ref_date.year(), ref_date.month() + 1, 1)
-            }
-            .map(|d| d - chrono::Duration::days(1))
-            .unwrap_or(ref_date);
-            (start, end)
-        }
-        _ => {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(json!({ "success": false, "message": "period must be week or month" })),
-            );
-        }
-    };
-
-    let from = from_date.to_string();
-    let to = to_date.to_string();
-
-    // Query all entries in range
-    let mut cat_map: std::collections::HashMap<&str, (f64, i64)> = std::collections::HashMap::new();
-    let mut day_map: std::collections::HashMap<String, f64> = std::collections::HashMap::new();
-    let mut total_amount: f64 = 0.0;
-    let mut entry_count: i64 = 0;
-
-    if let Ok(mut stmt) = db.prepare(
-        "SELECT amount, date, tags FROM expense_entries WHERE user_id = ?1 AND date >= ?2 AND date <= ?3",
-    ) {
-        if let Ok(rows) = stmt.query_map(rusqlite::params![user_id.0, from, to], |row| {
-            Ok((
-                row.get::<_, f64>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, String>(2)?,
-            ))
-        }) {
-            for row in rows.flatten() {
-                let (amount, date, tags_json) = row;
-                total_amount += amount;
-                entry_count += 1;
-
-                let cat = entry_category(&tags_json);
-                let e = cat_map.entry(cat).or_insert((0.0, 0));
-                e.0 += amount;
-                e.1 += 1;
-
-                *day_map.entry(date).or_insert(0.0) += amount;
-            }
-        }
-    }
-
-    // Build categories sorted by amount desc
-    let mut categories: Vec<crate::models::expense::CategoryTotal> = cat_map
-        .into_iter()
-        .map(|(cat, (amount, count))| {
-            let percentage = if total_amount > 0.0 {
-                (amount / total_amount * 1000.0).round() / 10.0
-            } else {
-                0.0
-            };
-            crate::models::expense::CategoryTotal {
-                category: cat.to_string(),
-                amount,
-                count,
-                percentage,
-            }
-        })
-        .collect();
-    categories.sort_by(|a, b| {
-        b.amount
-            .partial_cmp(&a.amount)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
-
-    // Build daily totals — every date in range, 0 for missing
-    let mut daily: Vec<crate::models::expense::DailyTotal> = Vec::new();
-    let mut d = from_date;
-    while d <= to_date {
-        let ds = d.to_string();
-        let amt = day_map.get(&ds).copied().unwrap_or(0.0);
-        daily.push(crate::models::expense::DailyTotal {
-            date: ds,
-            amount: amt,
-        });
-        d += chrono::Duration::days(1);
-    }
-
-    (
-        StatusCode::OK,
-        Json(json!({
-            "success": true,
-            "analytics": {
-                "period": query.period,
-                "from": from,
-                "to": to,
-                "total_amount": total_amount,
-                "entry_count": entry_count,
-                "categories": categories,
-                "daily": daily,
-            }
-        })),
-    )
 }
 
 // ===== Exchange rate proxy =====

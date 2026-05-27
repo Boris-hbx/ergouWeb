@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>阿宝接入 work_task 工具 · 设计稿</title>
+<style>
+  :root {
+    --bg: #FAF9FC;
+    --bg-card: #FFFFFF;
+    --bg-elev: #F5F2FB;
+    --bg-elev-2: #EFEAF7;
+    --border: #E5E3EE;
+    --border-strong: #D4D0E0;
+    --text: #1F2937;
+    --text-mute: #6B7280;
+    --text-faint: #9CA3AF;
+    --primary: #7C4DFF;
+    --primary-soft: rgba(124, 77, 255, 0.10);
+    --primary-strong: rgba(124, 77, 255, 0.18);
+    --danger: #E11D48;
+    --danger-soft: rgba(225, 29, 72, 0.10);
+    --warn: #F59E0B;
+    --warn-soft: rgba(245, 158, 11, 0.12);
+    --ok: #10B981;
+    --ok-soft: rgba(16, 185, 129, 0.10);
+    --avatar-1: #7C4DFF; --avatar-2: #14B8A6; --avatar-3: #E0A23B; --avatar-4: #3B82F6;
+    --shadow: 0 1px 2px rgba(15, 15, 30, 0.04), 0 4px 12px rgba(15, 15, 30, 0.06);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--bg); color: var(--text); font: 13.5px/1.55 -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; height: 100%; overflow: hidden; }
+  body { display: flex; flex-direction: column; height: 100vh; }
+
+  /* 顶栏 */
+  .topbar {
+    padding: 12px 24px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 14px;
+    background: var(--bg-card);
+  }
+  .topbar h1 { font-size: 17px; font-weight: 600; }
+  .topbar .tag {
+    background: var(--primary-soft); color: var(--primary);
+    padding: 3px 10px; border-radius: 10px; font-size: 11.5px; font-weight: 500;
+  }
+  .topbar .spacer { flex: 1; }
+  .topbar .meta { color: var(--text-mute); font-size: 12px; }
+
+  /* 主区：左聊天 + 右工具 spec */
+  .main { display: flex; flex: 1; overflow: hidden; }
+  .chat-pane {
+    flex: 1.4; overflow-y: auto;
+    padding: 20px 32px;
+  }
+  .tools-pane {
+    flex: 1; overflow-y: auto;
+    background: var(--bg-card);
+    border-left: 1px solid var(--border);
+    padding: 18px 22px;
+  }
+
+  /* 聊天 */
+  .scene-label {
+    margin: 22px 0 8px;
+    font-size: 11.5px; color: var(--text-faint);
+    letter-spacing: 0.06em; text-transform: uppercase; font-weight: 600;
+  }
+  .scene-label:first-child { margin-top: 0; }
+  .msg {
+    display: flex; gap: 10px; margin-bottom: 14px;
+    max-width: 90%;
+  }
+  .msg .av {
+    width: 30px; height: 30px; border-radius: 50%;
+    flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: white; font-weight: 600; font-size: 12px;
+  }
+  .msg.user { flex-direction: row-reverse; margin-left: auto; }
+  .msg.user .av { background: var(--avatar-4); }
+  .msg.user .bubble {
+    background: var(--primary); color: white;
+    border-radius: 14px 4px 14px 14px;
+  }
+  .msg.abao .av { background: var(--avatar-1); }
+  .msg.abao .bubble {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 4px 14px 14px 14px;
+  }
+  .bubble {
+    padding: 10px 14px;
+    max-width: 580px;
+    line-height: 1.55;
+    font-size: 13px;
+  }
+  .bubble p + p { margin-top: 6px; }
+  .bubble code {
+    background: rgba(0,0,0,0.06); padding: 1px 5px; border-radius: 3px;
+    font-family: ui-monospace, monospace; font-size: 12px;
+  }
+  .msg.user .bubble code { background: rgba(255,255,255,0.18); color: white; }
+
+  /* 工具调用展示（阿宝消息内嵌） */
+  .tool-call {
+    margin: 8px 0 0;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-family: ui-monospace, "SF Mono", monospace;
+    font-size: 11.5px;
+    overflow: hidden;
+  }
+  .tool-call .head {
+    padding: 5px 10px; background: var(--primary-soft);
+    color: var(--primary); font-weight: 600;
+    display: flex; align-items: center; gap: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+  .tool-call .head::before { content: '⚙'; }
+  .tool-call .body {
+    padding: 6px 10px; color: var(--text-mute);
+    white-space: pre-wrap; word-break: break-all;
+  }
+  .tool-call .body .k { color: #8B5CF6; }
+  .tool-call .body .v { color: var(--text); }
+  .tool-call .body .s { color: #047857; } /* string */
+
+  /* 工具返回结果：任务卡 */
+  .task-card {
+    margin: 8px 0 0;
+    background: var(--bg-card);
+    border: 1px solid var(--primary-strong);
+    border-radius: 10px;
+    padding: 10px 12px;
+    box-shadow: 0 1px 3px rgba(124, 77, 255, 0.10);
+  }
+  .task-card .tc-head {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 6px;
+  }
+  .task-card .tid {
+    background: var(--primary-soft); color: var(--primary);
+    padding: 1px 7px; border-radius: 10px; font-size: 11px;
+    font-family: ui-monospace, monospace; font-weight: 600;
+  }
+  .task-card .tt {
+    flex: 1; font-weight: 600; font-size: 13.5px;
+  }
+  .task-card .tc-meta {
+    display: flex; gap: 8px; flex-wrap: wrap;
+    font-size: 11.5px; color: var(--text-mute);
+  }
+  .task-card .pill {
+    padding: 1px 7px; border-radius: 8px; font-size: 11px;
+    background: var(--bg-elev);
+  }
+  .task-card .pill.due-soon { background: var(--warn-soft); color: #8B5A00; }
+  .task-card .pill.overdue { background: var(--danger-soft); color: var(--danger); font-weight: 600; }
+  .task-card .pill.p0 { background: var(--warn-soft); color: #8B5A00; font-weight: 600; }
+  .task-card .av-mini {
+    width: 18px; height: 18px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: white; font-weight: 600; font-size: 10px;
+  }
+  .task-card .actions {
+    margin-top: 8px;
+    display: flex; gap: 6px;
+  }
+  .task-card .actions a {
+    color: var(--primary); font-size: 12px; cursor: pointer;
+    padding: 2px 8px; border-radius: 6px;
+    background: var(--primary-soft);
+    text-decoration: none;
+  }
+  .task-card .actions a:hover { background: var(--primary-strong); }
+
+  /* 列表卡（query 返回） */
+  .list-card {
+    margin: 8px 0 0;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .list-card .lc-summary {
+    padding: 8px 12px;
+    background: var(--bg-elev);
+    font-size: 12px;
+    color: var(--text-mute);
+    border-bottom: 1px solid var(--border);
+    display: flex; gap: 12px;
+  }
+  .list-card .lc-summary strong { color: var(--text); }
+  .list-card .lc-row {
+    padding: 8px 12px;
+    display: flex; align-items: center; gap: 8px;
+    border-bottom: 1px solid var(--border);
+    font-size: 12.5px;
+  }
+  .list-card .lc-row:last-child { border-bottom: 0; }
+  .list-card .lc-row:hover { background: var(--bg-elev); }
+  .list-card .lc-row .tid {
+    background: var(--bg-elev); color: var(--text-mute);
+    padding: 0 5px; border-radius: 6px; font-size: 10.5px;
+    font-family: ui-monospace, monospace;
+  }
+  .list-card .lc-row .tt { flex: 1; }
+  .list-card .lc-row .pill { padding: 0 6px; border-radius: 8px; font-size: 10.5px; background: var(--bg-elev); }
+
+  /* 确认卡 */
+  .confirm-card {
+    margin: 8px 0 0;
+    background: var(--warn-soft);
+    border: 1px solid var(--warn);
+    border-radius: 10px;
+    padding: 10px 12px;
+    color: #8B5A00;
+  }
+  .confirm-card .cc-q { font-weight: 600; margin-bottom: 8px; }
+  .confirm-card .cc-btns { display: flex; gap: 8px; }
+  .confirm-card button {
+    padding: 4px 14px;
+    border-radius: 6px;
+    border: 1px solid;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .confirm-card .ok {
+    background: var(--primary); color: white; border-color: var(--primary);
+  }
+  .confirm-card .no {
+    background: white; color: var(--text-mute); border-color: var(--border-strong);
+  }
+
+  /* 消歧卡 */
+  .disambig-card {
+    margin: 8px 0 0;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+  }
+  .disambig-card .dc-q { font-weight: 600; margin-bottom: 6px; font-size: 12.5px; }
+  .disambig-card .dc-opts { display: flex; gap: 6px; flex-wrap: wrap; }
+  .disambig-card .dc-opt {
+    padding: 4px 10px;
+    background: var(--bg-elev);
+    border-radius: 14px;
+    cursor: pointer;
+    font-size: 12px;
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .disambig-card .dc-opt:hover { background: var(--primary-soft); color: var(--primary); }
+
+  /* 错误卡 */
+  .error-card {
+    margin: 8px 0 0;
+    background: var(--danger-soft);
+    border: 1px solid var(--danger);
+    border-radius: 10px;
+    padding: 10px 12px;
+    color: var(--danger);
+    font-size: 12.5px;
+  }
+
+  /* 输入区 */
+  .composer {
+    border-top: 1px solid var(--border);
+    background: var(--bg-card);
+    padding: 12px 20px;
+    display: flex; gap: 10px;
+    align-items: flex-end;
+  }
+  .composer textarea {
+    flex: 1;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 12px;
+    font: inherit; font-size: 13px;
+    resize: none;
+    outline: 0;
+    min-height: 38px; max-height: 100px;
+    color: var(--text);
+  }
+  .composer textarea:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-soft);
+  }
+  .composer .send {
+    padding: 8px 18px;
+    background: var(--primary); color: white;
+    border: 0; border-radius: 10px;
+    font-size: 13px; font-weight: 500;
+    cursor: pointer;
+  }
+  .composer .send:hover { filter: brightness(0.95); }
+
+  .examples {
+    padding: 8px 20px;
+    display: flex; gap: 6px; flex-wrap: wrap;
+    border-top: 1px solid var(--border);
+    background: var(--bg-elev);
+  }
+  .examples .lbl { font-size: 11.5px; color: var(--text-faint); align-self: center; margin-right: 4px; }
+  .examples button {
+    padding: 4px 10px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    cursor: pointer;
+    font-size: 11.5px;
+    color: var(--text-mute);
+  }
+  .examples button:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+  }
+
+  /* ── 右侧工具 spec 面板 ── */
+  .tools-pane h2 {
+    font-size: 14px; color: var(--primary); margin-bottom: 12px;
+    padding-bottom: 8px; border-bottom: 1px solid var(--border);
+  }
+  .tool-spec {
+    margin-bottom: 18px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .tool-spec .ts-head {
+    padding: 8px 12px;
+    background: var(--primary-soft);
+    color: var(--primary);
+    font-family: ui-monospace, monospace;
+    font-weight: 600;
+    font-size: 12.5px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .tool-spec .ts-body {
+    padding: 10px 12px;
+    font-size: 12px; color: var(--text-mute);
+    line-height: 1.55;
+  }
+  .tool-spec .ts-body code {
+    background: var(--bg-elev);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-family: ui-monospace, monospace;
+    font-size: 11.5px;
+    color: var(--primary);
+  }
+  .tool-spec .ts-params {
+    margin-top: 6px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-family: ui-monospace, monospace;
+    font-size: 11.5px;
+    line-height: 1.6;
+    color: var(--text-mute);
+    white-space: pre;
+    overflow-x: auto;
+  }
+  .tool-spec .ts-params .k { color: #8B5CF6; }
+  .tool-spec .ts-params .t { color: #14B8A6; }
+  .tool-spec .ts-params .c { color: var(--text-faint); }
+
+  .design-note {
+    margin-top: 16px;
+    padding: 14px 16px;
+    background: var(--bg);
+    border: 1px dashed var(--border-strong);
+    border-radius: 8px;
+    font-size: 12px; color: var(--text-mute);
+    line-height: 1.65;
+  }
+  .design-note h3 {
+    margin-bottom: 8px; color: var(--primary); font-size: 12.5px;
+  }
+  .design-note ul { margin-left: 18px; }
+  .design-note li { margin: 3px 0; }
+  .design-note code {
+    background: var(--bg-elev);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-family: ui-monospace, monospace;
+    font-size: 11px;
+    color: var(--primary);
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>阿宝 · 工作任务工具</h1>
+  <span class="tag">Phase 2 设计稿</span>
+  <div class="spacer"></div>
+  <span class="meta">3 个工具：<code style="background:var(--bg-elev);padding:1px 5px;border-radius:3px;font-family:ui-monospace,monospace;font-size:12px">create_work_task</code> · <code style="background:var(--bg-elev);padding:1px 5px;border-radius:3px;font-family:ui-monospace,monospace;font-size:12px">update_work_task</code> · <code style="background:var(--bg-elev);padding:1px 5px;border-radius:3px;font-family:ui-monospace,monospace;font-size:12px">query_work_tasks</code></span>
+</div>
+
+<div class="main">
+  <!-- ─── 左侧：对话流 ─── -->
+  <div class="chat-pane" id="chatPane">
+
+    <!-- 场景 1：自然语言派活 -->
+    <div class="scene-label">场景 1 · 自然语言派活</div>
+
+    <div class="msg user">
+      <div class="av">我</div>
+      <div class="bubble">让陈老师下周三前交季度经费报表，P1 优先级。</div>
+    </div>
+    <div class="msg abao">
+      <div class="av">阿</div>
+      <div class="bubble">
+        <p>好，我建一条任务。</p>
+        <div class="tool-call">
+          <div class="head">create_work_task</div>
+          <div class="body"><span class="k">title</span>: <span class="s">"季度经费报表"</span>
+<span class="k">assignee</span>: <span class="s">"陈老师"</span>
+<span class="k">level</span>: <span class="s">"院"</span>
+<span class="k">due_date</span>: <span class="s">"2026-06-03"</span>
+<span class="k">priority</span>: <span class="s">"mid"</span></div>
+        </div>
+        <div class="task-card">
+          <div class="tc-head">
+            <span class="tid">T-29</span>
+            <span class="tt">季度经费报表</span>
+          </div>
+          <div class="tc-meta">
+            <span><span class="av-mini" style="background:var(--avatar-3)">陈</span> 陈老师</span>
+            <span class="pill">院</span>
+            <span class="pill due-soon">6 月 3 日（下周三）</span>
+            <span class="pill">中优</span>
+          </div>
+          <div class="actions">
+            <a>查看详情</a>
+            <a>改字段</a>
+          </div>
+        </div>
+        <p style="margin-top:8px;">已派给陈老师，截止 6 月 3 日。要不要补一句"附季度账目原始凭证"到简介里？</p>
+      </div>
+    </div>
+
+    <!-- 场景 2：模糊指派 → 消歧 -->
+    <div class="scene-label">场景 2 · 模糊指派 → 消歧</div>
+
+    <div class="msg user">
+      <div class="av">我</div>
+      <div class="bubble">让陈老师做下下周的开题答辩准备。</div>
+    </div>
+    <div class="msg abao">
+      <div class="av">阿</div>
+      <div class="bubble">
+        <p>你的任务表里有两位陈老师，请选一下：</p>
+        <div class="disambig-card">
+          <div class="dc-q">哪位陈老师？</div>
+          <div class="dc-opts">
+            <span class="dc-opt"><span class="av-mini" style="background:var(--avatar-3)">陈</span> 陈大民（活跃 5 任务）</span>
+            <span class="dc-opt"><span class="av-mini" style="background:var(--avatar-1)">陈</span> 陈丽（活跃 2 任务）</span>
+            <span class="dc-opt" style="background:transparent">都不是，新人</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="msg user">
+      <div class="av">我</div>
+      <div class="bubble">陈大民</div>
+    </div>
+    <div class="msg abao">
+      <div class="av">阿</div>
+      <div class="bubble">
+        <div class="tool-call">
+          <div class="head">create_work_task</div>
+          <div class="body"><span class="k">title</span>: <span class="s">"开题答辩准备"</span>
+<span class="k">assignee</span>: <span class="s">"陈大民"</span>
+<span class="k">due_date</span>: <span class="s">"2026-06-12"</span></div>
+        </div>
+        <div class="task-card">
+          <div class="tc-head">
+            <span class="tid">T-30</span>
+            <span class="tt">开题答辩准备</span>
+          </div>
+          <div class="tc-meta">
+            <span><span class="av-mini" style="background:var(--avatar-3)">陈</span> 陈大民</span>
+            <span class="pill">2026-06-12</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 场景 3：批量查询 -->
+    <div class="scene-label">场景 3 · 批量查询负载</div>
+
+    <div class="msg user">
+      <div class="av">我</div>
+      <div class="bubble">陈大民手上现在多少活</div>
+    </div>
+    <div class="msg abao">
+      <div class="av">阿</div>
+      <div class="bubble">
+        <div class="tool-call">
+          <div class="head">query_work_tasks</div>
+          <div class="body"><span class="k">assignee</span>: <span class="s">"陈大民"</span>
+<span class="k">status_not</span>: <span class="s">"done"</span></div>
+        </div>
+        <p>陈大民手上 5 条未完成：</p>
+        <div class="list-card">
+          <div class="lc-summary">
+            <span>共 <strong>5</strong> 条</span>
+            <span style="color:var(--danger)">⏰ <strong>1</strong> 逾期</span>
+            <span style="color:#8B5A00">⚡ <strong>1</strong> P0</span>
+          </div>
+          <div class="lc-row">
+            <span class="tid">T-15</span>
+            <span class="tt">季度经费报表</span>
+            <span class="pill" style="background:var(--danger-soft);color:var(--danger);font-weight:600">逾期 2 天</span>
+          </div>
+          <div class="lc-row">
+            <span class="tid">T-22</span>
+            <span class="tt">院评委会准备</span>
+            <span class="pill" style="background:var(--warn-soft);color:#8B5A00;font-weight:600">P0</span>
+            <span class="pill" style="background:var(--warn-soft);color:#8B5A00">今天</span>
+          </div>
+          <div class="lc-row"><span class="tid">T-29</span><span class="tt">季度经费报表（重复了？）</span><span class="pill">6/3</span></div>
+          <div class="lc-row"><span class="tid">T-30</span><span class="tt">开题答辩准备</span><span class="pill">6/12</span></div>
+          <div class="lc-row"><span class="tid">T-11</span><span class="tt">学生论文校对</span><span class="pill">下周</span></div>
+        </div>
+        <p style="margin-top:8px;">看了下：T-29 标题和 T-15 很像，可能是你刚才误派的重复？要不要合并或撤掉一个？</p>
+      </div>
+    </div>
+
+    <!-- 场景 4：状态更新 -->
+    <div class="scene-label">场景 4 · 状态更新（隐式查找）</div>
+
+    <div class="msg user">
+      <div class="av">我</div>
+      <div class="bubble">复印资料那条标记完成</div>
+    </div>
+    <div class="msg abao">
+      <div class="av">阿</div>
+      <div class="bubble">
+        <div class="tool-call">
+          <div class="head">query_work_tasks</div>
+          <div class="body"><span class="k">q</span>: <span class="s">"复印资料"</span></div>
+        </div>
+        <div class="tool-call">
+          <div class="head">update_work_task</div>
+          <div class="body"><span class="k">id</span>: <span class="v">4</span>
+<span class="k">status</span>: <span class="s">"done"</span>
+<span class="k">progress</span>: <span class="v">100</span></div>
+        </div>
+        <p>✓ T-4「复印资料」已标记完成。</p>
+      </div>
+    </div>
+
+    <!-- 场景 5：批量操作 + 二次确认 -->
+    <div class="scene-label">场景 5 · 批量操作（强制二次确认）</div>
+
+    <div class="msg user">
+      <div class="av">我</div>
+      <div class="bubble">所有逾期的都改成阻塞状态</div>
+    </div>
+    <div class="msg abao">
+      <div class="av">阿</div>
+      <div class="bubble">
+        <div class="tool-call">
+          <div class="head">query_work_tasks</div>
+          <div class="body"><span class="k">has_overdue</span>: <span class="v">true</span></div>
+        </div>
+        <p>找到 3 条逾期任务：</p>
+        <div class="list-card">
+          <div class="lc-row"><span class="tid">T-15</span><span class="tt">季度经费报表</span><span class="pill" style="background:var(--danger-soft);color:var(--danger)">陈大民 · 逾期 2 天</span></div>
+          <div class="lc-row"><span class="tid">T-10</span><span class="tt">数据分析（项目甲）</span><span class="pill" style="background:var(--danger-soft);color:var(--danger)">赵研究员 · 逾期 5 天</span></div>
+          <div class="lc-row"><span class="tid">T-11</span><span class="tt">实验设计文档</span><span class="pill" style="background:var(--danger-soft);color:var(--danger)">赵研究员 · 逾期 1 天</span></div>
+        </div>
+        <div class="confirm-card">
+          <div class="cc-q">确认把这 3 条全部改成「阻塞」吗？</div>
+          <div class="cc-btns">
+            <button class="ok">确认全部改</button>
+            <button class="no">取消</button>
+            <button class="no">让我先看下</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 场景 6：参数缺失 → 顺手补 -->
+    <div class="scene-label">场景 6 · 参数不全 → 友好补全</div>
+
+    <div class="msg user">
+      <div class="av">我</div>
+      <div class="bubble">加个任务：买年货</div>
+    </div>
+    <div class="msg abao">
+      <div class="av">阿</div>
+      <div class="bubble">
+        <p>这听着不像工作任务表的事——更像生活琐事？</p>
+        <p>要不发到 todo 里？或者你想强调"这是个工作"的话告诉我下：派给谁、什么截止？</p>
+        <p style="font-size:11.5px; color:var(--text-faint); margin-top:6px;">（小提示：工作任务表的 assignee 是必填字段，留空会归到「未指派」卡。）</p>
+      </div>
+    </div>
+
+    <!-- 场景 7：错误处理 -->
+    <div class="scene-label">场景 7 · 错误处理</div>
+
+    <div class="msg user">
+      <div class="av">我</div>
+      <div class="bubble">把 T-999 的进度改成 100</div>
+    </div>
+    <div class="msg abao">
+      <div class="av">阿</div>
+      <div class="bubble">
+        <div class="tool-call">
+          <div class="head">update_work_task</div>
+          <div class="body"><span class="k">id</span>: <span class="v">999</span>
+<span class="k">progress</span>: <span class="v">100</span></div>
+        </div>
+        <div class="error-card">
+          <strong>失败：</strong>任务 T-999 不存在（或已被删除）。
+        </div>
+        <p style="margin-top:8px;">最近的任务编号到 T-30，你是不是想说别的编号？或者标题搜一下？</p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ─── 右侧：工具 spec ─── -->
+  <div class="tools-pane">
+    <h2>工具集 (tools.json 草案)</h2>
+
+    <div class="tool-spec">
+      <div class="ts-head">create_work_task</div>
+      <div class="ts-body">
+        新建工作任务。<code>assignee</code> 留空 = 未指派。
+        <div class="ts-params"><span class="k">title</span>:        <span class="t">string</span>  <span class="c">// 必填</span>
+<span class="k">assignee</span>:     <span class="t">string?</span> <span class="c">// 纯文本</span>
+<span class="k">level</span>:        <span class="t">enum?</span>   <span class="c">// 院/所/组/个人</span>
+<span class="k">freq</span>:         <span class="t">enum?</span>   <span class="c">// 一次性/每周/每月/每季</span>
+<span class="k">status</span>:       <span class="t">enum?</span>   <span class="c">// todo|doing|blocked|done (默认 todo)</span>
+<span class="k">priority</span>:     <span class="t">enum?</span>   <span class="c">// P0|mid|low (默认 mid)</span>
+<span class="k">due_date</span>:     <span class="t">date?</span>   <span class="c">// YYYY-MM-DD</span>
+<span class="k">desc</span>:         <span class="t">string?</span> <span class="c">// 长文本简介</span></div>
+        返回：<code>{ id, title, ... }</code>，含完整新建任务对象，用于 inline 展示任务卡。
+      </div>
+    </div>
+
+    <div class="tool-spec">
+      <div class="ts-head">update_work_task</div>
+      <div class="ts-body">
+        部分更新。<code>id</code> 必填，其他字段传啥更新啥。
+        <div class="ts-params"><span class="k">id</span>:           <span class="t">number</span>  <span class="c">// 必填</span>
+<span class="k">title</span>?:       <span class="t">string</span>
+<span class="k">assignee</span>?:    <span class="t">string</span>
+<span class="k">level</span>?:       <span class="t">enum</span>
+<span class="k">freq</span>?:        <span class="t">enum</span>
+<span class="k">status</span>?:      <span class="t">enum</span>
+<span class="k">priority</span>?:    <span class="t">enum</span>
+<span class="k">due_date</span>?:    <span class="t">date | null</span>  <span class="c">// null = 清空</span>
+<span class="k">progress</span>?:    <span class="t">number</span>  <span class="c">// 0-100</span>
+<span class="k">desc</span>?:        <span class="t">string</span></div>
+        返回：<code>{ id, ... }</code>，更新后完整对象。<br>
+        <strong>边界</strong>：<code>status=done</code> 时自动 <code>progress=100</code>；<code>progress=100</code> 时自动 <code>status=done</code>（与现有 work-board 拖拽逻辑一致）。
+      </div>
+    </div>
+
+    <div class="tool-spec">
+      <div class="ts-head">query_work_tasks</div>
+      <div class="ts-body">
+        查询任务列表。所有筛选条件 AND；不传则返回最近 10 条。
+        <div class="ts-params"><span class="k">q</span>?:           <span class="t">string</span>  <span class="c">// 标题/简介模糊搜</span>
+<span class="k">assignee</span>?:    <span class="t">string</span>  <span class="c">// 精确</span>
+<span class="k">level</span>?:       <span class="t">enum</span>
+<span class="k">status</span>?:      <span class="t">enum</span>     <span class="c">// 单值</span>
+<span class="k">status_not</span>?:  <span class="t">enum</span>     <span class="c">// 排除该 status (常用: 排除 done)</span>
+<span class="k">priority</span>?:    <span class="t">enum</span>
+<span class="k">due_before</span>?:  <span class="t">date</span>     <span class="c">// 截止日 ≤</span>
+<span class="k">due_after</span>?:   <span class="t">date</span>     <span class="c">// 截止日 ≥</span>
+<span class="k">has_overdue</span>?: <span class="t">boolean</span>  <span class="c">// = due_before(today) AND status≠done</span>
+<span class="k">limit</span>?:       <span class="t">number</span>   <span class="c">// 默认 10, 最大 50</span></div>
+        返回：<code>{ count, tasks: [...], summary: { overdue, p0, by_status } }</code>。<br>
+        <strong>summary</strong> 让阿宝可以一句话概述："5 条未完成，1 条逾期，1 条 P0"。
+      </div>
+    </div>
+
+    <div class="design-note">
+      <h3>设计要点（PM 草稿）</h3>
+      <ul>
+        <li><strong>3 个工具足够</strong>：CRUD 的 D（删除）由 update_work_task 改 status 或表格 UI 走，不开 LLM delete 口子，避免误删。</li>
+        <li><strong>不引入 batch_update</strong>：批量操作走「query → 逐条 update + 二次确认」，慢一点但安全（场景 5）。Phase 3 视使用频率再决定要不要 <code>update_work_tasks</code>。</li>
+        <li><strong>消歧策略</strong>（场景 2）：assignee 是文本字段，阿宝看历史 assignee 集合，找 fuzzy 匹配 &gt;1 时弹候选；候选数据从 <code>query_work_tasks</code> 的隐式聚合得到。</li>
+        <li><strong>系统 prompt</strong> 要加：① 工作任务 vs 个人 todo 的区别（场景 6）；② 批量操作必须二次确认；③ 找不到任务时建议搜标题而不是猜编号（场景 7）。</li>
+        <li><strong>UI 内嵌任务卡</strong>：阿宝消息里 inline 显示 <code>task-card</code>，点击 → 打开抽屉（复用 T-100）；列表 <code>list-card</code> 点击行 → 同样开抽屉。</li>
+        <li><strong>跨端一致</strong>：工具名 / 参数必须与 ergouPM 的 <code>llm/tools.json</code> 一致，Android / 鸿蒙后续接入用同一份；按 ADR-004 命名规范。</li>
+        <li><strong>实施分两步</strong>：① 后端 tool dispatch（Rust 端在 <code>routes/chat.rs</code> tool 循环里 match 新工具，3 个 handler 直接调 work_tasks/columns 现有 service）；② 前端聊天面板内嵌 task-card / list-card 渲染逻辑。后端独立可测，前端独立可测。</li>
+        <li><strong>同步要求</strong>：完工时 <code>llm/tools.json</code> 必须 update（铁律），不只是 Web 端 hardcode。</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="examples">
+  <span class="lbl">示例：</span>
+  <button>让陈老师下周三前交季度经费报表</button>
+  <button>陈大民手上现在多少活</button>
+  <button>所有逾期的都改成阻塞</button>
+  <button>把 T-999 的进度改成 100</button>
+</div>
+
+<div class="composer">
+  <textarea placeholder="跟阿宝说点啥…… (示例对话已在上方，本输入框仅展示风格)" rows="1"></textarea>
+  <button class="send">发送</button>
+</div>
+
+<script>
+// 示例按钮点了把文本放到输入框（仅演示）
+document.querySelectorAll('.examples button').forEach(b => {
+  b.onclick = () => {
+    document.querySelector('.composer textarea').value = b.textContent;
+    document.querySelector('.composer textarea').focus();
+  };
+});
+// textarea 自适应
+const ta = document.querySelector('.composer textarea');
+ta.addEventListener('input', () => {
+  ta.style.height = 'auto';
+  ta.style.height = Math.min(ta.scrollHeight, 100) + 'px';
+});
+</script>
+
+</body>
+</html>

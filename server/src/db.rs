@@ -175,6 +175,99 @@ fn run_migrations(conn: &Connection) {
         )
         .ok();
     }
+
+    // Add importance column to ergou_memories (for databases created before this feature)
+    let has_importance: bool = conn
+        .prepare("SELECT importance FROM ergou_memories LIMIT 1")
+        .is_ok();
+    if !has_importance {
+        conn.execute_batch(
+            "ALTER TABLE ergou_memories ADD COLUMN importance INTEGER DEFAULT 3;",
+        )
+        .ok();
+    }
+    // Add additional indexes for memories
+    conn.execute_batch(
+        "CREATE INDEX IF NOT EXISTS idx_ergou_memories_user_category ON ergou_memories(user_id, category);",
+    )
+    .ok();
+
+    // Ensure soul_states table exists (for databases created before this feature)
+    let has_soul_states: bool = conn
+        .prepare("SELECT user_id FROM soul_states LIMIT 1")
+        .is_ok();
+    if !has_soul_states {
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS soul_states (
+                user_id TEXT PRIMARY KEY REFERENCES users(id),
+                classical_ratio REAL NOT NULL DEFAULT 0.9,
+                warmth_level REAL NOT NULL DEFAULT 0.3,
+                verbosity_level REAL NOT NULL DEFAULT 0.3,
+                proactivity_level REAL NOT NULL DEFAULT 0.2,
+                trust_level REAL NOT NULL DEFAULT 0.1,
+                relationship_stage TEXT NOT NULL DEFAULT 'stranger',
+                total_interactions INTEGER NOT NULL DEFAULT 0,
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE TABLE IF NOT EXISTS soul_evolution_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL REFERENCES users(id),
+                parameter TEXT NOT NULL,
+                old_value REAL NOT NULL,
+                new_value REAL NOT NULL,
+                trigger_type TEXT NOT NULL DEFAULT 'auto',
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE INDEX IF NOT EXISTS idx_soul_evo_user ON soul_evolution_log(user_id);",
+        )
+        .ok();
+    }
+
+    // Add image_uris column to chat_messages (T-072: multimodal support)
+    let has_image_uris: bool = conn
+        .prepare("SELECT image_uris FROM chat_messages LIMIT 1")
+        .is_ok();
+    if !has_image_uris {
+        conn.execute_batch("ALTER TABLE chat_messages ADD COLUMN image_uris TEXT;")
+            .ok();
+    }
+
+    // Add feedback column to chat_messages (T-048: thumbs up/down)
+    let has_feedback: bool = conn
+        .prepare("SELECT feedback FROM chat_messages LIMIT 1")
+        .is_ok();
+    if !has_feedback {
+        conn.execute_batch("ALTER TABLE chat_messages ADD COLUMN feedback INTEGER;")
+            .ok();
+    }
+
+    // Add conversation_id to memory_extraction_log (T-077: per-conv rate limit)
+    let has_conv_id: bool = conn
+        .prepare("SELECT conversation_id FROM memory_extraction_log LIMIT 1")
+        .is_ok();
+    if !has_conv_id {
+        conn.execute_batch("ALTER TABLE memory_extraction_log ADD COLUMN conversation_id TEXT;")
+            .ok();
+    }
+    // Index must be created after the column exists (cannot be in create_tables
+    // because CREATE TABLE IF NOT EXISTS is a no-op for legacy tables)
+    conn.execute_batch(
+        "CREATE INDEX IF NOT EXISTS idx_mem_extract_conv ON memory_extraction_log(conversation_id, created_at);",
+    )
+    .ok();
+
+    // T-095: 收紧内置列默认宽度,让 9 列在 1366 屏宽一屏可见。
+    // 只对 width 仍是 T-094 旧默认值的内置列 UPDATE — 保留用户拖过的列宽。
+    // 跑多次幂等:第一次后 width 已不是 320/240/130,WHERE 不再命中。
+    conn.execute_batch(
+        "UPDATE work_columns SET width = 260, min_width = 200
+           WHERE builtin = 1 AND key = 'title'    AND width = 320;
+         UPDATE work_columns SET width = 200, min_width = 140
+           WHERE builtin = 1 AND key = 'desc'     AND width = 240;
+         UPDATE work_columns SET width = 110, min_width = 100
+           WHERE builtin = 1 AND key = 'progress' AND width = 130;",
+    )
+    .ok();
 }
 
 fn create_tables(conn: &Connection) {
@@ -283,6 +376,8 @@ fn create_tables(conn: &Connection) {
             content_json TEXT,
             tool_name TEXT,
             token_count INTEGER,
+            image_uris TEXT,
+            feedback INTEGER,
             created_at TEXT NOT NULL,
             sequence INTEGER NOT NULL
         );
@@ -587,12 +682,14 @@ fn create_tables(conn: &Connection) {
             user_id TEXT NOT NULL REFERENCES users(id),
             category TEXT NOT NULL DEFAULT 'user_fact',
             content TEXT NOT NULL,
+            importance INTEGER DEFAULT 3,
             source_conversation_id TEXT,
             created_at TEXT NOT NULL,
             last_accessed_at TEXT NOT NULL,
             access_count INTEGER DEFAULT 0
         );
         CREATE INDEX IF NOT EXISTS idx_ergou_memories_user ON ergou_memories(user_id, last_accessed_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_ergou_memories_user_category ON ergou_memories(user_id, category);
 
         -- Security events (安全事件)
         CREATE TABLE IF NOT EXISTS security_events (
@@ -649,6 +746,87 @@ fn create_tables(conn: &Connection) {
             updated_at TEXT NOT NULL
         );
         CREATE INDEX IF NOT EXISTS idx_ergou_people_user ON ergou_people(user_id);
+
+        -- Soul state (per-user personality parameters)
+        CREATE TABLE IF NOT EXISTS soul_states (
+            user_id TEXT PRIMARY KEY REFERENCES users(id),
+            classical_ratio REAL NOT NULL DEFAULT 0.9,
+            warmth_level REAL NOT NULL DEFAULT 0.3,
+            verbosity_level REAL NOT NULL DEFAULT 0.3,
+            proactivity_level REAL NOT NULL DEFAULT 0.2,
+            trust_level REAL NOT NULL DEFAULT 0.1,
+            relationship_stage TEXT NOT NULL DEFAULT 'stranger',
+            total_interactions INTEGER NOT NULL DEFAULT 0,
+            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+
+        -- Soul evolution audit log
+        CREATE TABLE IF NOT EXISTS soul_evolution_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL REFERENCES users(id),
+            parameter TEXT NOT NULL,
+            old_value REAL NOT NULL,
+            new_value REAL NOT NULL,
+            trigger_type TEXT NOT NULL DEFAULT 'auto',
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_soul_evo_user ON soul_evolution_log(user_id);
+
+        -- Memory extraction daily log (rate limiting)
+        CREATE TABLE IF NOT EXISTS memory_extraction_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL REFERENCES users(id),
+            conversation_id TEXT,
+            extracted_count INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_mem_extract_user ON memory_extraction_log(user_id);
+
+        -- Work tasks (T-094 / SPEC work-task-table)
+        --   Independent task domain for organizational/recurring work
+        --   (院/所/组 level, responsible person, frequency label).
+        --   Separate from `todos` (which is personal four-quadrant matrix).
+        --   custom_fields stores user-added column values as a JSON object.
+        --   Field naming: SQL snake_case here; API JSON exposes as `due` / `createdAt` etc.
+        CREATE TABLE IF NOT EXISTS work_tasks (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id       TEXT    NOT NULL REFERENCES users(id),
+            title         TEXT    NOT NULL DEFAULT '',
+            desc          TEXT    NOT NULL DEFAULT '',
+            assignee      TEXT    NOT NULL DEFAULT '',
+            level         TEXT    NOT NULL DEFAULT '',
+            freq          TEXT    NOT NULL DEFAULT '',
+            status        TEXT    NOT NULL DEFAULT 'todo',
+            priority      TEXT    NOT NULL DEFAULT 'mid',
+            due_date      TEXT,
+            progress      INTEGER NOT NULL DEFAULT 0,
+            custom_fields TEXT    NOT NULL DEFAULT '{}',
+            sort_order    REAL    NOT NULL DEFAULT 0,
+            created_at    TEXT    NOT NULL,
+            updated_at    TEXT    NOT NULL,
+            deleted       INTEGER NOT NULL DEFAULT 0,
+            deleted_at    TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_work_tasks_user ON work_tasks(user_id, deleted);
+        CREATE INDEX IF NOT EXISTS idx_work_tasks_due  ON work_tasks(user_id, due_date);
+
+        -- Work columns (per-user schema config for the work_tasks table)
+        --   On first access, backend seeds 9 builtin rows (see models::work_column::builtin_seed).
+        --   builtin=1 → cannot be deleted; sys=1 → options semantics fixed (status / priority).
+        CREATE TABLE IF NOT EXISTS work_columns (
+            user_id   TEXT    NOT NULL REFERENCES users(id),
+            key       TEXT    NOT NULL,
+            name      TEXT    NOT NULL,
+            type      TEXT    NOT NULL,
+            options   TEXT    NOT NULL DEFAULT '[]',
+            width     INTEGER,
+            min_width INTEGER,
+            position  INTEGER NOT NULL,
+            builtin   INTEGER NOT NULL DEFAULT 0,
+            sys       INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (user_id, key)
+        );
+        CREATE INDEX IF NOT EXISTS idx_work_columns_user_pos ON work_columns(user_id, position);
         ",
     )
     .expect("Failed to create tables");

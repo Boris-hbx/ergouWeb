@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>工作任务表 · 责任人视图 设计稿</title>
+<style>
+  :root {
+    --bg: #FAF9FC;
+    --bg-card: #FFFFFF;
+    --bg-elev: #F5F2FB;
+    --border: #E5E3EE;
+    --border-strong: #D4D0E0;
+    --text: #1F2937;
+    --text-mute: #6B7280;
+    --text-faint: #9CA3AF;
+    --primary: #7C4DFF;
+    --primary-soft: rgba(124, 77, 255, 0.10);
+    --primary-strong: rgba(124, 77, 255, 0.18);
+    --danger: #E11D48;
+    --danger-soft: rgba(225, 29, 72, 0.10);
+    --warn: #F59E0B;
+    --warn-soft: rgba(245, 158, 11, 0.12);
+    --ok: #10B981;
+    --avatar-1: #7C4DFF; /* 紫 */
+    --avatar-2: #14B8A6; /* 青绿 */
+    --avatar-3: #E0A23B; /* 暖橙 */
+    --avatar-4: #3B82F6; /* 蓝 */
+    --shadow: 0 1px 2px rgba(15, 15, 30, 0.04), 0 4px 12px rgba(15, 15, 30, 0.06);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--bg); color: var(--text); font: 13px/1.5 -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; }
+
+  /* ── 顶栏 ── */
+  .topbar {
+    padding: 16px 28px 0;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .topbar h1 { font-size: 18px; font-weight: 600; }
+  .seg {
+    display: inline-flex;
+    background: var(--bg-elev);
+    border-radius: 8px;
+    padding: 3px;
+    border: 1px solid var(--border);
+  }
+  .seg button {
+    border: 0;
+    background: transparent;
+    padding: 5px 12px;
+    font-size: 12.5px;
+    color: var(--text-mute);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .seg button.active {
+    background: var(--bg-card);
+    color: var(--primary);
+    font-weight: 600;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  }
+  .spacer { flex: 1; }
+  .btn-primary {
+    background: var(--primary);
+    color: white;
+    border: 0;
+    padding: 7px 14px;
+    border-radius: 8px;
+    font-size: 12.5px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  /* ── 时间 Tab ── */
+  .time-tabs {
+    padding: 14px 28px 0;
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid var(--border);
+  }
+  .time-tab {
+    border: 0;
+    background: transparent;
+    padding: 8px 16px 10px;
+    font-size: 13px;
+    color: var(--text-mute);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: all .15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .time-tab:hover { color: var(--text); }
+  .time-tab.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+    font-weight: 600;
+  }
+  .time-tab .count {
+    font-size: 11px;
+    color: var(--text-faint);
+    background: var(--bg-elev);
+    padding: 1px 6px;
+    border-radius: 10px;
+  }
+  .time-tab.active .count {
+    background: var(--primary-soft);
+    color: var(--primary);
+  }
+  .time-tab .warn-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--danger);
+  }
+
+  /* ── 主区 ── */
+  .container {
+    padding: 0 28px 40px;
+  }
+  .section-label {
+    margin: 18px 0 10px;
+    font-size: 11.5px;
+    color: var(--text-faint);
+    letter-spacing: 0.06em;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  /* ── 气泡总览 ── */
+  .bubble-wrap {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px 22px;
+    box-shadow: var(--shadow);
+  }
+  .bubble-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    align-items: center;
+    justify-content: flex-start;
+  }
+  .bubble {
+    position: relative;
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform .18s, box-shadow .18s;
+    font-weight: 600;
+    color: var(--text);
+    text-align: center;
+    user-select: none;
+    border: 2px solid transparent;
+  }
+  .bubble:hover {
+    transform: translateY(-2px) scale(1.04);
+    box-shadow: 0 8px 24px rgba(15, 15, 30, 0.12);
+  }
+  .bubble .b-name {
+    font-size: 12.5px;
+    line-height: 1.1;
+  }
+  .bubble .b-count {
+    font-size: 14px;
+    margin-top: 2px;
+    color: var(--text-mute);
+    font-weight: 500;
+  }
+  .bubble.has-overdue {
+    background: var(--danger-soft);
+    border-color: var(--danger);
+    color: var(--danger);
+  }
+  .bubble.has-overdue .b-count { color: var(--danger); }
+  .bubble.has-p0 {
+    background: var(--warn-soft);
+    border-color: var(--warn);
+    color: #8B5A00;
+  }
+  .bubble.has-p0 .b-count { color: #8B5A00; }
+  .bubble.normal {
+    background: var(--primary-soft);
+    border-color: var(--primary);
+    color: var(--primary);
+  }
+  .bubble.normal .b-count { color: var(--primary); }
+  .bubble.low {
+    background: var(--bg-elev);
+    border-color: var(--border-strong);
+    color: var(--text-mute);
+  }
+  .bubble .b-badge {
+    position: absolute;
+    top: -6px;
+    right: -4px;
+    background: var(--danger);
+    color: white;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-weight: 600;
+    border: 2px solid var(--bg-card);
+  }
+  .bubble-legend {
+    display: flex;
+    gap: 18px;
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--border);
+    font-size: 11.5px;
+    color: var(--text-mute);
+  }
+  .bubble-legend .dot {
+    display: inline-block;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    margin-right: 5px;
+    vertical-align: middle;
+  }
+
+  /* ── 卡片墙 ── */
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 14px;
+  }
+  .person-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 14px 6px;
+    box-shadow: var(--shadow);
+    transition: border-color .2s, box-shadow .2s;
+    min-height: 220px;
+    display: flex;
+    flex-direction: column;
+  }
+  .person-card.highlight {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-soft), var(--shadow);
+  }
+  .person-card.dragover {
+    border-color: var(--primary);
+    background: var(--primary-soft);
+  }
+  .person-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px dashed var(--border);
+  }
+  .avatar {
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 600;
+    font-size: 12.5px;
+    flex-shrink: 0;
+  }
+  .person-name {
+    flex: 1;
+    font-weight: 600;
+    font-size: 13.5px;
+  }
+  .person-stats {
+    font-size: 11.5px;
+    color: var(--text-mute);
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .person-stats .total { color: var(--text); font-weight: 500; }
+  .person-stats .overdue {
+    color: var(--danger);
+    background: var(--danger-soft);
+    padding: 1px 6px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 10.5px;
+  }
+  .person-stats .p0 {
+    color: #8B5A00;
+    background: var(--warn-soft);
+    padding: 1px 6px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 10.5px;
+  }
+
+  .task-list {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .task-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 6px;
+    border-radius: 6px;
+    cursor: grab;
+    transition: background .12s;
+    position: relative;
+  }
+  .task-item:hover { background: var(--bg-elev); }
+  .task-item.dragging { opacity: 0.4; }
+  .task-item.done .task-title {
+    text-decoration: line-through;
+    color: var(--text-faint);
+  }
+  .task-checkbox {
+    width: 14px; height: 14px;
+    border: 1.5px solid var(--border-strong);
+    border-radius: 4px;
+    flex-shrink: 0;
+    cursor: pointer;
+    background: white;
+    transition: all .12s;
+  }
+  .task-item.done .task-checkbox {
+    background: var(--primary);
+    border-color: var(--primary);
+    position: relative;
+  }
+  .task-item.done .task-checkbox::after {
+    content: '✓';
+    color: white;
+    font-size: 10px;
+    position: absolute;
+    top: -2px; left: 1px;
+  }
+  .task-title {
+    flex: 1;
+    font-size: 12.5px;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .task-meta {
+    font-size: 10.5px;
+    color: var(--text-faint);
+    flex-shrink: 0;
+    display: flex;
+    gap: 4px;
+    align-items: center;
+  }
+  .task-meta .pill {
+    padding: 1px 6px;
+    border-radius: 8px;
+    background: var(--bg-elev);
+  }
+  .task-meta .pill.due-soon { background: var(--warn-soft); color: #8B5A00; }
+  .task-meta .pill.overdue { background: var(--danger-soft); color: var(--danger); font-weight: 600; }
+  .task-meta .pill.p0 { background: var(--warn-soft); color: var(--warn); }
+
+  .card-foot {
+    display: flex;
+    justify-content: center;
+    padding: 4px;
+    margin-top: 6px;
+    border-top: 1px dashed var(--border);
+    color: var(--text-faint);
+    font-size: 11.5px;
+    cursor: pointer;
+    transition: color .12s;
+  }
+  .card-foot:hover { color: var(--primary); }
+
+  /* ── 提示条 ── */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: rgba(31, 41, 55, 0.94);
+    color: white;
+    padding: 9px 16px;
+    border-radius: 8px;
+    font-size: 12.5px;
+    opacity: 0;
+    transition: all .25s;
+    pointer-events: none;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  }
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  /* ── 设计说明 ── */
+  .design-note {
+    margin-top: 28px;
+    padding: 18px 22px;
+    background: var(--bg-card);
+    border: 1px dashed var(--border-strong);
+    border-radius: 10px;
+    color: var(--text-mute);
+    font-size: 12.5px;
+    line-height: 1.65;
+  }
+  .design-note h3 {
+    margin-bottom: 10px;
+    color: var(--primary);
+    font-size: 13px;
+  }
+  .design-note ul { margin-left: 20px; }
+  .design-note li { margin: 4px 0; }
+  .design-note code {
+    background: var(--bg-elev);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-family: ui-monospace, monospace;
+    font-size: 11.5px;
+    color: var(--primary);
+  }
+</style>
+</head>
+<body>
+
+<!-- ─── 顶栏 ─── -->
+<div class="topbar">
+  <h1>任务表</h1>
+  <div class="seg" id="viewSeg">
+    <button data-view="table">表格</button>
+    <button data-view="board">看板</button>
+    <button data-view="cal">日历</button>
+    <button data-view="person" class="active">人员 ✦</button>
+  </div>
+  <div class="spacer"></div>
+  <button class="btn-primary">+ 新建任务</button>
+</div>
+
+<!-- ─── 时间 Tab ─── -->
+<div class="time-tabs" id="timeTabs">
+  <button class="time-tab" data-tab="all">全部 <span class="count">28</span></button>
+  <button class="time-tab active" data-tab="today">
+    今日 <span class="count">7</span> <span class="warn-dot" title="含 3 条逾期"></span>
+  </button>
+  <button class="time-tab" data-tab="week">本周 <span class="count">15</span></button>
+  <button class="time-tab" data-tab="month">本月 <span class="count">24</span></button>
+</div>
+
+<!-- ─── 主区 ─── -->
+<div class="container">
+
+  <!-- 气泡总览 -->
+  <div class="section-label">人员负载总览（点气泡跳转到对应卡片）</div>
+  <div class="bubble-wrap">
+    <div class="bubble-row" id="bubbleRow"></div>
+    <div class="bubble-legend">
+      <span><span class="dot" style="background:var(--danger)"></span>含逾期</span>
+      <span><span class="dot" style="background:var(--warn)"></span>含 P0</span>
+      <span><span class="dot" style="background:var(--primary)"></span>正常</span>
+      <span><span class="dot" style="background:var(--border-strong)"></span>仅低优</span>
+      <span style="margin-left:auto;">气泡大小 = 任务数</span>
+    </div>
+  </div>
+
+  <!-- 卡片墙 -->
+  <div class="section-label">分人详情（拖任务卡到另一人 = 转交）</div>
+  <div class="card-grid" id="cardGrid"></div>
+
+  <!-- 设计说明 -->
+  <div class="design-note">
+    <h3>设计说明（PM 草稿）</h3>
+    <ul>
+      <li><strong>形态</strong>：上图（气泡总览）+ 下卡（责任人卡片墙），方案 1「上图下卡片」。脑图不做，理由：节点 &gt; 20 容易乱，且 Boris 实际需求是「谁负责什么 / 谁有逾期」而非「拓扑关系」。</li>
+      <li><strong>气泡颜色</strong>：红=含逾期 / 橙=含 P0 / 紫=正常 / 灰=仅低优；<strong>气泡大小</strong>：按任务数（min 56px → max 110px，对数缩放避免大户压制小户）。</li>
+      <li><strong>头像配色</strong>：4 色调色板（紫 / 青绿 / 暖橙 / 蓝），按 assignee 字符串 hash 取色，同一人在所有视图色一致。</li>
+      <li><strong>时间 Tab 叠加</strong>：本视图遵循全局 Tab。切「今日」= 只显示今日任务的责任人和任务（含逾期）；切「全部」回到完整视图。</li>
+      <li><strong>未指派任务</strong>：单独显示一张「未指派」卡，置于最末。</li>
+      <li><strong>拖拽转交</strong>：复用 work-board 已有拖拽逻辑。拖任务卡到另一人 → 弹确认「将『XX』转交给 YY 吗？」→ 确认后 <code>PATCH /api/work/tasks/{id} {"assignee":"YY"}</code>。</li>
+      <li><strong>点击任务</strong>：MVP 走现有的列设置/编辑 modal 复用；本稿仅模拟划掉。</li>
+      <li><strong>实现成本</strong>：纯前端，复用 work-board 拖拽 + 现有 assignee 数据，<strong>无需新增 API</strong>。预计 1 个新文件 <code>work-person.js</code> + <code>work.css</code> 加一段。</li>
+    </ul>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── 假数据 ──
+const PEOPLE = [
+  { name: '陈老师',   tasks: [
+    { id: 1, title: '院学术委员会评审准备', due: '今天',  status: 'doing', priority: 'P0', overdue: false },
+    { id: 2, title: '季度经费报表',         due: '逾期2天', status: 'todo',  priority: 'mid', overdue: true },
+    { id: 3, title: '学生开题报告意见',     due: '后天',  status: 'todo',  priority: 'mid', overdue: false },
+    { id: 4, title: '硕士答辩排期协调',     due: '下周',  status: 'doing', priority: 'mid', overdue: false },
+    { id: 5, title: '会议室预订',           due: '今天',  status: 'doing', priority: 'low', overdue: false },
+  ]},
+  { name: '王主任',   tasks: [
+    { id: 6, title: '所务会材料',           due: '明天',  status: 'todo',  priority: 'P0', overdue: false },
+    { id: 7, title: '科研经费申报',         due: '本周内',status: 'doing', priority: 'mid', overdue: false },
+    { id: 8, title: '人事档案归档',         due: '下周',  status: 'todo',  priority: 'low', overdue: false },
+  ]},
+  { name: '赵研究员', tasks: [
+    { id: 9,  title: '论文校对',           due: '下周',  status: 'doing', priority: 'mid', overdue: false },
+    { id: 10, title: '数据分析（项目甲）', due: '逾期5天',status: 'doing', priority: 'P0', overdue: true },
+    { id: 11, title: '实验设计文档',       due: '逾期1天',status: 'todo',  priority: 'mid', overdue: true },
+    { id: 12, title: '会议海报',           due: '本月底',status: 'todo',  priority: 'low', overdue: false },
+  ]},
+  { name: '李秘书',   tasks: [
+    { id: 13, title: '复印资料',           due: '今天',  status: 'doing', priority: 'low', overdue: false },
+    { id: 14, title: '邮件回复',           due: '今天',  status: 'doing', priority: 'low', overdue: false },
+  ]},
+  { name: '刘工',     tasks: [
+    { id: 15, title: '服务器迁移',         due: '本周',  status: 'doing', priority: 'mid', overdue: false },
+    { id: 16, title: '权限审计',           due: '下周',  status: 'todo',  priority: 'mid', overdue: false },
+    { id: 17, title: '备份策略评估',       due: '本月',  status: 'todo',  priority: 'low', overdue: false },
+    { id: 18, title: '安全报告',           due: '本月底',status: 'todo',  priority: 'mid', overdue: false },
+  ]},
+  { name: '自己',     tasks: [
+    { id: 19, title: '院评委会准备整体把关', due: '今天',  status: 'doing', priority: 'P0', overdue: false },
+    { id: 20, title: '约见院长',            due: '明天',  status: 'todo',  priority: 'P0', overdue: false },
+    { id: 21, title: '差旅总结',            due: '本周',  status: 'doing', priority: 'mid', overdue: false },
+    { id: 22, title: '论文回复审稿意见',    due: '本周',  status: 'doing', priority: 'mid', overdue: false },
+    { id: 23, title: '硕士论文修改意见',    due: '下周',  status: 'todo',  priority: 'mid', overdue: false },
+    { id: 24, title: '基金中期总结',        due: '本月',  status: 'todo',  priority: 'mid', overdue: false },
+    { id: 25, title: '阅读 X 论文',         due: '本月',  status: 'todo',  priority: 'low', overdue: false },
+    { id: 26, title: '健身计划',            due: '本月',  status: 'todo',  priority: 'low', overdue: false },
+  ]},
+  { name: '未指派',   tasks: [
+    { id: 27, title: '财务对账（待派）',    due: '本周',  status: 'todo',  priority: 'mid', overdue: false },
+    { id: 28, title: '采购单录入（待派）',  due: '本月',  status: 'todo',  priority: 'low', overdue: false },
+  ]},
+];
+
+// ── 工具：取色 ──
+const AVATAR_COLORS = ['var(--avatar-1)','var(--avatar-2)','var(--avatar-3)','var(--avatar-4)'];
+function colorOf(name) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return AVATAR_COLORS[h % 4];
+}
+function initialOf(name) {
+  if (name === '未指派') return '?';
+  if (name === '自己') return '我';
+  return name.slice(0, 1);
+}
+
+// ── 气泡大小：对数缩放 ──
+function bubbleSize(n) {
+  const min = 60, max = 110;
+  const t = Math.min(1, Math.log2(n + 1) / 4);
+  return min + (max - min) * t;
+}
+
+// ── 气泡颜色分类 ──
+function bubbleClass(p) {
+  const overdue = p.tasks.filter(t => t.overdue).length;
+  const p0      = p.tasks.filter(t => t.priority === 'P0').length;
+  const onlyLow = p.tasks.every(t => t.priority === 'low');
+  if (p.name === '未指派') return 'low';
+  if (overdue > 0) return 'has-overdue';
+  if (p0 > 0)      return 'has-p0';
+  if (onlyLow)     return 'low';
+  return 'normal';
+}
+
+// ── 渲染气泡 ──
+function renderBubbles() {
+  const row = document.getElementById('bubbleRow');
+  row.innerHTML = '';
+  PEOPLE.forEach(p => {
+    const overdue = p.tasks.filter(t => t.overdue).length;
+    const size = bubbleSize(p.tasks.length);
+    const b = document.createElement('div');
+    b.className = 'bubble ' + bubbleClass(p);
+    b.style.width = b.style.height = size + 'px';
+    b.dataset.person = p.name;
+    b.innerHTML = `
+      <div class="b-name">${p.name}</div>
+      <div class="b-count">${p.tasks.length}</div>
+      ${overdue ? `<div class="b-badge">⏰ ${overdue}</div>` : ''}
+    `;
+    b.onclick = () => scrollToCard(p.name);
+    row.appendChild(b);
+  });
+}
+
+// ── 渲染卡片 ──
+function renderCards() {
+  const grid = document.getElementById('cardGrid');
+  grid.innerHTML = '';
+  PEOPLE.forEach(p => {
+    const card = document.createElement('div');
+    card.className = 'person-card';
+    card.dataset.person = p.name;
+
+    const overdue = p.tasks.filter(t => t.overdue).length;
+    const p0      = p.tasks.filter(t => t.priority === 'P0').length;
+
+    const statsHtml = `
+      <span class="total">${p.tasks.length} 任务</span>
+      ${overdue ? `<span class="overdue">⏰ ${overdue} 逾期</span>` : ''}
+      ${p0      ? `<span class="p0">⚡ ${p0} P0</span>` : ''}
+    `;
+
+    const head = `
+      <div class="person-head">
+        <div class="avatar" style="background:${colorOf(p.name)}">${initialOf(p.name)}</div>
+        <div class="person-name">${p.name}</div>
+      </div>
+      <div class="person-stats" style="margin:-4px 0 8px 40px;">${statsHtml}</div>
+    `;
+
+    const taskListHtml = p.tasks.map(t => {
+      const pillClass = t.overdue ? 'overdue' : (t.due === '今天' || t.due === '明天' ? 'due-soon' : '');
+      const p0Pill = t.priority === 'P0' ? '<span class="pill p0">P0</span>' : '';
+      return `
+        <div class="task-item" draggable="true" data-tid="${t.id}" data-from="${p.name}">
+          <div class="task-checkbox"></div>
+          <div class="task-title">${t.title}</div>
+          <div class="task-meta">
+            ${p0Pill}
+            <span class="pill ${pillClass}">${t.due}</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    card.innerHTML = head + `<div class="task-list">${taskListHtml}</div>
+      <div class="card-foot">+ 添加任务</div>
+    `;
+    grid.appendChild(card);
+  });
+  bindCardInteractions();
+}
+
+// ── 卡片交互：点 checkbox / 拖拽 ──
+function bindCardInteractions() {
+  // 复选框
+  document.querySelectorAll('.task-checkbox').forEach(cb => {
+    cb.onclick = (e) => {
+      e.stopPropagation();
+      cb.closest('.task-item').classList.toggle('done');
+    };
+  });
+
+  // 拖拽
+  let dragging = null;
+  document.querySelectorAll('.task-item').forEach(item => {
+    item.ondragstart = (e) => {
+      dragging = item;
+      item.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', item.dataset.tid);
+    };
+    item.ondragend = () => {
+      dragging && dragging.classList.remove('dragging');
+      dragging = null;
+      document.querySelectorAll('.person-card').forEach(c => c.classList.remove('dragover'));
+    };
+  });
+
+  document.querySelectorAll('.person-card').forEach(card => {
+    card.ondragover = (e) => {
+      e.preventDefault();
+      if (dragging && dragging.dataset.from !== card.dataset.person) {
+        card.classList.add('dragover');
+      }
+    };
+    card.ondragleave = () => card.classList.remove('dragover');
+    card.ondrop = (e) => {
+      e.preventDefault();
+      card.classList.remove('dragover');
+      if (!dragging) return;
+      const from = dragging.dataset.from;
+      const to = card.dataset.person;
+      if (from === to) return;
+      const title = dragging.querySelector('.task-title').textContent;
+      if (confirm(`将「${title}」从「${from}」转交给「${to}」吗？`)) {
+        toast(`✓ 已转交：${title}  →  ${to}`);
+        // 真实实现：PATCH /api/work/tasks/{id} {"assignee":"YY"} 后重渲
+        dragging.dataset.from = to;
+        card.querySelector('.task-list').appendChild(dragging);
+      }
+    };
+  });
+}
+
+// ── 点气泡 → 滚动到卡片并高亮 ──
+function scrollToCard(name) {
+  const card = document.querySelector(`.person-card[data-person="${name}"]`);
+  if (!card) return;
+  card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  card.classList.add('highlight');
+  setTimeout(() => card.classList.remove('highlight'), 1400);
+}
+
+// ── 时间 Tab 切换（模拟） ──
+document.getElementById('timeTabs').addEventListener('click', e => {
+  const btn = e.target.closest('.time-tab');
+  if (!btn) return;
+  document.querySelectorAll('.time-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  toast(`已切到「${btn.textContent.trim().split(/\s/)[0]}」（设计稿仅模拟）`);
+});
+
+// ── 视图切换（模拟） ──
+document.getElementById('viewSeg').addEventListener('click', e => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  const v = btn.dataset.view;
+  if (v !== 'person') {
+    toast(`「${btn.textContent}」视图设计稿暂无（请回到现有 work-board-preview）`);
+    return;
+  }
+  document.querySelectorAll('#viewSeg button').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+});
+
+// ── 提示 ──
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+// ── 启动 ──
+renderBubbles();
+renderCards();
+</script>
+
+</body>
+</html>

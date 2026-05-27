@@ -67,46 +67,53 @@ pub fn execute_tool(db: &Connection, user_id: &str, tool_name: &str, input: &Val
         "update_todo" => tool_update_todo(db, user_id, input),
         "delete_todo" => tool_delete_todo(db, user_id, input),
         "restore_todo" => tool_restore_todo(db, user_id, input),
-        "query_todos" => tool_query_todos(db, user_id, input),
+        "list_todos" => tool_query_todos(db, user_id, input),
         "batch_update_todos" => tool_batch_update_todos(db, user_id, input),
         "create_routine" => tool_create_routine(db, user_id, input),
-        "query_routines" => tool_query_routines(db, user_id, input),
+        "list_routines" => tool_query_routines(db, user_id, input),
         "update_routine" => tool_update_routine(db, user_id, input),
         "delete_routine" => tool_delete_routine(db, user_id, input),
         "create_review" => tool_create_review(db, user_id, input),
-        "query_reviews" => tool_query_reviews(db, user_id, input),
+        "list_reviews" => tool_query_reviews(db, user_id, input),
         "update_review" => tool_update_review(db, user_id, input),
         "delete_review" => tool_delete_review(db, user_id, input),
-        "get_statistics" => tool_get_statistics(db, user_id, input),
-        "get_current_datetime" => tool_get_current_datetime(),
-        "create_english_scenario" => tool_create_english_scenario(db, user_id, input),
-        "query_english_scenarios" => tool_query_english_scenarios(db, user_id, input),
-        "update_english_scenario" => tool_update_english_scenario(db, user_id, input),
-        "delete_english_scenario" => tool_delete_english_scenario(db, user_id, input),
+        "get_stats" => tool_get_statistics(db, user_id, input),
+        "get_datetime" => tool_get_current_datetime(),
+        "create_scenario" => tool_create_english_scenario(db, user_id, input),
+        "list_scenarios" => tool_query_english_scenarios(db, user_id, input),
+        "update_scenario" => tool_update_english_scenario(db, user_id, input),
+        "delete_scenario" => tool_delete_english_scenario(db, user_id, input),
         "create_expense" => tool_create_expense(db, user_id, input),
-        "query_expenses" => tool_query_expenses(db, user_id, input),
+        "list_expenses" => tool_query_expenses(db, user_id, input),
         "update_expense" => tool_update_expense(db, user_id, input),
         "delete_expense" => tool_delete_expense(db, user_id, input),
-        "get_expense_summary" => tool_get_expense_summary(db, user_id, input),
+        "get_expense_stats" => tool_get_expense_summary(db, user_id, input),
         "create_reminder" => tool_create_reminder(db, user_id, input),
-        "query_reminders" => tool_query_reminders(db, user_id, input),
+        "list_reminders" => tool_query_reminders(db, user_id, input),
         "cancel_reminder" => tool_cancel_reminder(db, user_id, input),
         "snooze_reminder" => tool_snooze_reminder(db, user_id, input),
-        "query_trips" => tool_query_trips(db, user_id, input),
-        "get_trip_detail" => tool_get_trip_detail(db, user_id, input),
+        "list_trips" => tool_query_trips(db, user_id, input),
+        "get_trip" => tool_get_trip_detail(db, user_id, input),
         "create_trip" => tool_create_trip(db, user_id, input),
         "update_trip" => tool_update_trip(db, user_id, input),
         "delete_trip" => tool_delete_trip(db, user_id, input),
         "create_trip_item" => tool_create_trip_item(db, user_id, input),
         "update_trip_item" => tool_update_trip_item(db, user_id, input),
         "delete_trip_item" => tool_delete_trip_item(db, user_id, input),
-        "get_trip_summary" => tool_get_trip_summary(db, user_id, input),
+        "get_trip_stats" => tool_get_trip_summary(db, user_id, input),
         "save_person" => tool_save_person(db, user_id, input),
         "update_person" => tool_update_person(db, user_id, input),
         "delete_person" => tool_delete_person(db, user_id, input),
         "save_memory" => tool_save_memory(db, user_id, input),
+        "update_memory" => tool_update_memory(db, user_id, input),
+        "list_memories" => tool_list_memories(db, user_id, input),
+        "search_memory" => tool_search_memory(db, user_id, input),
         "delete_memory" => tool_delete_memory(db, user_id, input),
         "report_security_event" => tool_report_security_event(db, user_id, input),
+        // ─── work_task tools (T-101) ───
+        "create_work_task" => tool_create_work_task(db, user_id, input),
+        "update_work_task" => tool_update_work_task(db, user_id, input),
+        "query_work_tasks" => tool_query_work_tasks(db, user_id, input),
         _ => json!({"error": format!("Unknown tool: {}", tool_name)}),
     }
 }
@@ -171,7 +178,7 @@ pub fn tool_definitions() -> Vec<Value> {
             }
         }),
         json!({
-            "name": "query_todos",
+            "name": "list_todos",
             "description": "查询任务列表，支持多种过滤条件。也会返回协作任务。",
             "input_schema": {
                 "type": "object",
@@ -235,7 +242,7 @@ pub fn tool_definitions() -> Vec<Value> {
             }
         }),
         json!({
-            "name": "get_statistics",
+            "name": "get_stats",
             "description": "获取用户的任务统计数据",
             "input_schema": {
                 "type": "object",
@@ -246,7 +253,7 @@ pub fn tool_definitions() -> Vec<Value> {
             }
         }),
         json!({
-            "name": "get_current_datetime",
+            "name": "get_datetime",
             "description": "获取当前日期和时间",
             "input_schema": {
                 "type": "object",
@@ -254,7 +261,7 @@ pub fn tool_definitions() -> Vec<Value> {
             }
         }),
         json!({
-            "name": "create_english_scenario",
+            "name": "create_scenario",
             "description": "创建一个学习场景（支持英语、编程、职场、生活等分类），创建后会自动生成学习内容",
             "input_schema": {
                 "type": "object",
@@ -267,7 +274,7 @@ pub fn tool_definitions() -> Vec<Value> {
             }
         }),
         json!({
-            "name": "query_english_scenarios",
+            "name": "list_scenarios",
             "description": "查询用户的学习场景列表。需要修改内容时请传 include_content: true 获取完整内容",
             "input_schema": {
                 "type": "object",
@@ -292,7 +299,7 @@ pub fn tool_definitions() -> Vec<Value> {
             }
         }),
         json!({
-            "name": "query_reminders",
+            "name": "list_reminders",
             "description": "查询用户的提醒列表",
             "input_schema": {
                 "type": "object",
@@ -326,7 +333,7 @@ pub fn tool_definitions() -> Vec<Value> {
         }),
         // ─── Routine tools ───
         json!({
-            "name": "query_routines",
+            "name": "list_routines",
             "description": "查询例行任务列表",
             "input_schema": {
                 "type": "object",
@@ -360,7 +367,7 @@ pub fn tool_definitions() -> Vec<Value> {
         }),
         // ─── Review tools ───
         json!({
-            "name": "query_reviews",
+            "name": "list_reviews",
             "description": "查询审视项列表",
             "input_schema": {
                 "type": "object",
@@ -399,7 +406,7 @@ pub fn tool_definitions() -> Vec<Value> {
         }),
         // ─── English scenario tools ───
         json!({
-            "name": "update_english_scenario",
+            "name": "update_scenario",
             "description": "更新学习笔记的标题、内容、备注或分类",
             "input_schema": {
                 "type": "object",
@@ -414,7 +421,7 @@ pub fn tool_definitions() -> Vec<Value> {
             }
         }),
         json!({
-            "name": "delete_english_scenario",
+            "name": "delete_scenario",
             "description": "删除一条学习笔记",
             "input_schema": {
                 "type": "object",
@@ -441,7 +448,7 @@ pub fn tool_definitions() -> Vec<Value> {
             }
         }),
         json!({
-            "name": "query_expenses",
+            "name": "list_expenses",
             "description": "查询记账记录列表",
             "input_schema": {
                 "type": "object",
@@ -482,7 +489,7 @@ pub fn tool_definitions() -> Vec<Value> {
             }
         }),
         json!({
-            "name": "get_expense_summary",
+            "name": "get_expense_stats",
             "description": "获取记账统计汇总（总额、笔数、按标签分组）",
             "input_schema": {
                 "type": "object",
@@ -494,7 +501,7 @@ pub fn tool_definitions() -> Vec<Value> {
         }),
         // ─── Trip tools ───
         json!({
-            "name": "query_trips",
+            "name": "list_trips",
             "description": "查询用户的差旅行程列表",
             "input_schema": {
                 "type": "object",
@@ -502,7 +509,7 @@ pub fn tool_definitions() -> Vec<Value> {
             }
         }),
         json!({
-            "name": "get_trip_detail",
+            "name": "get_trip",
             "description": "获取某个差旅行程的详细信息（包含所有条目和协作者）",
             "input_schema": {
                 "type": "object",
@@ -605,7 +612,7 @@ pub fn tool_definitions() -> Vec<Value> {
             }
         }),
         json!({
-            "name": "get_trip_summary",
+            "name": "get_trip_stats",
             "description": "获取差旅费用汇总（总额、报销状态统计）",
             "input_schema": {
                 "type": "object",
@@ -662,15 +669,53 @@ pub fn tool_definitions() -> Vec<Value> {
             "input_schema": {
                 "type": "object",
                 "properties": {
-                    "content": {"type": "string", "description": "要记住的内容，简明扼要，不超过200字"},
-                    "category": {"type": "string", "enum": ["habit", "fact", "personality", "intent"], "description": "记忆类别：habit=操作习惯/默认值，fact=个人事实，personality=沟通偏好，intent=提过但没做的事"}
+                    "content": {"type": "string", "description": "要记住的内容，简明扼要，不超过500字"},
+                    "category": {"type": "string", "enum": ["habit", "fact", "personality", "intent"], "description": "记忆类别：habit=操作习惯/默认值，fact=个人事实，personality=沟通偏好，intent=提过但没做的事"},
+                    "importance": {"type": "integer", "description": "重要程度1-5，默认3", "minimum": 1, "maximum": 5}
                 },
                 "required": ["content", "category"]
             }
         }),
         json!({
+            "name": "search_memory",
+            "description": "搜索用户的记忆。当需要回忆用户之前提到的信息时调用。",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "搜索关键词"}
+                },
+                "required": ["query"]
+            }
+        }),
+        json!({
+            "name": "update_memory",
+            "description": "更新一条已有记忆的内容、分类或重要性。用户要求修改某条记忆时调用。",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string", "description": "要更新的记忆ID"},
+                    "content": {"type": "string", "description": "新内容（可选）"},
+                    "category": {"type": "string", "enum": ["habit", "fact", "personality", "intent"], "description": "新类别（可选）"},
+                    "importance": {"type": "integer", "description": "新重要程度1-5（可选）", "minimum": 1, "maximum": 5}
+                },
+                "required": ["id"]
+            }
+        }),
+        json!({
+            "name": "list_memories",
+            "description": "列出用户的记忆。当需要查看用户所有记忆或按分类浏览时调用。",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "category": {"type": "string", "enum": ["habit", "fact", "personality", "intent"], "description": "按分类筛选（可选）"},
+                    "limit": {"type": "integer", "description": "返回条数，默认20，最大100", "minimum": 1, "maximum": 100},
+                    "sort": {"type": "string", "enum": ["recent", "importance"], "description": "排序方式，默认recent"}
+                }
+            }
+        }),
+        json!({
             "name": "delete_memory",
-            "description": "用户要求忘掉某条记忆时调用",
+            "description": "删除过时或不再适用的记忆。触发场景：用户说忘掉/别记了；用户说事情完了/搞定了；intent类记忆已过期（如出差回来了就删掉'要出差'）；用户纠正事实时先删旧的再save新的。删除前先 search_memory 找到对应记忆。",
             "input_schema": {
                 "type": "object",
                 "properties": {
@@ -690,6 +735,65 @@ pub fn tool_definitions() -> Vec<Value> {
                     "description": {"type": "string", "description": "简要描述发生了什么"}
                 },
                 "required": ["event_type", "severity", "description"]
+            }
+        }),
+        // ─── work_task tools (T-101 / SPEC work-task-table 附录 A) ───
+        // 跟个人 todo 的分流见 system-prompt:带组织属性/责任人/部门层级的事走这里。
+        json!({
+            "name": "create_work_task",
+            "description": "新建一条工作任务（独立于个人 todo 的工作任务表）。用于带组织属性、有责任人、有部门层级的事——比如『让陈老师下周三前交季度经费报表』。assignee 是纯文本（不关联真实账号），留空 = 未指派。",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string", "description": "任务标题"},
+                    "assignee": {"type": "string", "description": "责任人姓名（纯文本，如『陈老师』『王主任』）；留空 = 未指派"},
+                    "level": {"type": "string", "description": "层级（自由文本，建议:院/所/组/个人）"},
+                    "freq": {"type": "string", "description": "频率（自由文本，建议:一次性/每周/每月/每季）"},
+                    "status": {"type": "string", "enum": ["todo", "doing", "blocked", "done"], "description": "状态，默认 todo"},
+                    "priority": {"type": "string", "enum": ["high", "mid", "low", "P0"], "description": "优先级，默认 mid;P0 = high 别名"},
+                    "due_date": {"type": "string", "description": "截止日 YYYY-MM-DD"},
+                    "desc": {"type": "string", "description": "长文本简介(背景/要点)"}
+                },
+                "required": ["title"]
+            }
+        }),
+        json!({
+            "name": "update_work_task",
+            "description": "更新已存在的工作任务的某些字段(部分更新)。只传 id + 要改的字段。边界:status=done 时自动 progress=100;progress=100 时自动 status=done(与 work-board 拖拽行为一致)。due_date 传空字符串 = 清空。",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer", "description": "任务 id(数字)"},
+                    "title": {"type": "string"},
+                    "assignee": {"type": "string"},
+                    "level": {"type": "string"},
+                    "freq": {"type": "string"},
+                    "status": {"type": "string", "enum": ["todo", "doing", "blocked", "done"]},
+                    "priority": {"type": "string", "enum": ["high", "mid", "low", "P0"], "description": "P0 = high 别名"},
+                    "due_date": {"type": "string", "description": "YYYY-MM-DD;传空字符串清空"},
+                    "progress": {"type": "integer", "minimum": 0, "maximum": 100},
+                    "desc": {"type": "string"}
+                },
+                "required": ["id"]
+            }
+        }),
+        json!({
+            "name": "query_work_tasks",
+            "description": "查询工作任务列表(支持多种过滤)。所有条件 AND 关系;不传任何条件 → 返回当前用户所有未删除任务。返回值附带 summary={overdue, p0, by_status},方便一句话概述如『5 条未完成,1 条逾期,1 条 P0』。找不到任务时,建议先 query 标题模糊搜,而非凭空猜 id。",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "q": {"type": "string", "description": "标题/简介模糊搜(SQL LIKE %q%)"},
+                    "assignee": {"type": "string", "description": "按责任人精确匹配"},
+                    "level": {"type": "string", "description": "按层级精确匹配"},
+                    "status": {"type": "string", "enum": ["todo", "doing", "blocked", "done"]},
+                    "status_not": {"type": "string", "enum": ["todo", "doing", "blocked", "done"], "description": "排除该 status(常用:status_not=done 查未完成)"},
+                    "priority": {"type": "string", "enum": ["high", "mid", "low", "P0"]},
+                    "due_before": {"type": "string", "description": "截止日 ≤ 该日(YYYY-MM-DD)"},
+                    "due_after": {"type": "string", "description": "截止日 ≥ 该日(YYYY-MM-DD)"},
+                    "has_overdue": {"type": "boolean", "description": "true = 只看逾期未完成(due<today AND status≠done)"},
+                    "limit": {"type": "integer", "description": "返回最多多少条,默认 10,最大 50", "minimum": 1, "maximum": 50}
+                }
             }
         }),
     ]
@@ -2724,9 +2828,9 @@ fn tool_save_memory(db: &Connection, user_id: &str, input: &Value) -> Value {
         _ => return json!({"error": "content 不能为空"}),
     };
 
-    // Length check (200 chars)
-    if content.chars().count() > 200 {
-        return json!({"error": "记忆内容不能超过200字"});
+    // Length check (500 chars)
+    if content.chars().count() > 500 {
+        return json!({"error": "记忆内容不能超过500字"});
     }
 
     // Category validation
@@ -2735,6 +2839,9 @@ fn tool_save_memory(db: &Connection, user_id: &str, input: &Value) -> Value {
     if !valid_categories.contains(&category) {
         return json!({"error": "无效的记忆类别"});
     }
+
+    // Importance (1-5, default 3)
+    let importance = input["importance"].as_i64().unwrap_or(3).clamp(1, 5);
 
     // Sensitive content check
     if is_sensitive_content(content) {
@@ -2753,7 +2860,7 @@ fn tool_save_memory(db: &Connection, user_id: &str, input: &Value) -> Value {
         return json!({"success": true, "message": "已经记住了，不用重复记"});
     }
 
-    // Check 50 limit
+    // Check 100 limit
     let count: i64 = db
         .query_row(
             "SELECT COUNT(*) FROM ergou_memories WHERE user_id=?1",
@@ -2761,7 +2868,7 @@ fn tool_save_memory(db: &Connection, user_id: &str, input: &Value) -> Value {
             |r| r.get(0),
         )
         .unwrap_or(0);
-    if count >= 50 {
+    if count >= 100 {
         // Delete the oldest least-accessed memory to make room
         db.execute(
             "DELETE FROM ergou_memories WHERE id = (SELECT id FROM ergou_memories WHERE user_id=?1 ORDER BY access_count ASC, last_accessed_at ASC LIMIT 1)",
@@ -2770,17 +2877,65 @@ fn tool_save_memory(db: &Connection, user_id: &str, input: &Value) -> Value {
         .ok();
     }
 
-    let id = uuid::Uuid::new_v4().to_string()[..8].to_string();
+    let id = format!("mem_{}", &uuid::Uuid::new_v4().to_string()[..12]);
     let now = chrono::Utc::now().to_rfc3339();
     let conversation_id = input["conversation_id"].as_str().unwrap_or("");
 
     match db.execute(
-        "INSERT INTO ergou_memories (id, user_id, category, content, source_conversation_id, created_at, last_accessed_at, access_count) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 0)",
-        rusqlite::params![id, user_id, category, content, conversation_id, now, now],
+        "INSERT INTO ergou_memories (id, user_id, category, content, importance, source_conversation_id, created_at, last_accessed_at, access_count) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 0)",
+        rusqlite::params![id, user_id, category, content, importance, conversation_id, now, now],
     ) {
         Ok(_) => json!({"success": true, "id": id, "message": "记住了"}),
         Err(e) => json!({"error": format!("保存记忆失败: {}", e)}),
     }
+}
+
+fn tool_search_memory(db: &Connection, user_id: &str, input: &Value) -> Value {
+    let query = match input["query"].as_str() {
+        Some(q) if !q.trim().is_empty() => q.trim(),
+        _ => return json!({"error": "query 不能为空"}),
+    };
+
+    let pattern = format!("%{}%", query);
+    let mut results: Vec<Value> = Vec::new();
+    let mut ids: Vec<String> = Vec::new();
+
+    if let Ok(mut stmt) = db.prepare(
+        "SELECT id, category, content, importance FROM ergou_memories WHERE user_id=?1 AND content LIKE ?2 COLLATE NOCASE ORDER BY importance DESC, access_count DESC LIMIT 10",
+    ) {
+        if let Ok(rows) = stmt.query_map(rusqlite::params![user_id, pattern], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, i64>(3).unwrap_or(3),
+            ))
+        }) {
+            for row in rows.flatten() {
+                ids.push(row.0.clone());
+                results.push(json!({
+                    "id": row.0,
+                    "category": row.1,
+                    "content": row.2,
+                    "importance": row.3
+                }));
+            }
+        }
+    }
+
+    // Update access tracking
+    if !ids.is_empty() {
+        let now = chrono::Utc::now().to_rfc3339();
+        for id in &ids {
+            db.execute(
+                "UPDATE ergou_memories SET last_accessed_at=?1, access_count=access_count+1 WHERE id=?2",
+                rusqlite::params![now, id],
+            )
+            .ok();
+        }
+    }
+
+    json!({"success": true, "memories": results, "count": results.len()})
 }
 
 fn tool_delete_memory(db: &Connection, user_id: &str, input: &Value) -> Value {
@@ -2797,6 +2952,186 @@ fn tool_delete_memory(db: &Connection, user_id: &str, input: &Value) -> Value {
         Ok(_) => json!({"success": true, "message": "已忘掉"}),
         Err(e) => json!({"error": format!("删除失败: {}", e)}),
     }
+}
+
+fn tool_update_memory(db: &Connection, user_id: &str, input: &Value) -> Value {
+    let id = match input["id"].as_str() {
+        Some(i) if !i.is_empty() => i,
+        _ => return json!({"error": "id is required"}),
+    };
+
+    // Check memory exists and belongs to user
+    let exists: bool = db
+        .query_row(
+            "SELECT COUNT(*) > 0 FROM ergou_memories WHERE id=?1 AND user_id=?2",
+            rusqlite::params![id, user_id],
+            |r| r.get(0),
+        )
+        .unwrap_or(false);
+    if !exists {
+        return json!({"error": "记忆不存在或不属于当前用户"});
+    }
+
+    let new_content = input["content"].as_str().map(|s| s.trim()).filter(|s| !s.is_empty());
+    let new_category = input["category"].as_str();
+    let new_importance = input["importance"].as_i64();
+
+    if new_content.is_none() && new_category.is_none() && new_importance.is_none() {
+        return json!({"error": "至少提供 content、category 或 importance 中的一个"});
+    }
+
+    // Validate content
+    if let Some(content) = new_content {
+        if content.chars().count() > 500 {
+            return json!({"error": "记忆内容不能超过500字"});
+        }
+        if is_sensitive_content(content) {
+            return json!({"error": "不能记录敏感信息（密码、银行卡、证件号等）"});
+        }
+        // Dedup
+        let dup: bool = db
+            .query_row(
+                "SELECT COUNT(*) > 0 FROM ergou_memories WHERE user_id=?1 AND content=?2 AND id!=?3",
+                rusqlite::params![user_id, content, id],
+                |r| r.get(0),
+            )
+            .unwrap_or(false);
+        if dup {
+            return json!({"error": "已经有相同内容的记忆了"});
+        }
+    }
+
+    // Validate category
+    if let Some(cat) = new_category {
+        let valid_categories = ["habit", "fact", "personality", "intent"];
+        if !valid_categories.contains(&cat) {
+            return json!({"error": "无效的记忆类别"});
+        }
+    }
+
+    // Build dynamic UPDATE
+    let mut set_clauses: Vec<String> = Vec::new();
+    let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
+    let mut idx = 1;
+
+    if let Some(content) = new_content {
+        set_clauses.push(format!("content=?{}", idx));
+        params.push(Box::new(content.to_string()));
+        idx += 1;
+    }
+    if let Some(cat) = new_category {
+        set_clauses.push(format!("category=?{}", idx));
+        params.push(Box::new(cat.to_string()));
+        idx += 1;
+    }
+    if let Some(imp) = new_importance {
+        let imp = imp.clamp(1, 5);
+        set_clauses.push(format!("importance=?{}", idx));
+        params.push(Box::new(imp));
+        idx += 1;
+    }
+
+    let now = chrono::Utc::now().to_rfc3339();
+    set_clauses.push(format!("last_accessed_at=?{}", idx));
+    params.push(Box::new(now));
+    idx += 1;
+
+    let sql = format!(
+        "UPDATE ergou_memories SET {} WHERE id=?{} AND user_id=?{}",
+        set_clauses.join(", "),
+        idx,
+        idx + 1
+    );
+    params.push(Box::new(id.to_string()));
+    params.push(Box::new(user_id.to_string()));
+
+    let params_refs: Vec<&dyn rusqlite::types::ToSql> =
+        params.iter().map(|p| p.as_ref()).collect();
+
+    match db.execute(&sql, params_refs.as_slice()) {
+        Ok(0) => json!({"error": "更新失败"}),
+        Ok(_) => json!({"success": true, "message": "记忆已更新"}),
+        Err(e) => json!({"error": format!("更新失败: {}", e)}),
+    }
+}
+
+fn tool_list_memories(db: &Connection, user_id: &str, input: &Value) -> Value {
+    let limit = input["limit"].as_i64().unwrap_or(20).clamp(1, 100);
+    let sort = input["sort"].as_str().unwrap_or("recent");
+    let category = input["category"].as_str();
+
+    let order = match sort {
+        "importance" => "importance DESC, last_accessed_at DESC",
+        _ => "last_accessed_at DESC",
+    };
+
+    let (sql, params_vec): (String, Vec<Box<dyn rusqlite::types::ToSql>>) = if let Some(cat) = category {
+        (
+            format!(
+                "SELECT id, category, content, importance, access_count FROM ergou_memories WHERE user_id=?1 AND category=?2 ORDER BY {} LIMIT ?3",
+                order
+            ),
+            vec![
+                Box::new(user_id.to_string()),
+                Box::new(cat.to_string()),
+                Box::new(limit),
+            ],
+        )
+    } else {
+        (
+            format!(
+                "SELECT id, category, content, importance, access_count FROM ergou_memories WHERE user_id=?1 ORDER BY {} LIMIT ?2",
+                order
+            ),
+            vec![Box::new(user_id.to_string()), Box::new(limit)],
+        )
+    };
+
+    let params_refs: Vec<&dyn rusqlite::types::ToSql> =
+        params_vec.iter().map(|p| p.as_ref()).collect();
+
+    let mut memories: Vec<Value> = Vec::new();
+
+    if let Ok(mut stmt) = db.prepare(&sql) {
+        if let Ok(rows) = stmt.query_map(params_refs.as_slice(), |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, i64>(3).unwrap_or(3),
+                row.get::<_, i64>(4)?,
+            ))
+        }) {
+            for row in rows.flatten() {
+                memories.push(json!({
+                    "id": row.0,
+                    "category": row.1,
+                    "content": row.2,
+                    "importance": row.3,
+                    "access_count": row.4
+                }));
+            }
+        }
+    }
+
+    // Total count
+    let total: i64 = if let Some(cat) = category {
+        db.query_row(
+            "SELECT COUNT(*) FROM ergou_memories WHERE user_id=?1 AND category=?2",
+            rusqlite::params![user_id, cat],
+            |r| r.get(0),
+        )
+        .unwrap_or(0)
+    } else {
+        db.query_row(
+            "SELECT COUNT(*) FROM ergou_memories WHERE user_id=?1",
+            [user_id],
+            |r| r.get(0),
+        )
+        .unwrap_or(0)
+    };
+
+    json!({"success": true, "memories": memories, "count": memories.len(), "total": total})
 }
 
 // ─── Security event tool ───
@@ -2886,5 +3221,246 @@ fn tool_report_security_event(db: &Connection, user_id: &str, input: &Value) -> 
             result
         }
         Err(e) => json!({"error": format!("记录安全事件失败: {}", e)}),
+    }
+}
+
+// ============================================================
+// T-101:work_task LLM 工具
+//
+// 3 个工具(create / update / query)直接复用 routes::work_tasks 里的 *_impl 函数,
+// 不重复 SQL。input 解析时:
+//   - id 接 number 或 string(LLM 输出有时是字符串数字)
+//   - priority 接受 'P0' 别名(impl 内部 normalize 到 'high')
+// 返回结构与其它工具一致:成功 -> {success: true, ...};错误 -> {error: "..."}。
+// abao.js 的 addToolInfo 用 `tool === 'create_work_task'` 等 key 渲染 inline 卡片。
+// ============================================================
+
+use crate::models::work_task::{CreateWorkTaskRequest, UpdateWorkTaskRequest};
+use crate::routes::work_tasks::{
+    create_task_impl, query_tasks_impl, update_task_impl, QueryFilters,
+};
+
+/// 把 input["id"] 接 number / string,转 i64
+fn extract_i64_id(input: &Value) -> Option<i64> {
+    if let Some(n) = input["id"].as_i64() {
+        return Some(n);
+    }
+    if let Some(s) = input["id"].as_str() {
+        return s.parse::<i64>().ok();
+    }
+    None
+}
+
+fn opt_string(input: &Value, key: &str) -> Option<String> {
+    input[key].as_str().map(|s| s.to_string())
+}
+
+fn tool_create_work_task(db: &Connection, user_id: &str, input: &Value) -> Value {
+    let title = input["title"].as_str().unwrap_or("").trim().to_string();
+    if title.is_empty() {
+        return json!({"error": "title is required"});
+    }
+    let req = CreateWorkTaskRequest {
+        title,
+        desc: opt_string(input, "desc").unwrap_or_default(),
+        assignee: opt_string(input, "assignee").unwrap_or_default(),
+        level: opt_string(input, "level").unwrap_or_default(),
+        freq: opt_string(input, "freq").unwrap_or_default(),
+        status: opt_string(input, "status").unwrap_or_else(|| "todo".to_string()),
+        priority: opt_string(input, "priority").unwrap_or_else(|| "mid".to_string()),
+        due_date: opt_string(input, "due_date").filter(|s| !s.is_empty()),
+        progress: input["progress"].as_i64().unwrap_or(0) as i32,
+        custom_fields: None,
+    };
+    match create_task_impl(db, user_id, &req) {
+        Ok(item) => match serde_json::to_value(&item) {
+            Ok(mut v) => {
+                v["success"] = json!(true);
+                v
+            }
+            Err(e) => json!({"error": format!("serialize: {}", e)}),
+        },
+        Err(e) => json!({"error": format!("创建任务失败: {}", e)}),
+    }
+}
+
+fn tool_update_work_task(db: &Connection, user_id: &str, input: &Value) -> Value {
+    let id = match extract_i64_id(input) {
+        Some(n) => n,
+        None => return json!({"error": "id is required (number)"}),
+    };
+    let patch = UpdateWorkTaskRequest {
+        title: opt_string(input, "title"),
+        desc: opt_string(input, "desc"),
+        assignee: opt_string(input, "assignee"),
+        level: opt_string(input, "level"),
+        freq: opt_string(input, "freq"),
+        status: opt_string(input, "status"),
+        priority: opt_string(input, "priority"),
+        due_date: opt_string(input, "due_date"), // 空字符串 = 清空(impl 已处理)
+        progress: input["progress"].as_i64().map(|n| n as i32),
+        custom_fields: None,
+        sort_order: None,
+    };
+    match update_task_impl(db, user_id, id, patch) {
+        Ok(Some(item)) => match serde_json::to_value(&item) {
+            Ok(mut v) => {
+                v["success"] = json!(true);
+                v
+            }
+            Err(e) => json!({"error": format!("serialize: {}", e)}),
+        },
+        Ok(None) => json!({"error": format!("任务 T-{} 不存在(或已被删除)", id)}),
+        Err(e) => json!({"error": format!("更新任务失败: {}", e)}),
+    }
+}
+
+fn tool_query_work_tasks(db: &Connection, user_id: &str, input: &Value) -> Value {
+    let filters = QueryFilters {
+        q: opt_string(input, "q"),
+        assignee: opt_string(input, "assignee"),
+        level: opt_string(input, "level"),
+        status: opt_string(input, "status"),
+        status_not: opt_string(input, "status_not"),
+        priority: opt_string(input, "priority"),
+        due_before: opt_string(input, "due_before"),
+        due_after: opt_string(input, "due_after"),
+        has_overdue: input["has_overdue"].as_bool(),
+        // LLM 默认拿 10 条,避免回复过长(spec § A.1)
+        limit: Some(input["limit"].as_i64().unwrap_or(10).clamp(1, 50)),
+    };
+    match query_tasks_impl(db, user_id, &filters) {
+        Ok((items, summary)) => match (
+            serde_json::to_value(&items),
+            serde_json::to_value(&summary),
+        ) {
+            (Ok(items_v), Ok(sum_v)) => json!({
+                "success": true,
+                "count": items.len(),
+                "tasks": items_v,
+                "summary": sum_v,
+            }),
+            _ => json!({"error": "serialize failed"}),
+        },
+        Err(e) => json!({"error": format!("查询任务失败: {}", e)}),
+    }
+}
+
+#[cfg(test)]
+mod work_task_tool_tests {
+    use super::*;
+
+    fn setup() -> Connection {
+        let db = Connection::open_in_memory().expect("in-memory db");
+        crate::db::init_connection(&db);
+        // work_tasks 表有 FK to users(id),测试前先种几个 user 行
+        let now = chrono::Utc::now().to_rfc3339();
+        for uid in ["u-test", "u-alice", "u-bob"] {
+            db.execute(
+                "INSERT INTO users (id, username, password_hash, display_name, created_at, updated_at) VALUES (?1, ?2, 'x', ?2, ?3, ?3)",
+                rusqlite::params![uid, uid, now],
+            )
+            .expect("seed user");
+        }
+        db
+    }
+
+    const UID: &str = "u-test";
+
+    #[test]
+    fn create_returns_full_task_with_id() {
+        let db = setup();
+        let r = tool_create_work_task(
+            &db,
+            UID,
+            &json!({"title": "x", "assignee": "陈老师", "priority": "P0"}),
+        );
+        assert_eq!(r["success"], true, "response: {r}");
+        assert!(r["id"].as_i64().is_some());
+        assert_eq!(r["title"], "x");
+        assert_eq!(r["priority"], "high"); // P0 别名规整
+    }
+
+    #[test]
+    fn update_status_done_auto_progress_100() {
+        let db = setup();
+        let c = tool_create_work_task(&db, UID, &json!({"title": "y"}));
+        let id = c["id"].as_i64().unwrap();
+        let r = tool_update_work_task(&db, UID, &json!({"id": id, "status": "done"}));
+        assert_eq!(r["status"], "done");
+        assert_eq!(r["progress"], 100);
+    }
+
+    #[test]
+    fn update_nonexistent_id_returns_error() {
+        let db = setup();
+        let r = tool_update_work_task(&db, UID, &json!({"id": 999999, "status": "done"}));
+        assert!(r["error"].as_str().unwrap().contains("不存在"));
+    }
+
+    #[test]
+    fn query_status_not_excludes_done() {
+        let db = setup();
+        tool_create_work_task(&db, UID, &json!({"title": "a", "status": "todo"}));
+        let c = tool_create_work_task(&db, UID, &json!({"title": "b"}));
+        tool_update_work_task(
+            &db,
+            UID,
+            &json!({"id": c["id"], "status": "done"}),
+        );
+        let r = tool_query_work_tasks(&db, UID, &json!({"status_not": "done"}));
+        assert_eq!(r["success"], true);
+        assert_eq!(r["count"], 1);
+        assert_eq!(r["tasks"][0]["title"], "a");
+    }
+
+    #[test]
+    fn query_q_searches_title_and_desc() {
+        let db = setup();
+        tool_create_work_task(
+            &db,
+            UID,
+            &json!({"title": "季度经费报表"}),
+        );
+        tool_create_work_task(
+            &db,
+            UID,
+            &json!({"title": "院评审", "desc": "含经费明细"}),
+        );
+        tool_create_work_task(&db, UID, &json!({"title": "复印资料"}));
+        let r = tool_query_work_tasks(&db, UID, &json!({"q": "经费"}));
+        assert_eq!(r["count"], 2);
+    }
+
+    #[test]
+    fn query_summary_overdue_and_p0() {
+        let db = setup();
+        tool_create_work_task(
+            &db,
+            UID,
+            &json!({"title": "old", "due_date": "2020-01-01", "priority": "high"}),
+        );
+        tool_create_work_task(
+            &db,
+            UID,
+            &json!({"title": "future", "due_date": "2099-01-01", "priority": "mid"}),
+        );
+        let r = tool_query_work_tasks(&db, UID, &json!({}));
+        assert_eq!(r["count"], 2);
+        assert_eq!(r["summary"]["overdue"], 1);
+        assert_eq!(r["summary"]["p0"], 1);
+    }
+
+    #[test]
+    fn user_isolation_no_cross_read() {
+        let db = setup();
+        tool_create_work_task(&db, "u-alice", &json!({"title": "alice's"}));
+        tool_create_work_task(&db, "u-bob", &json!({"title": "bob's"}));
+        let r_alice = tool_query_work_tasks(&db, "u-alice", &json!({}));
+        assert_eq!(r_alice["count"], 1);
+        assert_eq!(r_alice["tasks"][0]["title"], "alice's");
+        let r_bob = tool_query_work_tasks(&db, "u-bob", &json!({}));
+        assert_eq!(r_bob["count"], 1);
+        assert_eq!(r_bob["tasks"][0]["title"], "bob's");
     }
 }

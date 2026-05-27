@@ -7,5 +7,8 @@ pub mod friend;
 pub mod reminder;
 pub mod review;
 pub mod routine;
+pub mod soul_state;
 pub mod todo;
 pub mod trip;
+pub mod work_column;
+pub mod work_task;

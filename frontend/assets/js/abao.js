@@ -14,6 +14,15 @@ var Abao = (function() {
     var autoScroll = true;
     var thinkingTimer = null;
 
+    // ─── 图片上传状态 ───
+    var pendingImages = []; // [{file, dataUrl, base64, mediaType}]
+    var imagePreviewEl = null;
+    var imgBtn = null;
+    var imageInput = null;
+    var MAX_IMAGES = 3;
+    var MAX_LONG_EDGE = 1024;
+    var JPEG_QUALITY = 0.85;
+
     // ─── 手势物理常量 ───
     var GESTURE = {
         DEAD_ZONE: 10,              // 点击 vs 滑动区分 (px)
@@ -81,6 +90,66 @@ var Abao = (function() {
             inputEl.addEventListener('input', function() {
                 this.style.height = 'auto';
                 this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+            });
+        }
+
+        // ─── Image upload ───
+        imagePreviewEl = document.getElementById('abao-image-preview');
+        imgBtn = document.getElementById('abao-img-btn');
+        imageInput = document.getElementById('abao-image-input');
+
+        if (imgBtn && imageInput) {
+            imgBtn.addEventListener('click', function() {
+                if (pendingImages.length >= MAX_IMAGES) {
+                    showToast('最多上传' + MAX_IMAGES + '张图片', 'warning');
+                    return;
+                }
+                imageInput.click();
+            });
+            imageInput.addEventListener('change', function() {
+                handleImageFiles(this.files);
+                this.value = '';
+            });
+        }
+
+        // Paste image
+        if (inputEl) {
+            inputEl.addEventListener('paste', function(e) {
+                var items = e.clipboardData && e.clipboardData.items;
+                if (!items) return;
+                for (var i = 0; i < items.length; i++) {
+                    if (items[i].type.indexOf('image/') === 0) {
+                        e.preventDefault();
+                        handleImageFiles([items[i].getAsFile()]);
+                        return;
+                    }
+                }
+            });
+        }
+
+        // Drag & drop on panel
+        if (panel) {
+            panel.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                panel.classList.add('drag-over');
+            });
+            panel.addEventListener('dragleave', function(e) {
+                if (!panel.contains(e.relatedTarget)) {
+                    panel.classList.remove('drag-over');
+                }
+            });
+            panel.addEventListener('drop', function(e) {
+                e.preventDefault();
+                panel.classList.remove('drag-over');
+                if (e.dataTransfer && e.dataTransfer.files.length) {
+                    var imgFiles = [];
+                    for (var i = 0; i < e.dataTransfer.files.length; i++) {
+                        if (e.dataTransfer.files[i].type.indexOf('image/') === 0) {
+                            imgFiles.push(e.dataTransfer.files[i]);
+                        }
+                    }
+                    if (imgFiles.length) handleImageFiles(imgFiles);
+                }
             });
         }
 
@@ -560,6 +629,13 @@ var Abao = (function() {
         else open();
     }
 
+    document.addEventListener('mousedown', function(e) {
+        if (!isOpen || !panel || _isMobile) return;
+        if (!panel.contains(e.target) && !e.target.closest('#header-avatar') && !e.target.closest('.abao-tab')) {
+            close();
+        }
+    });
+
     // ─── Messages ───
     var _isMobile = window.matchMedia('(max-width: 768px)').matches;
 
@@ -596,12 +672,196 @@ var Abao = (function() {
         return row;
     }
 
-    function addMessage(role, text) {
+    function renderMarkdown(text) {
+        if (typeof marked !== 'undefined' && typeof DOMPurify !== 'undefined') {
+            try {
+                var html = marked.parse(text, { breaks: true, gfm: true });
+                return DOMPurify.sanitize(html, {
+                    ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'code', 'pre', 'ul', 'ol', 'li', 'a', 'h1', 'h2', 'h3', 'h4', 'blockquote', 'hr', 'del', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'span'],
+                    ALLOWED_ATTR: ['href', 'target', 'rel', 'class']
+                });
+            } catch (e) {
+                console.error('[Abao] markdown render error:', e);
+            }
+        }
+        return null;
+    }
+
+    var SVG_COPY = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>';
+    var SVG_CHECK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>';
+    var SVG_THUMB_UP = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14zM7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg>';
+    var SVG_THUMB_DOWN = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 15v4a3 3 0 003 3l4-9V2H5.72a2 2 0 00-2 1.7l-1.38 9a2 2 0 002 2.3H10zM17 2h2.67A2.31 2.31 0 0122 4v7a2.31 2.31 0 01-2.33 2H17"/></svg>';
+
+    function createActionBar(msgEl, text, messageId) {
+        var bar = document.createElement('div');
+        bar.className = 'abao-action-bar';
+
+        // Copy button
+        var copyBtn = document.createElement('button');
+        copyBtn.className = 'abao-action-btn';
+        copyBtn.title = '复制';
+        copyBtn.innerHTML = SVG_COPY;
+        copyBtn.onclick = function() {
+            navigator.clipboard.writeText(text).then(function() {
+                copyBtn.innerHTML = SVG_CHECK;
+                copyBtn.title = '已复制';
+                if (typeof showToast === 'function') showToast('已复制', 'success');
+                setTimeout(function() {
+                    copyBtn.innerHTML = SVG_COPY;
+                    copyBtn.title = '复制';
+                }, 2000);
+            }).catch(function() {
+                if (typeof showToast === 'function') showToast('复制失败', 'error');
+            });
+        };
+        bar.appendChild(copyBtn);
+
+        // Thumbs up / down (only if we have a message ID)
+        if (messageId) {
+            var currentFeedback = null;
+
+            var likeBtn = document.createElement('button');
+            likeBtn.className = 'abao-action-btn';
+            likeBtn.title = '有帮助';
+            likeBtn.innerHTML = SVG_THUMB_UP;
+
+            var dislikeBtn = document.createElement('button');
+            dislikeBtn.className = 'abao-action-btn';
+            dislikeBtn.title = '没帮助';
+            dislikeBtn.innerHTML = SVG_THUMB_DOWN;
+
+            function updateFeedbackUI() {
+                likeBtn.classList.toggle('active', currentFeedback === 1);
+                dislikeBtn.classList.toggle('active', currentFeedback === -1);
+            }
+
+            function sendFeedback(value) {
+                var newVal = currentFeedback === value ? null : value;
+                currentFeedback = newVal;
+                updateFeedbackUI();
+                fetch('/api/chat/messages/' + messageId + '/feedback', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ feedback: newVal })
+                }).catch(function(err) {
+                    console.error('[Abao] feedback error:', err);
+                });
+            }
+
+            likeBtn.onclick = function() { sendFeedback(1); };
+            dislikeBtn.onclick = function() { sendFeedback(-1); };
+
+            bar.appendChild(likeBtn);
+            bar.appendChild(dislikeBtn);
+        }
+
+        return bar;
+    }
+
+    function addSuggestionChips(userMsg, assistantReply) {
+        // Remove existing suggestion chips
+        var old = messagesContainer.querySelector('.abao-suggestions');
+        if (old) old.remove();
+
+        var container = document.createElement('div');
+        container.className = 'abao-suggestions';
+
+        // Generate suggestions based on context
+        var suggestions = generateSuggestions(userMsg, assistantReply);
+        suggestions.forEach(function(s) {
+            var chip = document.createElement('button');
+            chip.className = 'abao-suggestion-chip';
+            chip.textContent = s;
+            chip.onclick = function() {
+                container.remove();
+                if (inputEl) inputEl.value = s;
+                sendMessage();
+            };
+            container.appendChild(chip);
+        });
+
+        if (suggestions.length > 0) {
+            messagesContainer.appendChild(container);
+            if (autoScroll) scrollToBottom();
+        }
+    }
+
+    function generateSuggestions(userMsg, reply) {
+        var suggestions = [];
+        var lower = (reply || '').toLowerCase();
+        var userLower = (userMsg || '').toLowerCase();
+
+        // Context-aware suggestions
+        if (/记账|花了|消费|支出/.test(userLower) || /记账|花了|消费|支出/.test(lower)) {
+            suggestions.push('这个月花了多少？');
+            suggestions.push('帮我看看消费趋势');
+        } else if (/待办|任务|todo/.test(userLower) || /待办|任务|todo/.test(lower)) {
+            suggestions.push('今天还有什么没做？');
+            suggestions.push('帮我整理一下本周任务');
+        } else if (/例行|习惯|routine/.test(userLower) || /例行|习惯|routine/.test(lower)) {
+            suggestions.push('我的习惯完成情况怎么样？');
+            suggestions.push('帮我新建一个习惯');
+        } else if (/差旅|出差|trip/.test(userLower) || /差旅|出差|trip/.test(lower)) {
+            suggestions.push('我有哪些出差行程？');
+            suggestions.push('帮我算算差旅花费');
+        }
+
+        // Always add a generic follow-up if we have less than 2
+        if (suggestions.length < 2) {
+            if (suggestions.length === 0) suggestions.push('还有别的事吗？');
+            suggestions.push('帮我看看今天的概况');
+        }
+
+        return suggestions.slice(0, 3);
+    }
+
+    var _lastUserMsg = '';
+
+    function addMessage(role, text, messageId, images) {
         if (!messagesContainer) return;
         var msg = document.createElement('div');
         msg.className = 'abao-msg ' + role;
-        msg.textContent = text;
-        messagesContainer.appendChild(wrapWithAvatar(role, msg));
+
+        if (role === 'assistant') {
+            var md = renderMarkdown(text);
+            if (md) {
+                msg.innerHTML = md;
+                msg.classList.add('abao-md');
+            } else {
+                msg.textContent = text;
+            }
+            // Action bar (copy + feedback)
+            var wrapper = document.createElement('div');
+            wrapper.className = 'abao-msg-wrapper';
+            wrapper.appendChild(msg);
+            wrapper.appendChild(createActionBar(msg, text, messageId));
+            messagesContainer.appendChild(wrapWithAvatar(role, wrapper));
+        } else {
+            // User message: render images above text (if any)
+            if (images && images.length) {
+                var imgRow = document.createElement('div');
+                imgRow.className = 'abao-msg-images-row';
+                images.forEach(function(dataUrl) {
+                    var thumb = document.createElement('img');
+                    thumb.className = 'abao-msg-image';
+                    thumb.src = dataUrl;
+                    thumb.alt = '用户发送的图片';
+                    thumb.onclick = function() { openLightbox(dataUrl); };
+                    imgRow.appendChild(thumb);
+                });
+                msg.appendChild(imgRow);
+            }
+            if (text) {
+                var textSpan = document.createElement('div');
+                textSpan.className = 'abao-msg-text';
+                textSpan.textContent = text;
+                msg.appendChild(textSpan);
+            }
+            if (role === 'user') _lastUserMsg = text;
+            messagesContainer.appendChild(wrapWithAvatar(role, msg));
+        }
+
         if (autoScroll) scrollToBottom();
     }
 
@@ -620,7 +880,26 @@ var Abao = (function() {
         if (!messagesContainer || !toolCalls || toolCalls.length === 0) return;
         for (var i = 0; i < toolCalls.length; i++) {
             var tc = toolCalls[i];
+
+            // T-101:工具失败 → error-card(任何 work_task 工具都走这一路)
+            if (tc.tool && tc.tool.indexOf('work_task') >= 0 && tc.result && tc.result.error) {
+                _appendWtErrorCard(tc.result.error);
+                continue;
+            }
+
             if (!tc.result || !tc.result.success) continue;
+
+            // T-101:create_work_task / update_work_task → task-card
+            if (tc.tool === 'create_work_task' || tc.tool === 'update_work_task') {
+                _appendWtTaskCard(tc.result);
+                continue;
+            }
+            // T-101:query_work_tasks → list-card
+            if (tc.tool === 'query_work_tasks') {
+                _appendWtListCard(tc.result);
+                continue;
+            }
+
             // Show task card for create_todo
             if (tc.tool === 'create_todo' && tc.result.text) {
                 var card = document.createElement('div');
@@ -657,6 +936,147 @@ var Abao = (function() {
                 maybePromptPush();
             }
         }
+    }
+
+    // ============================================================
+    // T-101:工作任务工具 inline 卡片渲染
+    // 视觉设计依据:frontend/work-tools-preview.html
+    // 卡片点击 → 复用 T-100 侧拉抽屉(WorkDetail.openDetail)
+    // ============================================================
+
+    function _wtEsc(s) {
+        return ('' + (s == null ? '' : s))
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function _wtColorOf(name) {
+        if (typeof Work !== 'undefined' && Work.colorOf) return Work.colorOf(name || '?');
+        var pal = ['#7C4DFF', '#14B8A6', '#E0A23B', '#3B82F6'];
+        var h = 0;
+        var s = '' + (name || '');
+        for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+        return pal[h % 4];
+    }
+
+    function _wtTodayYmd() {
+        var d = new Date();
+        return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+    }
+
+    // due 显示:逾期 / 今天 / 明天 / 本周 / 原日期
+    function _wtDueLabel(t) {
+        if (!t.due) return { text: '', cls: '' };
+        var due = ('' + t.due);
+        var today = _wtTodayYmd();
+        if (t.status !== 'done' && due < today) {
+            return { text: '⏰ 逾期', cls: 'abao-wt-overdue' };
+        }
+        if (due === today) return { text: '今天', cls: 'abao-wt-due-soon' };
+        return { text: due, cls: '' };
+    }
+
+    // 打开侧拉抽屉(必须在工作模块视图打开时才可见;否则给提示)
+    function _wtOpenDetail(id) {
+        if (typeof WorkDetail !== 'undefined' && WorkDetail.openDetail) {
+            // 切到 work 页(如果不在)
+            if (typeof switchPage === 'function' && document.body && !document.querySelector('#work-view') ||
+                (document.getElementById('work-view') && document.getElementById('work-view').style.display === 'none')) {
+                if (typeof switchPage === 'function') switchPage('work');
+                if (typeof Work !== 'undefined' && Work.openFeature) Work.openFeature('table');
+                // 等一下数据加载完(reload 异步)再打开抽屉
+                setTimeout(function() { WorkDetail.openDetail(id); }, 350);
+                return;
+            }
+            WorkDetail.openDetail(id);
+        }
+    }
+
+    function _appendWtTaskCard(t) {
+        if (!t || !t.id) return;
+        var card = document.createElement('div');
+        card.className = 'abao-wt-task-card';
+        var assignee = t.assignee || '未指派';
+        var initial = (t.assignee || '?').charAt(0);
+        var due = _wtDueLabel(t);
+        var isP0 = (t.priority === 'high');
+
+        var headHtml = '<div class="abao-wt-tc-head">'
+            + '<span class="abao-wt-tid">T-' + t.id + '</span>'
+            + '<span class="abao-wt-tt">' + _wtEsc(t.title || '(无标题)') + '</span>'
+            + '</div>';
+
+        var metaParts = [];
+        metaParts.push('<span><span class="abao-wt-av-mini" style="background:' + _wtColorOf(assignee) + '">'
+            + _wtEsc(initial) + '</span> ' + _wtEsc(assignee) + '</span>');
+        if (t.level)  metaParts.push('<span class="abao-wt-pill">' + _wtEsc(t.level) + '</span>');
+        if (t.freq)   metaParts.push('<span class="abao-wt-pill">' + _wtEsc(t.freq) + '</span>');
+        if (due.text) metaParts.push('<span class="abao-wt-pill ' + due.cls + '">' + _wtEsc(due.text) + '</span>');
+        if (isP0)     metaParts.push('<span class="abao-wt-pill abao-wt-p0">P0</span>');
+
+        card.innerHTML = headHtml
+            + '<div class="abao-wt-tc-meta">' + metaParts.join('') + '</div>'
+            + '<div class="abao-wt-tc-actions">'
+            + '<a class="abao-wt-open-detail">查看详情</a>'
+            + '</div>';
+        card.querySelector('.abao-wt-open-detail').addEventListener('click', function(e) {
+            e.preventDefault();
+            _wtOpenDetail(t.id);
+        });
+        messagesContainer.appendChild(card);
+        if (autoScroll) scrollToBottom();
+    }
+
+    function _appendWtListCard(result) {
+        var tasks = (result && result.tasks) || [];
+        var summary = (result && result.summary) || {};
+        var card = document.createElement('div');
+        card.className = 'abao-wt-list-card';
+
+        var sumParts = [];
+        sumParts.push('共 <strong>' + (result.count || tasks.length) + '</strong> 条');
+        if (summary.overdue) {
+            sumParts.push('<span style="color:#E11D48">⏰ <strong>' + summary.overdue + '</strong> 逾期</span>');
+        }
+        if (summary.p0) {
+            sumParts.push('<span style="color:#8B5A00">⚡ <strong>' + summary.p0 + '</strong> P0</span>');
+        }
+
+        var rowsHtml = '';
+        if (!tasks.length) {
+            rowsHtml = '<div class="abao-wt-lc-empty">没找到匹配的任务</div>';
+        } else {
+            tasks.forEach(function(t) {
+                var due = _wtDueLabel(t);
+                rowsHtml += '<div class="abao-wt-lc-row" data-id="' + t.id + '">'
+                    + '<span class="abao-wt-tid">T-' + t.id + '</span>'
+                    + '<span class="abao-wt-tt">' + _wtEsc(t.title || '(无标题)') + '</span>'
+                    + (t.assignee ? '<span class="abao-wt-pill">' + _wtEsc(t.assignee) + '</span>' : '')
+                    + (t.priority === 'high' ? '<span class="abao-wt-pill abao-wt-p0">P0</span>' : '')
+                    + (due.text ? '<span class="abao-wt-pill ' + due.cls + '">' + _wtEsc(due.text) + '</span>' : '')
+                    + '</div>';
+            });
+        }
+
+        card.innerHTML =
+            '<div class="abao-wt-lc-summary">' + sumParts.join(' ') + '</div>'
+            + rowsHtml;
+        // 行点击 → 打开抽屉
+        card.querySelectorAll('.abao-wt-lc-row').forEach(function(row) {
+            row.addEventListener('click', function() {
+                var id = parseInt(row.dataset.id, 10);
+                if (id) _wtOpenDetail(id);
+            });
+        });
+        messagesContainer.appendChild(card);
+        if (autoScroll) scrollToBottom();
+    }
+
+    function _appendWtErrorCard(errMsg) {
+        var card = document.createElement('div');
+        card.className = 'abao-wt-error-card';
+        card.innerHTML = '<strong>失败:</strong> ' + _wtEsc(errMsg);
+        messagesContainer.appendChild(card);
+        if (autoScroll) scrollToBottom();
     }
 
     function maybePromptPush() {
@@ -796,6 +1216,138 @@ var Abao = (function() {
     }
 
     // ─── Send message ───
+    // ─── Image handling ───
+
+    function handleImageFiles(files) {
+        var remaining = MAX_IMAGES - pendingImages.length;
+        if (remaining <= 0) {
+            showToast('最多上传' + MAX_IMAGES + '张图片', 'warning');
+            return;
+        }
+        var toProcess = [];
+        for (var i = 0; i < Math.min(files.length, remaining); i++) {
+            var f = files[i];
+            if (!f || !f.type.match(/^image\/(jpeg|png|webp|gif)$/)) {
+                showToast('不支持的图片格式', 'warning');
+                continue;
+            }
+            if (f.size > 10 * 1024 * 1024) { // 10MB pre-compress limit
+                showToast('图片太大（超过10MB）', 'warning');
+                continue;
+            }
+            toProcess.push(f);
+        }
+        toProcess.forEach(function(f) { compressAndAddImage(f); });
+    }
+
+    function compressAndAddImage(file) {
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            var img = new Image();
+            img.onload = function() {
+                var canvas = document.createElement('canvas');
+                var w = img.width, h = img.height;
+                // Resize long edge to MAX_LONG_EDGE
+                if (Math.max(w, h) > MAX_LONG_EDGE) {
+                    if (w > h) {
+                        h = Math.round(h * MAX_LONG_EDGE / w);
+                        w = MAX_LONG_EDGE;
+                    } else {
+                        w = Math.round(w * MAX_LONG_EDGE / h);
+                        h = MAX_LONG_EDGE;
+                    }
+                }
+                canvas.width = w;
+                canvas.height = h;
+                var ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, w, h);
+                var dataUrl = canvas.toDataURL('image/jpeg', JPEG_QUALITY);
+                var base64 = dataUrl.split(',')[1];
+                pendingImages.push({
+                    dataUrl: dataUrl,
+                    base64: base64,
+                    mediaType: 'image/jpeg'
+                });
+                renderImagePreviews();
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function renderImagePreviews() {
+        if (!imagePreviewEl) return;
+        imagePreviewEl.innerHTML = '';
+        if (pendingImages.length === 0) {
+            imagePreviewEl.classList.remove('active');
+            if (imgBtn) imgBtn.classList.remove('has-images');
+            return;
+        }
+        imagePreviewEl.classList.add('active');
+        if (imgBtn) imgBtn.classList.add('has-images');
+        pendingImages.forEach(function(item, idx) {
+            var thumb = document.createElement('div');
+            thumb.className = 'abao-image-thumb';
+            var imgEl = document.createElement('img');
+            imgEl.src = item.dataUrl;
+            imgEl.alt = '图片 ' + (idx + 1);
+            thumb.appendChild(imgEl);
+            var removeBtn = document.createElement('button');
+            removeBtn.className = 'abao-thumb-remove';
+            removeBtn.textContent = '✕';
+            removeBtn.onclick = function() {
+                pendingImages.splice(idx, 1);
+                renderImagePreviews();
+            };
+            thumb.appendChild(removeBtn);
+            imagePreviewEl.appendChild(thumb);
+        });
+    }
+
+    function clearPendingImages() {
+        pendingImages = [];
+        renderImagePreviews();
+    }
+
+    function openLightbox(dataUrl) {
+        var existing = document.getElementById('abao-lightbox');
+        if (existing) existing.remove();
+
+        var overlay = document.createElement('div');
+        overlay.id = 'abao-lightbox';
+        overlay.className = 'abao-lightbox';
+
+        var img = document.createElement('img');
+        img.src = dataUrl;
+        img.className = 'abao-lightbox-img';
+        img.onclick = function(e) { e.stopPropagation(); };
+
+        overlay.appendChild(img);
+        overlay.onclick = function() { closeLightbox(); };
+        document.body.appendChild(overlay);
+
+        // ESC to close
+        var escHandler = function(e) {
+            if (e.key === 'Escape') {
+                closeLightbox();
+                document.removeEventListener('keydown', escHandler);
+            }
+        };
+        document.addEventListener('keydown', escHandler);
+    }
+
+    function closeLightbox() {
+        var overlay = document.getElementById('abao-lightbox');
+        if (overlay) overlay.remove();
+    }
+
+    function collectImagesPayload() {
+        if (pendingImages.length === 0) return undefined;
+        return pendingImages.map(function(item) {
+            return { data: item.base64, media_type: item.mediaType };
+        });
+    }
+
     async function sendMessage() {
         if (!inputEl || isSending) return;
         // Guest AI exhausted check
@@ -804,14 +1356,23 @@ var Abao = (function() {
             return;
         }
         var text = inputEl.value.trim();
-        if (!text) return;
+        var images = collectImagesPayload();
+        // Snapshot dataUrls for in-message display (before clearing)
+        var imageDataUrls = pendingImages.map(function(item) { return item.dataUrl; });
+        if (!text && !images) return;
+        if (!text) text = ''; // allow image-only messages
 
-        // Clear input
+        // Clear input and images
         inputEl.value = '';
         inputEl.style.height = 'auto';
+        clearPendingImages();
 
-        // Add user message
-        addMessage('user', text);
+        // Remove old suggestion chips
+        var oldSuggestions = messagesContainer && messagesContainer.querySelector('.abao-suggestions');
+        if (oldSuggestions) oldSuggestions.remove();
+
+        // Add user message with image thumbnails
+        addMessage('user', text, null, imageDataUrls.length ? imageDataUrls : null);
 
         // Disable input
         isSending = true;
@@ -822,15 +1383,17 @@ var Abao = (function() {
         document.dispatchEvent(new CustomEvent('patrol:chatStatus', { detail: { status: 'thinking' } }));
 
         try {
+            var payload = {
+                    message: text || '请看图片',
+                    conversation_id: conversationId || undefined,
+                    page_context: getPageContext()
+                };
+            if (images) payload.images = images;
             var resp = await fetch('/api/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'same-origin',
-                body: JSON.stringify({
-                    message: text,
-                    conversation_id: conversationId || undefined,
-                    page_context: getPageContext()
-                })
+                body: JSON.stringify(payload)
             });
 
             if (resp.status === 401) {
@@ -869,13 +1432,15 @@ var Abao = (function() {
             }
 
             if (data.success && data.reply) {
-                addMessage('assistant', data.reply);
+                addMessage('assistant', data.reply, data.message_id);
                 // Show tool call results (task cards etc.)
                 if (data.tool_calls) {
                     addToolInfo(data.tool_calls);
                     // Refresh task list if tools modified data
                     refreshTasksIfNeeded(data.tool_calls);
                 }
+                // Show suggestion chips
+                addSuggestionChips(text, data.reply);
             } else if (data.message) {
                 addMessage('error', sanitizeErrorMessage(data.message));
             } else {
@@ -929,6 +1494,11 @@ var Abao = (function() {
             if (!refreshed.trip && tool.indexOf('trip') >= 0) {
                 refreshed.trip = true;
                 if (typeof Trip !== 'undefined' && Trip.init) Trip.init();
+            }
+            // T-101:work_task — 工作模块若已加载,reload 以反映新建/更新
+            if (!refreshed.work_task && tool.indexOf('work_task') >= 0) {
+                refreshed.work_task = true;
+                if (typeof Work !== 'undefined' && Work.reload) Work.reload();
             }
         }
     }

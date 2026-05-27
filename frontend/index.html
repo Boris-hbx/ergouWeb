@@ -3,20 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, viewport-fit=cover">
-    <meta name="theme-color" content="#667eea">
+    <meta name="theme-color" content="#7C4DFF">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Next">
     <title>Next - Focus on the Right Thing</title>
-    <link rel="stylesheet" href="assets/css/base.css?v=20260308a">
-    <link rel="stylesheet" href="assets/css/style.css?v=20260308a">
-    <link rel="stylesheet" href="assets/css/components.css?v=20260308a">
-    <link rel="stylesheet" href="assets/css/mobile.css?v=20260308a">
-    <link rel="stylesheet" href="assets/css/abao.css?v=20260308a">
-    <link rel="stylesheet" href="assets/css/english.css?v=20260308a">
-    <link rel="stylesheet" href="assets/css/health.css?v=20260308a">
-    <link rel="stylesheet" href="assets/css/patrol.css?v=20260308a">
-    <link rel="stylesheet" href="assets/css/admin-panel.css?v=20260308a">
+    <link rel="stylesheet" href="assets/css/base.css?v=20260527e">
+    <link rel="stylesheet" href="assets/css/style.css?v=20260527e">
+    <link rel="stylesheet" href="assets/css/components.css?v=20260527e">
+    <link rel="stylesheet" href="assets/css/mobile.css?v=20260527e">
+    <link rel="stylesheet" href="assets/css/abao.css?v=20260527e">
+    <link rel="stylesheet" href="assets/css/english.css?v=20260527e">
+    <link rel="stylesheet" href="assets/css/health.css?v=20260527e">
+    <link rel="stylesheet" href="assets/css/patrol.css?v=20260527e">
+    <link rel="stylesheet" href="assets/css/admin-panel.css?v=20260527e">
+    <link rel="stylesheet" href="assets/css/work.css?v=20260527e">
     <link rel="manifest" href="assets/manifest.json">
     <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
     <script>
@@ -117,6 +118,7 @@
                 <a class="nav-link" data-page="review" onclick="switchPage('review')">例行</a>
                 <a class="nav-link" data-page="english" onclick="switchPage('english')">学习</a>
                 <a class="nav-link" data-page="life" onclick="switchPage('life')">生活</a>
+                <a class="nav-link" data-page="work" onclick="switchPage('work')">工作</a>
                 <a class="nav-link" data-page="admin" onclick="switchPage('admin')" id="admin-nav-link" style="display:none;">管理</a>
             </div>
 
@@ -557,24 +559,7 @@
                     <button class="btn btn-primary settings-add-friend-btn" id="add-contact-btn" onclick="Contacts.addSelfContact()">+ 添加联系人</button>
                 </div>
             </div>
-            <!-- AI 模型 -->
-            <div class="settings-section" id="settings-ai-section">
-                <h4 id="ai-model-heading">AI 模型</h4>
-                <div class="ai-model-options" id="ai-model-options">
-                    <button class="ai-model-btn active" data-model="auto" onclick="selectAiModel('auto')">
-                        <span class="ai-model-name">自动</span>
-                        <span class="ai-model-desc">智能选择最优模型</span>
-                    </button>
-                    <button class="ai-model-btn" data-model="doubao" onclick="selectAiModel('doubao')">
-                        <span class="ai-model-name">模型 A</span>
-                        <span class="ai-model-desc">效果还行且便宜</span>
-                    </button>
-                    <button class="ai-model-btn" data-model="claude" onclick="selectAiModel('claude')">
-                        <span class="ai-model-name">模型 B</span>
-                        <span class="ai-model-desc">效果顶级但稍贵</span>
-                    </button>
-                </div>
-            </div>
+            <!-- AI 模型（固定使用 Claude） -->
             <!-- 二狗设置 -->
             <div class="settings-section" id="settings-ergou-section">
                 <h4>二狗设置</h4>
@@ -606,12 +591,93 @@
             </div>
             <!-- 二狗的记忆 -->
             <div class="settings-section" id="settings-memory-section">
-                <h4>二狗的记忆</h4>
-                <p class="setting-desc">二狗在聊天中记住的关于你的信息，你可以随时查看和删除</p>
+                <div class="memory-topbar">
+                    <h4>二狗的记忆</h4>
+                    <div class="memory-topbar-actions">
+                        <button class="memory-action-btn memory-add-btn" id="memory-add-btn" title="手动添加记忆" onclick="MemoryUI.showAddModal()">＋</button>
+                        <button class="memory-action-btn memory-clear-btn" id="memory-clear-btn" title="清空所有记忆" onclick="MemoryUI.startClearAll()">🗑</button>
+                    </div>
+                </div>
+                <div class="memory-search-box">
+                    <input type="text" id="memory-search-input" class="memory-search-input" placeholder="🔍 搜索记忆..." oninput="MemoryUI.onSearchInput(this.value)">
+                </div>
+                <div class="memory-tabs" id="memory-tabs">
+                    <button class="memory-tab active" data-category="" onclick="MemoryUI.switchTab('')">全部</button>
+                    <button class="memory-tab" data-category="fact" onclick="MemoryUI.switchTab('fact')">事实</button>
+                    <button class="memory-tab" data-category="habit" onclick="MemoryUI.switchTab('habit')">习惯</button>
+                    <button class="memory-tab" data-category="personality" onclick="MemoryUI.switchTab('personality')">性格</button>
+                    <button class="memory-tab" data-category="intent" onclick="MemoryUI.switchTab('intent')">意图</button>
+                </div>
+                <div class="memory-stats" id="memory-stats"></div>
                 <div id="memory-list" class="memory-list">
                     <div class="memory-loading">加载中...</div>
                 </div>
-                <button class="btn btn-danger" id="clear-all-memories-btn" style="display:none;margin-top:12px;width:100%" onclick="deleteAllMemories()">清空所有记忆</button>
+            </div>
+            <!-- 记忆编辑/添加弹窗 -->
+            <div class="memory-modal-overlay" id="memory-modal-overlay" style="display:none" onclick="MemoryUI.closeModal()">
+                <div class="memory-modal" onclick="event.stopPropagation()">
+                    <div class="memory-modal-title" id="memory-modal-title">编辑记忆</div>
+                    <input type="hidden" id="memory-edit-id">
+                    <div class="memory-form-group">
+                        <label>内容</label>
+                        <textarea id="memory-edit-content" class="memory-form-textarea" rows="3" maxlength="500" placeholder="记忆内容（1-500字）"></textarea>
+                        <div class="memory-char-count" id="memory-char-count">0/500</div>
+                    </div>
+                    <div class="memory-form-group">
+                        <label>分类</label>
+                        <div class="memory-form-radios" id="memory-edit-category">
+                            <label><input type="radio" name="mem-cat" value="fact" checked> 事实</label>
+                            <label><input type="radio" name="mem-cat" value="habit"> 习惯</label>
+                            <label><input type="radio" name="mem-cat" value="personality"> 性格</label>
+                            <label><input type="radio" name="mem-cat" value="intent"> 意图</label>
+                        </div>
+                    </div>
+                    <div class="memory-form-group">
+                        <label>重要性</label>
+                        <div class="memory-star-picker" id="memory-edit-importance">
+                            <span class="memory-star" data-val="1" onclick="MemoryUI.pickStar(1)">⭐</span>
+                            <span class="memory-star" data-val="2" onclick="MemoryUI.pickStar(2)">⭐</span>
+                            <span class="memory-star" data-val="3" onclick="MemoryUI.pickStar(3)">⭐</span>
+                            <span class="memory-star" data-val="4" onclick="MemoryUI.pickStar(4)">⭐</span>
+                            <span class="memory-star" data-val="5" onclick="MemoryUI.pickStar(5)">⭐</span>
+                        </div>
+                    </div>
+                    <div class="memory-modal-actions">
+                        <button class="btn btn-secondary" onclick="MemoryUI.closeModal()">取消</button>
+                        <button class="btn btn-primary" id="memory-save-btn" onclick="MemoryUI.saveModal()">保存</button>
+                    </div>
+                </div>
+            </div>
+            <!-- 清空二次确认弹窗 -->
+            <div class="memory-modal-overlay" id="memory-clear-overlay" style="display:none" onclick="MemoryUI.closeClearModal()">
+                <div class="memory-modal" onclick="event.stopPropagation()">
+                    <div class="memory-modal-title">⚠️ 清空所有记忆</div>
+                    <p style="margin:12px 0;color:var(--text-secondary);" id="memory-clear-msg"></p>
+                    <div class="memory-form-group" id="memory-clear-input-group" style="display:none">
+                        <label>请输入"清空"以确认</label>
+                        <input type="text" id="memory-clear-confirm-input" class="memory-form-input" placeholder="输入 清空">
+                    </div>
+                    <div class="memory-modal-actions">
+                        <button class="btn btn-secondary" onclick="MemoryUI.closeClearModal()">取消</button>
+                        <button class="btn btn-danger" id="memory-clear-confirm-btn" onclick="MemoryUI.confirmClear()">确定清空</button>
+                    </div>
+                </div>
+            </div>
+            <!-- 二狗的灵魂（T-092） -->
+            <div class="settings-section" id="settings-soul-section">
+                <div class="soul-topbar">
+                    <h4>二狗的灵魂</h4>
+                </div>
+                <div class="soul-tabs">
+                    <button class="soul-tab active" data-tab="params" onclick="SoulUI.switchTab('params')">参数面板</button>
+                    <button class="soul-tab" data-tab="logs" onclick="SoulUI.switchTab('logs')">演化日志</button>
+                </div>
+                <div id="soul-params-panel" class="soul-panel">
+                    <div class="soul-loading">加载中...</div>
+                </div>
+                <div id="soul-logs-panel" class="soul-panel" style="display:none">
+                    <div class="soul-loading">加载中...</div>
+                </div>
             </div>
             <!-- 推送通知 -->
             <div class="settings-section">
@@ -858,31 +924,65 @@
 
             <!-- 统计子视图 -->
             <div class="expense-analytics-view" id="expense-analytics-view" style="display:none;">
-                <div class="expense-analytics-period-tabs">
-                    <button class="expense-analytics-period-btn active" data-period="week" onclick="ExpenseAnalytics.switchPeriod('week')">周</button>
-                    <button class="expense-analytics-period-btn" data-period="month" onclick="ExpenseAnalytics.switchPeriod('month')">月</button>
-                </div>
                 <div class="expense-analytics-date-nav">
                     <button class="expense-nav-btn" onclick="ExpenseAnalytics.navigateDate(-1)">&lsaquo;</button>
                     <span class="expense-analytics-date-label" id="expense-analytics-date-label"></span>
-                    <button class="expense-nav-btn" onclick="ExpenseAnalytics.navigateDate(1)">&rsaquo;</button>
+                    <button class="expense-nav-btn" id="expense-analytics-next-btn" onclick="ExpenseAnalytics.navigateDate(1)">&rsaquo;</button>
                 </div>
-                <div class="expense-analytics-total" id="expense-analytics-total"></div>
-                <div class="expense-analytics-chart-section">
-                    <h4 class="expense-analytics-section-title">分类占比</h4>
-                    <div class="expense-analytics-pie-wrapper">
-                        <canvas id="expense-pie-canvas"></canvas>
+                <div class="expense-analytics-period-tabs">
+                    <button class="expense-analytics-period-btn" data-period="day" onclick="ExpenseAnalytics.switchPeriod('day')">日</button>
+                    <button class="expense-analytics-period-btn" data-period="week" onclick="ExpenseAnalytics.switchPeriod('week')">周</button>
+                    <button class="expense-analytics-period-btn active" data-period="month" onclick="ExpenseAnalytics.switchPeriod('month')">月</button>
+                </div>
+                <!-- 骨架屏 -->
+                <div class="expense-analytics-skeleton" id="expense-analytics-skeleton" style="display:none;">
+                    <div class="ea-skeleton-summary"><div class="ea-skeleton-bar wide"></div><div class="ea-skeleton-bar narrow"></div></div>
+                    <div class="ea-skeleton-chart"><div class="ea-skeleton-circle"></div></div>
+                    <div class="ea-skeleton-chart"><div class="ea-skeleton-bar wide"></div><div class="ea-skeleton-bar wide"></div></div>
+                </div>
+                <!-- 错误重试 -->
+                <div class="expense-analytics-error" id="expense-analytics-error" style="display:none;">
+                    <p>加载失败</p>
+                    <button class="btn btn-primary btn-sm" onclick="ExpenseAnalytics.retry()">重试</button>
+                </div>
+                <!-- 数据内容 -->
+                <div id="expense-analytics-content" style="display:none;">
+                    <!-- 汇总卡片 -->
+                    <div class="expense-analytics-summary-card" id="expense-analytics-summary">
+                        <div class="ea-summary-main">
+                            <span class="ea-summary-label">总支出</span>
+                            <span class="ea-summary-amount" id="expense-analytics-amount">¥0.00</span>
+                        </div>
+                        <div class="ea-summary-meta">
+                            <span class="ea-summary-count" id="expense-analytics-count"></span>
+                            <span class="ea-summary-comparison" id="expense-analytics-comparison"></span>
+                        </div>
                     </div>
-                    <div class="expense-analytics-legend" id="expense-analytics-legend"></div>
-                </div>
-                <div class="expense-analytics-chart-section">
-                    <h4 class="expense-analytics-section-title">每日趋势</h4>
-                    <div class="expense-analytics-bar-wrapper">
-                        <canvas id="expense-bar-canvas"></canvas>
+                    <!-- 分类饼图 -->
+                    <div class="expense-analytics-chart-section" id="expense-analytics-pie-section">
+                        <h4 class="expense-analytics-section-title">分类占比</h4>
+                        <div class="expense-analytics-pie-wrapper">
+                            <canvas id="expense-pie-canvas"></canvas>
+                        </div>
+                        <div class="expense-analytics-legend" id="expense-analytics-legend"></div>
+                    </div>
+                    <!-- 每日趋势 -->
+                    <div class="expense-analytics-chart-section" id="expense-analytics-bar-section">
+                        <h4 class="expense-analytics-section-title">每日趋势</h4>
+                        <div class="expense-analytics-bar-wrapper">
+                            <canvas id="expense-bar-canvas"></canvas>
+                        </div>
+                    </div>
+                    <!-- 标签明细 -->
+                    <div class="expense-analytics-chart-section" id="expense-analytics-tags-section">
+                        <h4 class="expense-analytics-section-title">标签明细</h4>
+                        <div class="expense-analytics-tag-list" id="expense-analytics-tag-list"></div>
                     </div>
                 </div>
+                <!-- 空状态 -->
                 <div class="expense-analytics-empty" id="expense-analytics-empty" style="display:none;">
-                    <p>暂无消费记录</p>
+                    <div class="expense-analytics-empty-icon">📊</div>
+                    <p id="expense-analytics-empty-text">暂无消费记录</p>
                 </div>
             </div>
         </div>
@@ -909,6 +1009,11 @@
                         <div class="expense-add-field">
                             <label>备注</label>
                             <input type="text" id="expense-notes-input" placeholder="买了什么...">
+                        </div>
+                        <div class="expense-add-field">
+                            <label>标签</label>
+                            <div class="expense-tag-chips" id="expense-tag-chips"></div>
+                            <input type="text" id="expense-custom-tag-input" class="expense-custom-tag-input" placeholder="自定义标签，逗号分隔">
                         </div>
                         <div class="expense-add-field">
                             <label>照片（收据/小票）</label>
@@ -1034,6 +1139,210 @@
             </div>
         </div>
     </div>
+
+    <!-- 工作 Hub (T-094 / SPEC work-task-table) -->
+    <div class="work-main-layout" id="work-view" style="display:none;">
+        <!-- Hub 页面 -->
+        <div class="life-hub" id="work-hub">
+            <div class="life-hub-header"><h2>工作</h2></div>
+            <div class="life-hub-grid">
+                <div class="life-hub-card" onclick="Work.openFeature('table')">
+                    <div class="life-hub-card-icon">📋</div>
+                    <div class="life-hub-card-title">任务表</div>
+                    <div class="life-hub-card-desc">表格 · 看板 · 日历 多视图</div>
+                </div>
+                <div class="life-hub-card life-hub-card-disabled">
+                    <div class="life-hub-card-icon">📊</div>
+                    <div class="life-hub-card-title">周报</div>
+                    <div class="life-hub-card-desc">自动汇总本周进展</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 任务表子视图(三视图共用此容器，由 Work.setView 切换) -->
+        <div id="work-table-view" style="display:none;">
+            <button class="wt-back-btn" onclick="Work.showHub()">&larr; 工作</button>
+            <!-- T-103 B.1:30 天负载心电图;JS 在 Work.render 时填充 -->
+            <div class="wt-heart-strip" id="wt-heart-strip"></div>
+            <!-- T-098: 时间镜头 Tab(全部 / 今日 / 本周 / 本月);日历视图下自动隐藏
+                 T-103 B.2:加 .wt-tab-indicator spring 滑块,JS 在 setTimeTab 时移动 -->
+            <div class="wt-time-tabs" id="wt-time-tabs">
+                <button class="wt-time-tab active" data-tab="all" onclick="Work.setTimeTab('all')">
+                    全部 <span class="wt-time-tab-count" id="wt-tab-count-all">0</span>
+                </button>
+                <button class="wt-time-tab" data-tab="today" onclick="Work.setTimeTab('today')">
+                    今日 <span class="wt-time-tab-count" id="wt-tab-count-today">0</span><span class="wt-time-tab-warn" id="wt-tab-warn" style="display:none" title="">⚠</span>
+                </button>
+                <button class="wt-time-tab" data-tab="week" onclick="Work.setTimeTab('week')">
+                    本周 <span class="wt-time-tab-count" id="wt-tab-count-week">0</span>
+                </button>
+                <button class="wt-time-tab" data-tab="month" onclick="Work.setTimeTab('month')">
+                    本月 <span class="wt-time-tab-count" id="wt-tab-count-month">0</span>
+                </button>
+                <div class="wt-tab-indicator" id="wt-tab-indicator"></div>
+            </div>
+            <div class="wt-toolbar">
+                <h2>任务表</h2>
+                <span class="wt-total" id="wt-total">共 0 项</span>
+                <!-- T-103 B.1:点心电图柱后显示的日期过滤 chip -->
+                <span class="wt-date-filter-chip" id="wt-date-filter-chip" style="display:none">
+                    <span>📅 <span id="wt-dfc-date"></span></span>
+                    <span class="wt-dfc-x" onclick="Work.clearDateFilter()" title="清除日期过滤">✕</span>
+                </span>
+                <div class="wt-seg">
+                    <button id="wt-seg-table" class="active" onclick="Work.setView('table')">▦ 表格</button>
+                    <button id="wt-seg-board" onclick="Work.setView('board')">▤ 看板</button>
+                    <button id="wt-seg-cal"   onclick="Work.setView('cal')">▥ 日历</button>
+                    <!-- T-099 -->
+                    <button id="wt-seg-person" onclick="Work.setView('person')">✦ 人员</button>
+                </div>
+                <select class="wt-select" id="wt-filter" onchange="Work.render()">
+                    <option value="">全部责任人</option>
+                </select>
+                <select class="wt-select" id="wt-group" onchange="Work.render()">
+                    <option value="">不分组</option>
+                    <option value="level">按层级分组</option>
+                    <option value="assignee">按责任人分组</option>
+                    <option value="status">按状态分组</option>
+                </select>
+                <button class="wt-select" onclick="WorkColumnCfg.open()" title="编辑表头、列类型、增删列">⚙ 列设置</button>
+                <button class="wt-newbtn" onclick="WorkTable.addRow()">+ 新建任务</button>
+            </div>
+
+            <div id="wt-table-view" class="wt-table-wrap"></div>
+            <div id="wt-board-view" class="wt-board wt-hidden"></div>
+            <div id="wt-cal-view" class="wt-hidden"></div>
+            <!-- T-099:人员视图(气泡总览 + 卡片墙) -->
+            <div id="wt-person-view" class="wt-hidden"></div>
+        </div>
+    </div>
+
+    <!-- 工作:长文本弹层(简介编辑) -->
+    <div class="wt-modal-overlay" id="wt-text-modal" onclick="if(event.target===this)WorkTable.closeText()">
+        <div class="wt-modal">
+            <div class="wt-modal-title" id="wt-text-title">任务标题</div>
+            <div class="wt-modal-sub" id="wt-text-sub">长文本 · 可输入大段说明、背景、要点</div>
+            <textarea id="wt-text-area" placeholder="在这里写详细内容……"></textarea>
+            <div class="wt-modal-actions">
+                <button class="wt-mbtn" onclick="WorkTable.closeText()">取消</button>
+                <button class="wt-mbtn primary" onclick="WorkTable.saveText()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 工作:列设置弹层 -->
+    <div class="wt-modal-overlay" id="wt-col-modal" onclick="if(event.target===this)WorkColumnCfg.close()">
+        <div class="wt-modal" style="max-width:640px">
+            <div class="wt-modal-title">列设置</div>
+            <div class="wt-modal-sub">拖动 ≡ 调整列顺序 · 改列名 / 设类型 / 增删选项 · 底部可新增列</div>
+            <div id="wt-col-list"></div>
+            <div class="wt-modal-actions">
+                <button class="wt-mbtn primary" onclick="WorkColumnCfg.close()">完成</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 工作:单选/多选弹候选 -->
+    <div class="wt-pick-bd" id="wt-pick-bd" onclick="WorkPick.close()"></div>
+    <div class="wt-pick" id="wt-pick"></div>
+
+    <!-- 工作:任务详情侧拉抽屉 (T-100 / SPEC § 7.6) -->
+    <div class="wt-detail-scrim" id="wt-detail-scrim" onclick="WorkDetail.closeDetail()"></div>
+    <aside class="wt-detail-drawer" id="wt-detail-drawer" aria-hidden="true">
+      <div class="wt-d-head">
+        <div class="wt-d-head-top">
+          <button class="wt-d-icon-btn" id="wt-d-close" onclick="WorkDetail.closeDetail()" title="关闭 (Esc)">✕</button>
+          <div class="wt-d-nav">
+            <button class="wt-d-icon-btn wt-d-nav-btn" id="wt-d-prev" onclick="WorkDetail.navigate(-1)" title="上一条 (↑)">↑</button>
+            <span class="wt-d-nav-pos"><span id="wt-d-nav-pos">1</span> / <span id="wt-d-nav-total">1</span></span>
+            <button class="wt-d-icon-btn wt-d-nav-btn" id="wt-d-next" onclick="WorkDetail.navigate(1)" title="下一条 (↓)">↓</button>
+          </div>
+          <button class="wt-d-icon-btn" title="复制链接(暂未实现)" onclick="showToast && showToast('复制链接将在后续版本支持','info')">🔗</button>
+          <button class="wt-d-icon-btn" title="更多(暂未实现)" onclick="showToast && showToast('更多操作将在后续版本支持','info')">⋯</button>
+        </div>
+        <div class="wt-d-title-row">
+          <textarea class="wt-d-title" id="wt-d-title" rows="1" placeholder="任务标题(失焦自动保存)"></textarea>
+        </div>
+        <div class="wt-d-quickrow">
+          <span class="wt-pill" id="wt-d-status-pill">●待办</span>
+          <span class="wt-pill" id="wt-d-prio-pill">中</span>
+          <span class="wt-pill" id="wt-d-due-pill" style="display:none"></span>
+        </div>
+      </div>
+
+      <div class="wt-d-body">
+        <!-- 字段网格 -->
+        <div class="wt-d-section">
+          <div class="wt-d-grid">
+            <div class="wt-d-k">👤 责任人</div>
+            <div class="wt-d-v">
+              <div class="wt-d-field" id="wt-d-field-assignee">
+                <span class="wt-avatar" id="wt-d-avatar">?</span>
+                <span id="wt-d-assignee">未指派</span>
+                <span class="wt-d-caret">▾</span>
+              </div>
+            </div>
+
+            <div class="wt-d-k">🏛 层级</div>
+            <div class="wt-d-v">
+              <div class="wt-d-field" id="wt-d-field-level">
+                <span id="wt-d-level">—</span>
+                <span class="wt-d-caret">▾</span>
+              </div>
+            </div>
+
+            <div class="wt-d-k">🔁 频率</div>
+            <div class="wt-d-v">
+              <div class="wt-d-field" id="wt-d-field-freq">
+                <span id="wt-d-freq">—</span>
+                <span class="wt-d-caret">▾</span>
+              </div>
+            </div>
+
+            <div class="wt-d-k">⚡ 优先级</div>
+            <div class="wt-d-v">
+              <div class="wt-d-field" id="wt-d-field-priority">
+                <span id="wt-d-priority-field">—</span>
+                <span class="wt-d-caret">▾</span>
+              </div>
+            </div>
+
+            <div class="wt-d-k">📅 截止日</div>
+            <div class="wt-d-v">
+              <div class="wt-d-field" id="wt-d-field-due">
+                <span id="wt-d-due">—</span>
+                <span class="wt-d-caret">📅</span>
+              </div>
+            </div>
+
+            <div class="wt-d-k">📊 进度</div>
+            <div class="wt-d-v">
+              <div class="wt-d-progress" id="wt-d-progress" title="点击修改进度">
+                <div class="wt-d-bar"><div class="wt-d-fill" id="wt-d-progress-fill" style="width:0%"></div></div>
+                <span class="wt-d-pct" id="wt-d-progress-pct">0%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 简介 -->
+        <div class="wt-d-section">
+          <div class="wt-d-label">简介</div>
+          <textarea class="wt-d-desc" id="wt-d-desc" placeholder="点击添加简介……(Cmd/Ctrl+Enter 保存)"></textarea>
+        </div>
+
+        <!-- 活动时间线 -->
+        <div class="wt-d-section">
+          <div class="wt-d-label">活动</div>
+          <div class="wt-d-timeline" id="wt-d-timeline"></div>
+        </div>
+      </div>
+
+      <div class="wt-d-foot">
+        <span class="wt-d-meta">创建 <span id="wt-d-created">—</span></span>
+        <span class="wt-d-meta wt-d-meta-sep">修改 <span id="wt-d-updated">—</span></span>
+      </div>
+    </aside>
 
     <!-- 差旅弹窗 -->
     <div class="trip-modal-overlay" id="trip-modal-overlay" style="display:none;"></div>
@@ -1357,7 +1666,12 @@
             <button class="abao-shortcut-btn" data-text="帮我整理待分类任务">整理分类</button>
             <button class="abao-shortcut-btn" data-text="这周完成了多少？">本周统计</button>
         </div>
+        <div class="abao-image-preview" id="abao-image-preview"></div>
         <div class="abao-input-area">
+            <input type="file" id="abao-image-input" accept="image/jpeg,image/png,image/webp,image/gif" multiple style="display:none">
+            <button class="abao-img-btn" id="abao-img-btn" title="上传图片（最多3张）">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+            </button>
             <textarea class="abao-input" id="abao-input" placeholder="跟二狗说点什么..." rows="1"></textarea>
             <button class="abao-send-btn" id="abao-send" title="发送">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M14 8L2 14V9L8 8L2 7V2L14 8Z" fill="currentColor"/></svg>
@@ -1384,40 +1698,56 @@
         <div class="action-sheet" id="action-sheet"></div>
     </div>
 
+    <!-- Markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@15/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+
     <!-- JS Modules -->
-    <script src="assets/js/observability.js?v=20260308a"></script>
-    <script src="assets/js/api.js?v=20260308a"></script>
-    <script src="assets/js/utils.js?v=20260308a"></script>
-    <script src="assets/js/jelly-indicator.js?v=20260308a"></script>
-    <script src="assets/js/app.js?v=20260308a"></script>
-    <script src="assets/js/tasks.js?v=20260308a"></script>
-    <script src="assets/js/modal.js?v=20260308a"></script>
-    <script src="assets/js/datepicker.js?v=20260308a"></script>
-    <script src="assets/js/drag.js?v=20260308a"></script>
-    <script src="assets/js/actionsheet.js?v=20260308a"></script>
-    <script src="assets/js/share-modal.js?v=20260308a"></script>
-    <script src="assets/js/review.js?v=20260308a"></script>
-    <script src="assets/js/routines.js?v=20260308a"></script>
-    <script src="assets/js/features.js?v=20260308a"></script>
-    <script src="assets/js/particles.js?v=20260308a"></script>
-    <script src="assets/js/living-line.js?v=20260308a"></script>
-    <script src="assets/js/abao.js?v=20260308a"></script>
-    <script src="assets/js/english.js?v=20260308a"></script>
-    <script src="assets/js/life.js?v=20260308a"></script>
-    <script src="assets/js/expense.js?v=20260308a"></script>
-    <script src="assets/js/expense-analytics.js?v=20260308a"></script>
-    <script src="assets/js/trip.js?v=20260308a"></script>
-    <script src="assets/js/health-data.js?v=20260308a"></script>
-    <script src="assets/js/health-renderer.js?v=20260308a"></script>
-    <script src="assets/js/health.js?v=20260308a"></script>
-    <script src="assets/js/friends.js?v=20260308a"></script>
-    <script src="assets/js/notifications.js?v=20260308a"></script>
-    <script src="assets/js/settings.js?v=20260308a"></script>
-    <script src="assets/js/admin-panel.js?v=20260308a"></script>
-    <script src="assets/js/patrol-utils.js?v=20260308a"></script>
-    <script src="assets/js/patrol-terrain.js?v=20260308a"></script>
-    <script src="assets/js/patrol-debug.js?v=20260308a"></script>
-    <script src="assets/js/patrol.js?v=20260308a"></script>
+    <script src="assets/js/observability.js?v=20260527e"></script>
+    <script src="assets/js/api.js?v=20260527e"></script>
+    <script src="assets/js/utils.js?v=20260527e"></script>
+    <!-- T-095: 通用弹窗组件 (openProgressDialog / openTextInputDialog),tasks.js 和 work-table.js 都依赖 -->
+    <script src="assets/js/dialogs.js?v=20260527e"></script>
+    <script src="assets/js/jelly-indicator.js?v=20260527e"></script>
+    <script src="assets/js/app.js?v=20260527e"></script>
+    <script src="assets/js/tasks.js?v=20260527e"></script>
+    <script src="assets/js/modal.js?v=20260527e"></script>
+    <script src="assets/js/datepicker.js?v=20260527e"></script>
+    <script src="assets/js/drag.js?v=20260527e"></script>
+    <script src="assets/js/actionsheet.js?v=20260527e"></script>
+    <script src="assets/js/share-modal.js?v=20260527e"></script>
+    <script src="assets/js/review.js?v=20260527e"></script>
+    <script src="assets/js/routines.js?v=20260527e"></script>
+    <script src="assets/js/features.js?v=20260527e"></script>
+    <script src="assets/js/particles.js?v=20260527e"></script>
+    <script src="assets/js/living-line.js?v=20260527e"></script>
+    <script src="assets/js/abao.js?v=20260527e"></script>
+    <script src="assets/js/english.js?v=20260527e"></script>
+    <script src="assets/js/life.js?v=20260527e"></script>
+    <script src="assets/js/expense.js?v=20260527e"></script>
+    <script src="assets/js/expense-analytics.js?v=20260527e"></script>
+    <script src="assets/js/trip.js?v=20260527e"></script>
+    <script src="assets/js/health-data.js?v=20260527e"></script>
+    <script src="assets/js/health-renderer.js?v=20260527e"></script>
+    <script src="assets/js/health.js?v=20260527e"></script>
+    <script src="assets/js/friends.js?v=20260527e"></script>
+    <script src="assets/js/notifications.js?v=20260527e"></script>
+    <script src="assets/js/settings.js?v=20260527e"></script>
+    <script src="assets/js/admin-panel.js?v=20260527e"></script>
+    <!-- Work module (T-094 / SPEC work-task-table) -->
+    <script src="assets/js/work-pick.js?v=20260527e"></script>
+    <script src="assets/js/work-table.js?v=20260527e"></script>
+    <script src="assets/js/work-column-cfg.js?v=20260527e"></script>
+    <script src="assets/js/work-board.js?v=20260527e"></script>
+    <script src="assets/js/work-calendar.js?v=20260527e"></script>
+    <!-- T-099 -->
+    <script src="assets/js/work-person.js?v=20260527e"></script>
+    <script src="assets/js/work-detail.js?v=20260527e"></script>
+    <script src="assets/js/work.js?v=20260527e"></script>
+    <script src="assets/js/patrol-utils.js?v=20260527e"></script>
+    <script src="assets/js/patrol-terrain.js?v=20260527e"></script>
+    <script src="assets/js/patrol-debug.js?v=20260527e"></script>
+    <script src="assets/js/patrol.js?v=20260527e"></script>
 
     <script>
     // Initialize

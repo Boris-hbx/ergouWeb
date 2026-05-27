@@ -26,7 +26,9 @@ pub fn build_app(state: state::AppState) -> Router {
         .route("/guest", post(auth::guest_login))
         .route("/me", get(auth::me))
         .route("/change-password", post(auth::change_password))
-        .route("/avatar", put(auth::update_avatar));
+        .route("/avatar", put(auth::update_avatar))
+        // T-096 / ADR-006:owner 紧急密码重置(必须双写 main.rs + lib.rs,见 memory duplicate-build-app-lib-rs.md)
+        .route("/owner-recovery", post(auth::owner_recovery));
 
     let todo_routes = Router::new()
         .route(
@@ -71,7 +73,11 @@ pub fn build_app(state: state::AppState) -> Router {
 
     let chat_routes = Router::new()
         .route("/", post(routes::chat::chat_handler))
-        .route("/usage", get(routes::conversations::get_usage));
+        .route("/usage", get(routes::conversations::get_usage))
+        .route(
+            "/messages/{id}/feedback",
+            put(routes::chat::message_feedback_handler),
+        );
 
     let conversation_routes = Router::new()
         .route("/", get(routes::conversations::list_conversations))
@@ -87,8 +93,7 @@ pub fn build_app(state: state::AppState) -> Router {
             "/",
             get(routes::expenses::list_entries).post(routes::expenses::create_entry),
         )
-        .route("/summary", get(routes::expenses::get_summary))
-        .route("/analytics", get(routes::expenses::get_analytics))
+        .route("/stats", get(routes::expenses::get_stats))
         .route("/tags", get(routes::expenses::list_tags))
         .route(
             "/{id}",
@@ -254,6 +259,27 @@ pub fn build_app(state: state::AppState) -> Router {
         .nest("/contacts", contacts_routes)
         .nest("/collaborate", collaborate_routes)
         .nest(
+            "/soul-state",
+            Router::new().route(
+                "/",
+                get(routes::soul_state::get_soul_state)
+                    .put(routes::soul_state::update_soul_state),
+            ),
+        )
+        .nest(
+            "/memories",
+            Router::new()
+                .route(
+                    "/",
+                    get(routes::memories::list_memories)
+                        .post(routes::memories::create_memory)
+                        .delete(routes::memories::clear_memories),
+                )
+                .route("/batch", post(routes::memories::batch_import))
+                .route("/search", get(routes::memories::search_memories))
+                .route("/{id}", delete(routes::memories::delete_memory)),
+        )
+        .nest(
             "/admin",
             Router::new()
                 .route("/dashboard", get(routes::admin::dashboard))
@@ -262,12 +288,37 @@ pub fn build_app(state: state::AppState) -> Router {
                 .route("/users/{id}/reject", post(routes::admin::reject_user))
                 .route("/conversations/users", get(routes::admin::conversation_user_summary))
                 .route("/conversations", get(routes::admin::list_conversations))
-                .route("/conversations/{id}/messages", get(routes::admin::get_conversation_messages)),
+                .route("/conversations/{id}/messages", get(routes::admin::get_conversation_messages))
+                // T-089 块2:30 req/min/user 限流(必须双写 main.rs + lib.rs)
+                .route_layer(axum::middleware::from_fn_with_state(
+                    state.clone(),
+                    auth::admin_rate_limit_middleware,
+                )),
         )
         .route("/moment", get(routes::moment::get_moment))
         .route(
             "/uploads/{user_id}/{filename}",
             get(routes::expenses::serve_photo),
+        )
+        // Work module (T-094 / SPEC work-task-table)
+        .route(
+            "/work/tasks",
+            get(routes::work_tasks::list_tasks).post(routes::work_tasks::create_task),
+        )
+        .route(
+            "/work/tasks/{id}",
+            axum::routing::patch(routes::work_tasks::update_task)
+                .delete(routes::work_tasks::delete_task),
+        )
+        .route(
+            "/work/columns",
+            get(routes::work_columns::list_columns)
+                .put(routes::work_columns::batch_save_columns)
+                .post(routes::work_columns::create_column),
+        )
+        .route(
+            "/work/columns/{key}",
+            delete(routes::work_columns::delete_column),
         );
 
     Router::new()

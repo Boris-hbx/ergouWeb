@@ -7,7 +7,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use crate::auth::{check_guest_ai_quota, ActiveUserId, UserId};
+use crate::auth::{check_guest_ai_quota, extract_client_ip, ActiveUserId, UserId};
 use crate::models::english::*;
 use crate::services::llm::LlmClient;
 use crate::state::AppState;
@@ -392,10 +392,12 @@ pub async fn archive_scenario(
 pub async fn generate_scenario(
     State(state): State<AppState>,
     user_id: ActiveUserId,
+    headers: http::HeaderMap,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
-    // Guest AI quota check
-    let ai_remaining = match check_guest_ai_quota(&state, &user_id.0) {
+    // Guest AI quota check (T-089: IP aggregate)
+    let client_ip = extract_client_ip(&headers);
+    let ai_remaining = match check_guest_ai_quota(&state, &user_id.0, &client_ip) {
         Ok(remaining) => remaining,
         Err(_) => {
             return (

@@ -695,85 +695,17 @@ function showProgressPopup(itemId, element) {
 }
 
 function showProgressDialog(item) {
-    var currentProgress = item.progress || 0;
-
-    var overlay = document.createElement('div');
-    overlay.className = 'progress-dialog-overlay';
-    overlay.innerHTML =
-        '<div class="progress-dialog">' +
-            '<div class="progress-dialog-title">设置完成度</div>' +
-            '<div class="progress-dialog-task">' + escapeHtml(item.text) + '</div>' +
-            '<div class="progress-slider-container">' +
-                '<input type="range" class="progress-slider" id="progress-slider" min="0" max="100" value="' + currentProgress + '" style="--val:' + currentProgress + '%">' +
-                '<div class="progress-value" id="progress-value">' + currentProgress + '%</div>' +
-            '</div>' +
-            '<div class="progress-dialog-buttons">' +
-                '<button class="progress-btn cancel" id="progress-cancel">取消</button>' +
-                '<button class="progress-btn confirm" id="progress-confirm">确定</button>' +
-            '</div>' +
-        '</div>';
-
-    document.body.appendChild(overlay);
-
-    var slider = document.getElementById('progress-slider');
-    var valueDisplay = document.getElementById('progress-value');
-    var confirmBtn = document.getElementById('progress-confirm');
-    var cancelBtn = document.getElementById('progress-cancel');
-
-    var lastSliderValue = currentProgress;
-    var sliderVelocity = 0;
-
-    slider.addEventListener('input', function() {
-        var val = parseInt(slider.value);
-        valueDisplay.textContent = val + '%';
-        slider.style.setProperty('--val', val + '%');
-
-        sliderVelocity = Math.abs(val - lastSliderValue);
-        lastSliderValue = val;
-
-        if (window.syncLineWithProgress) {
-            var sliderRect = slider.getBoundingClientRect();
-            var sliderX = sliderRect.left + (val / 100) * sliderRect.width;
-            window.syncLineWithProgress(sliderX, sliderVelocity);
-        }
-
-        if (val >= 100) {
-            valueDisplay.classList.add('complete');
-            confirmBtn.textContent = '确定完成';
-            confirmBtn.classList.add('complete');
-        } else {
-            valueDisplay.classList.remove('complete');
-            confirmBtn.textContent = '确定';
-            confirmBtn.classList.remove('complete');
-        }
-    });
-
-    slider.addEventListener('mouseup', function() {
-        if (window.releaseLineProgress) {
-            window.releaseLineProgress();
-        }
-    });
-    slider.addEventListener('touchend', function() {
-        if (window.releaseLineProgress) {
-            window.releaseLineProgress();
-        }
-    });
-
-    cancelBtn.addEventListener('click', function() {
-        document.body.removeChild(overlay);
-    });
-
-    overlay.addEventListener('click', function(e) {
-        if (e.target === overlay) {
-            document.body.removeChild(overlay);
-        }
-    });
-
-    confirmBtn.addEventListener('click', function() {
-        var newProgress = parseInt(slider.value);
-
-        if (newProgress >= 100) {
-            document.body.removeChild(overlay);
+    // T-095:此处原本是 ~90 行内联实现的 progress-dialog;
+    // 现抽成通用组件 openProgressDialog (assets/js/dialogs.js),
+    // tasks(本文件)和 work-table 共用同一弹窗框架,视觉/动画/键盘交互完全一致。
+    // todo 的额外行为(living-line 联动、完成确认 + saveProgress(true))在回调里保留。
+    openProgressDialog({
+        label: item.text,
+        currentProgress: item.progress || 0,
+        onConfirm: function(p) {
+            saveProgress(item.id, p, false);
+        },
+        onComplete: function() {
             window.AppUtils.showConfirm(
                 '确定要将此任务标记为已完成吗？\n完成后任务将移至已完成列表。',
                 function() {
@@ -781,10 +713,7 @@ function showProgressDialog(item) {
                 },
                 { confirmText: '确定完成' }
             );
-        } else {
-            saveProgress(item.id, newProgress, false);
-            document.body.removeChild(overlay);
-        }
+        },
     });
 }
 

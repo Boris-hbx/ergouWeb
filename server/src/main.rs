@@ -19,6 +19,7 @@ use http::HeaderValue;
 use parking_lot::Mutex;
 use state::AppState;
 use std::sync::Arc;
+use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::set_header::SetResponseHeaderLayer;
 use tower_http::trace::TraceLayer;
 
@@ -33,7 +34,9 @@ pub fn build_app(state: AppState) -> Router {
         .route("/guest", post(auth::guest_login))
         .route("/me", get(auth::me))
         .route("/change-password", post(auth::change_password))
-        .route("/avatar", put(auth::update_avatar));
+        .route("/avatar", put(auth::update_avatar))
+        // T-096 / ADR-006:owner 紧急密码重置(需要 OWNER_RECOVERY_KEY 环境变量)
+        .route("/owner-recovery", post(auth::owner_recovery));
 
     // Todo routes (session required via UserId extractor)
     let todo_routes = Router::new()
@@ -83,7 +86,12 @@ pub fn build_app(state: AppState) -> Router {
     // Chat routes (阿宝)
     let chat_routes = Router::new()
         .route("/", post(routes::chat::chat_handler))
-        .route("/usage", get(routes::conversations::get_usage));
+        .route("/stream", post(routes::chat::chat_stream_handler))
+        .route("/usage", get(routes::conversations::get_usage))
+        .route(
+            "/messages/{id}/feedback",
+            put(routes::chat::message_feedback_handler),
+        );
 
     // Conversation routes
     let conversation_routes = Router::new()
@@ -101,8 +109,7 @@ pub fn build_app(state: AppState) -> Router {
             "/",
             get(routes::expenses::list_entries).post(routes::expenses::create_entry),
         )
-        .route("/summary", get(routes::expenses::get_summary))
-        .route("/analytics", get(routes::expenses::get_analytics))
+        .route("/stats", get(routes::expenses::get_stats))
         .route("/tags", get(routes::expenses::list_tags))
         .route("/rates", get(routes::expenses::get_rates))
         .route("/parse-preview", post(routes::expenses::parse_preview))
@@ -263,7 +270,6 @@ pub fn build_app(state: AppState) -> Router {
 
     // Settings routes (user preferences)
     let settings_routes = Router::new()
-        .route("/ai-model", get(auth::get_ai_model).put(auth::set_ai_model))
         .route(
             "/timezone",
             get(auth::get_timezone).put(auth::set_timezone),
@@ -300,6 +306,54 @@ pub fn build_app(state: AppState) -> Router {
         .nest("/share", share_routes)
         .nest("/contacts", contacts_routes)
         .nest("/collaborate", collaborate_routes)
+        // Work module (T-094 / SPEC work-task-table) — registered flat to avoid
+        // an Axum 0.8 nest issue we hit when nesting another Router inside api_routes.
+        .route(
+            "/work/tasks",
+            get(routes::work_tasks::list_tasks).post(routes::work_tasks::create_task),
+        )
+        .route(
+            "/work/tasks/{id}",
+            axum::routing::patch(routes::work_tasks::update_task)
+                .delete(routes::work_tasks::delete_task),
+        )
+        .route(
+            "/work/columns",
+            get(routes::work_columns::list_columns)
+                .put(routes::work_columns::batch_save_columns)
+                .post(routes::work_columns::create_column),
+        )
+        .route(
+            "/work/columns/{key}",
+            delete(routes::work_columns::delete_column),
+        )
+        .nest(
+            "/soul-state",
+            Router::new()
+                .route(
+                    "/",
+                    get(routes::soul_state::get_soul_state)
+                        .put(routes::soul_state::update_soul_state),
+                )
+                .route("/logs", get(routes::soul_state::get_evolution_logs)),
+        )
+        .nest(
+            "/memories",
+            Router::new()
+                .route(
+                    "/",
+                    get(routes::memories::list_memories)
+                        .post(routes::memories::create_memory)
+                        .delete(routes::memories::clear_memories),
+                )
+                .route("/batch", post(routes::memories::batch_import))
+                .route("/search", get(routes::memories::search_memories))
+                .route(
+                    "/{id}",
+                    put(routes::memories::update_memory)
+                        .delete(routes::memories::delete_memory),
+                ),
+        )
         .nest(
             "/admin",
             Router::new()
@@ -329,7 +383,13 @@ pub fn build_app(state: AppState) -> Router {
                 .route("/audit-log", get(routes::admin::audit_log))
                 // People (人物档案)
                 .route("/people", get(routes::admin::list_people).post(routes::admin::create_person))
-                .route("/people/{id}", put(routes::admin::update_person).delete(routes::admin::delete_person)),
+                .route("/people/{id}", put(routes::admin::update_person).delete(routes::admin::delete_person))
+                // T-089 块2:30 req/min/user 限流 —— 防暴力枚举 / DoS。
+                // route_layer 比 layer 更紧凑;仅作用于 admin 路由子树。
+                .route_layer(axum::middleware::from_fn_with_state(
+                    state.clone(),
+                    auth::admin_rate_limit_middleware,
+                )),
         )
         .route("/moment", get(routes::moment::get_moment))
         .route(
@@ -373,6 +433,33 @@ pub fn build_app(state: AppState) -> Router {
         ))
         .layer(DefaultBodyLimit::max(1_048_576)) // 1MB global body size limit
         .layer(TraceLayer::new_for_http())
+        .layer(
+            CorsLayer::new()
+                .allow_origin(AllowOrigin::predicate(|origin, _| {
+                    if let Ok(s) = origin.to_str() {
+                        s == "https://next-boris.fly.dev"
+                            || s == "https://next-boris-staging.fly.dev"
+                            || s.starts_with("http://localhost:")
+                            || s.starts_with("http://127.0.0.1:")
+                    } else {
+                        false
+                    }
+                }))
+                .allow_methods([
+                    http::Method::GET,
+                    http::Method::POST,
+                    http::Method::PUT,
+                    http::Method::DELETE,
+                    http::Method::OPTIONS,
+                ])
+                .allow_headers([
+                    http::header::CONTENT_TYPE,
+                    http::header::COOKIE,
+                    http::header::AUTHORIZATION,
+                ])
+                .allow_credentials(true)
+                .max_age(std::time::Duration::from_secs(3600)),
+        )
         .with_state(state)
 }
 
@@ -406,6 +493,10 @@ async fn main() {
         ai_rate_limits: Arc::new(Mutex::new(std::collections::HashMap::new())),
         guest_ip_rate_limits: Arc::new(Mutex::new(std::collections::HashMap::new())),
         error_report_limits: Arc::new(Mutex::new(std::collections::HashMap::new())),
+        recovery_ip_attempts: Arc::new(Mutex::new(std::collections::HashMap::new())),
+        recovery_ip_lockouts: Arc::new(Mutex::new(std::collections::HashMap::new())),
+        admin_user_rate_limits: Arc::new(Mutex::new(std::collections::HashMap::new())),
+        guest_ai_ip_aggregate: Arc::new(Mutex::new(std::collections::HashMap::new())),
     };
 
     // Spawn reminder poller (checks every 30s for due reminders)

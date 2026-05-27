@@ -839,7 +839,7 @@ pub async fn ai_usage(
         ).unwrap_or_else(|_| json!({"messages":0,"input_tokens":0,"output_tokens":0}))
     };
 
-    let models = ["claude", "kimi", "doubao"];
+    let models = ["claude"];
     let periods = [("today", today.as_str()), ("week", week_ago.as_str()), ("month", month_ago.as_str())];
 
     let mut by_model = json!({});
@@ -908,16 +908,6 @@ pub async fn ai_providers(
             "name": "Claude",
             "id": "claude",
             "configured": std::env::var("ANTHROPIC_API_KEY").ok().filter(|k| !k.is_empty()).is_some()
-        },
-        {
-            "name": "Kimi",
-            "id": "kimi",
-            "configured": std::env::var("KIMI_API_KEY").ok().filter(|k| !k.is_empty()).is_some()
-        },
-        {
-            "name": "Doubao",
-            "id": "doubao",
-            "configured": std::env::var("ARK_API_KEY").ok().filter(|k| !k.is_empty()).is_some()
         }
     ]);
 

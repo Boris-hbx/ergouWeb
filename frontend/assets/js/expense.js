@@ -22,6 +22,52 @@ var Expense = (function() {
     var _ratesTimestamp = 0;
     var _periodIndicator = null;
 
+    // Preset tag chips (aligned with Android TAG_EMOJI_MAP)
+    var PRESET_TAGS = [
+        { emoji: '🍜', label: '餐饮' },
+        { emoji: '🚗', label: '交通' },
+        { emoji: '🛒', label: '购物' },
+        { emoji: '🏠', label: '日用' },
+        { emoji: '🎮', label: '娱乐' },
+        { emoji: '✈️', label: '差旅' }
+    ];
+    var _formSelectedTags = []; // tags selected in the add/edit form
+
+    function renderTagChips(selected) {
+        var container = document.getElementById('expense-tag-chips');
+        if (!container) return;
+        container.innerHTML = '';
+        _formSelectedTags = selected || [];
+        PRESET_TAGS.forEach(function(tag) {
+            var chip = document.createElement('span');
+            chip.className = 'expense-tag-chip' + (_formSelectedTags.indexOf(tag.label) >= 0 ? ' selected' : '');
+            chip.textContent = tag.emoji + ' ' + tag.label;
+            chip.onclick = function() {
+                var idx = _formSelectedTags.indexOf(tag.label);
+                if (idx >= 0) {
+                    _formSelectedTags.splice(idx, 1);
+                    chip.classList.remove('selected');
+                } else {
+                    _formSelectedTags.push(tag.label);
+                    chip.classList.add('selected');
+                }
+            };
+            container.appendChild(chip);
+        });
+    }
+
+    function getFormTags() {
+        var tags = _formSelectedTags.slice();
+        var customInput = document.getElementById('expense-custom-tag-input');
+        if (customInput && customInput.value.trim()) {
+            customInput.value.split(/[,，]/).forEach(function(t) {
+                t = t.trim();
+                if (t && tags.indexOf(t) < 0) tags.push(t);
+            });
+        }
+        return tags;
+    }
+
     function log(action, detail) {
         var ts = new Date().toTimeString().slice(0, 8);
         var msg = '[Expense ' + ts + '] ' + action;
@@ -388,6 +434,9 @@ var Expense = (function() {
         if (dateInput) dateInput.value = formatDate(new Date());
         if (notesInput) notesInput.value = '';
         if (fileInput) fileInput.value = '';
+        var customTagInput = document.getElementById('expense-custom-tag-input');
+        if (customTagInput) customTagInput.value = '';
+        renderTagChips([]);
 
         setModalState('input');
         renderCurrencyToggle();
@@ -895,11 +944,13 @@ var Expense = (function() {
             return;
         }
 
+        var tags = getFormTags();
         var data = {
             amount: amount,
             currency: _currency,
             date: entryDate,
-            notes: notes
+            notes: notes,
+            tags: tags
         };
 
         try {
@@ -943,14 +994,16 @@ var Expense = (function() {
             return;
         }
 
+        var tags = getFormTags();
         var data = {
             amount: amount,
             currency: _currency,
             date: dateInput ? dateInput.value : undefined,
-            notes: notesInput ? notesInput.value.trim() : undefined
+            notes: notesInput ? notesInput.value.trim() : undefined,
+            tags: tags
         };
 
-        log('submitEdit', { id: _editingId, amount: amount });
+        log('submitEdit', { id: _editingId, amount: amount, tags: tags });
 
         try {
             var result = await API.updateExpense(_editingId, data);
@@ -1212,6 +1265,18 @@ var Expense = (function() {
         if (amountInput) amountInput.value = entry.amount;
         if (dateInput) dateInput.value = entry.date;
         if (notesInput) notesInput.value = entry.notes || '';
+
+        // Populate tags
+        var entryTags = entry.tags || [];
+        if (typeof entryTags === 'string') {
+            try { entryTags = JSON.parse(entryTags); } catch(e) { entryTags = entryTags.split(/[,，]/).map(function(t) { return t.trim(); }).filter(Boolean); }
+        }
+        var presetLabels = PRESET_TAGS.map(function(t) { return t.label; });
+        var presetSelected = entryTags.filter(function(t) { return presetLabels.indexOf(t) >= 0; });
+        var customTags = entryTags.filter(function(t) { return presetLabels.indexOf(t) < 0; });
+        renderTagChips(presetSelected);
+        var customTagInput = document.getElementById('expense-custom-tag-input');
+        if (customTagInput) customTagInput.value = customTags.join('，');
 
         // Show existing photos with delete buttons (separate from PhotoManager)
         var existingGrid = document.getElementById('expense-existing-photos');

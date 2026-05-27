@@ -29,8 +29,6 @@ async function loadSettingsData() {
             friendsSection.innerHTML = '<h4>好友</h4><div class="friends-empty">注册后可管理好友</div>';
         }
     }
-    // Load AI model preference
-    loadAiModel();
     // Load timezone preference
     loadTimezone();
     // Init patrol toggle
@@ -106,62 +104,7 @@ async function doLogout() {
     window.location.href = '/login.html';
 }
 
-// ========== AI 模型选择 ==========
-
-var _currentAiModel = 'auto';
-
-async function loadAiModel() {
-    if (window._userStatus === 'guest') {
-        // Guest: disable all buttons, show hint
-        var heading = document.getElementById('ai-model-heading');
-        if (heading) heading.textContent = 'AI 模型 — 注册后可切换';
-        document.querySelectorAll('.ai-model-btn').forEach(function(btn) {
-            btn.disabled = true;
-            btn.classList.add('ai-model-disabled');
-        });
-        return;
-    }
-    try {
-        var data = await API.getAiModel();
-        if (data.success && data.model) {
-            _currentAiModel = data.model;
-            highlightAiModel(data.model);
-        }
-    } catch(e) {
-        console.error('[settings] loadAiModel:', e);
-    }
-}
-
-function highlightAiModel(model) {
-    document.querySelectorAll('.ai-model-btn').forEach(function(btn) {
-        btn.classList.toggle('active', btn.dataset.model === model);
-    });
-}
-
-async function selectAiModel(model) {
-    if (window._userStatus === 'guest') return;
-    if (model === _currentAiModel) return;
-
-    var prevModel = _currentAiModel;
-    _currentAiModel = model;
-    highlightAiModel(model);
-
-    try {
-        var data = await API.setAiModel(model);
-        if (data.success) {
-            var names = { auto: '自动', doubao: '模型 A', claude: '模型 B' };
-            showToast('已切换到 ' + (names[model] || model), 'success');
-        } else {
-            _currentAiModel = prevModel;
-            highlightAiModel(prevModel);
-            showToast(data.message || '保存失败', 'error');
-        }
-    } catch(e) {
-        _currentAiModel = prevModel;
-        highlightAiModel(prevModel);
-        showToast('保存失败', 'error');
-    }
-}
+// AI 模型已固定为 Claude，无需用户选择
 
 // ========== 二狗值班开关 ==========
 
@@ -542,106 +485,409 @@ var Contacts = (function() {
 
 // ─── Memory management ───
 
-async function loadMemories() {
-    var container = document.getElementById('memory-list');
-    var clearBtn = document.getElementById('clear-all-memories-btn');
-    if (!container) return;
+// ===== 记忆管理 UI (T-081) =====
+var MemoryUI = (function() {
+    var _cat = '';          // current category filter
+    var _searchQ = '';      // current search keyword
+    var _total = 0;         // total count for current view
+    var _memories = [];     // currently displayed memories
+    var _debounceTimer = null;
+    var _editStarVal = 3;   // star value in modal
+    var _clearStep = 0;     // 0=idle, 1=first confirm shown, 2=input shown
 
-    try {
-        var res = await API.getMemories();
-        if (!res.success) {
-            container.innerHTML = '<div class="memory-empty">加载失败</div>';
+    var CAT_LABELS = { fact: '事实', habit: '习惯', personality: '性格', intent: '意图' };
+
+    function relativeTime(iso) {
+        if (!iso) return '';
+        var diff = (Date.now() - new Date(iso).getTime()) / 1000;
+        if (diff < 60) return '刚刚';
+        if (diff < 3600) return Math.floor(diff / 60) + ' 分钟前';
+        if (diff < 86400) return Math.floor(diff / 3600) + ' 小时前';
+        if (diff < 604800) return Math.floor(diff / 86400) + ' 天前';
+        if (diff < 2592000) return Math.floor(diff / 604800) + ' 周前';
+        return Math.floor(diff / 2592000) + ' 个月前';
+    }
+
+    function stars(n) {
+        return '⭐'.repeat(Math.max(1, Math.min(5, n || 3)));
+    }
+
+    function escapeHtml(text) {
+        var d = document.createElement('div');
+        d.textContent = text;
+        return d.innerHTML;
+    }
+
+    async function load() {
+        var container = document.getElementById('memory-list');
+        if (!container) return;
+        container.innerHTML = '<div class="memory-loading">加载中...</div>';
+
+        try {
+            var res;
+            if (_searchQ) {
+                res = await API.searchMemories(_searchQ, _cat || undefined);
+                _memories = res.memories || [];
+                _total = res.count || _memories.length;
+            } else {
+                res = await API.getMemories({ category: _cat || undefined, limit: 200 });
+                _memories = res.memories || [];
+                _total = res.total != null ? res.total : _memories.length;
+            }
+            if (!res.success && !res.memories) {
+                container.innerHTML = '<div class="memory-empty">加载失败 <button class="memory-retry-btn" onclick="MemoryUI.load()">重试</button></div>';
+                return;
+            }
+            render();
+        } catch(e) {
+            console.error('[MemoryUI]', e);
+            container.innerHTML = '<div class="memory-empty">网络异常，记忆暂时无法查看 <button class="memory-retry-btn" onclick="MemoryUI.load()">重试</button></div>';
+        }
+    }
+
+    function render() {
+        var container = document.getElementById('memory-list');
+        var statsEl = document.getElementById('memory-stats');
+        if (!container) return;
+
+        // Stats
+        if (statsEl) {
+            var catName = _cat ? (CAT_LABELS[_cat] || _cat) : '';
+            statsEl.textContent = _searchQ
+                ? '搜索到 ' + _memories.length + ' 条'
+                : (catName ? catName + '共 ' : '共 ') + _total + ' 条记忆';
+        }
+
+        if (!_memories || _memories.length === 0) {
+            container.innerHTML = '<div class="memory-empty">' +
+                (_searchQ ? '没有匹配的记忆' : '还没有记忆，和二狗多聊几句吧') + '</div>';
             return;
         }
-        renderMemories(res.memories || []);
-        if (clearBtn) clearBtn.style.display = (res.memories && res.memories.length > 0) ? '' : 'none';
-    } catch(e) {
-        container.innerHTML = '<div class="memory-empty">加载失败</div>';
+
+        var html = _memories.map(function(m) {
+            var label = CAT_LABELS[m.category] || m.category;
+            var accessInfo = (m.importance >= 4 && m.access_count) ? ' · 已用 ' + m.access_count + ' 次' : '';
+            var content = escapeHtml(m.content);
+            // Highlight search keyword
+            if (_searchQ) {
+                var re = new RegExp('(' + _searchQ.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+                content = content.replace(re, '<mark>$1</mark>');
+            }
+            return '<div class="memory-item" data-id="' + m.id + '">' +
+                '<div class="memory-content">' +
+                    '<div class="memory-content-text">' + content + '</div>' +
+                    '<div class="memory-meta">' +
+                        '<span class="memory-category memory-cat-' + m.category + '">' + label + '</span>' +
+                        '<span class="memory-importance">' + stars(m.importance) + '</span>' +
+                        '<span class="memory-time">' + relativeTime(m.created_at) + '</span>' +
+                        accessInfo +
+                    '</div>' +
+                '</div>' +
+                '<div class="memory-item-actions">' +
+                    '<button class="memory-edit-btn" onclick="MemoryUI.showEditModal(\'' + m.id + '\')" title="编辑">改</button>' +
+                    '<button class="memory-delete-btn" onclick="MemoryUI.deleteOne(\'' + m.id + '\')" title="删除">删</button>' +
+                '</div>' +
+            '</div>';
+        }).join('');
+
+        container.innerHTML = html;
     }
-}
 
-function renderMemories(memories) {
-    var container = document.getElementById('memory-list');
-    if (!container) return;
-
-    if (!memories || memories.length === 0) {
-        container.innerHTML = '<div class="memory-empty">二狗还没记住什么，聊天中自然提到的信息会被记住</div>';
-        return;
+    // ─── Tab ───
+    function switchTab(cat) {
+        _cat = cat;
+        _searchQ = '';
+        var input = document.getElementById('memory-search-input');
+        if (input) input.value = '';
+        // Update active tab
+        document.querySelectorAll('.memory-tab').forEach(function(t) {
+            t.classList.toggle('active', t.getAttribute('data-category') === cat);
+        });
+        load();
     }
 
-    var categoryLabels = {
-        'habit': '习惯',
-        'fact': '事实',
-        'personality': '性格',
-        'intent': '意图'
+    // ─── Search ───
+    function onSearchInput(val) {
+        clearTimeout(_debounceTimer);
+        _debounceTimer = setTimeout(function() {
+            _searchQ = val.trim();
+            load();
+        }, 300);
+    }
+
+    // ─── Delete single ───
+    async function deleteOne(id) {
+        if (!confirm('确定删除这条记忆？删除后无法恢复')) return;
+        try {
+            var res = await API.deleteMemory(id);
+            if (res.success) {
+                showToast('已删除', 'success');
+                load();
+            } else {
+                showToast(res.error || '删除失败', 'error');
+            }
+        } catch(e) {
+            showToast('删除失败', 'error');
+        }
+    }
+
+    // ─── Clear all (two-step) ───
+    function startClearAll() {
+        if (_total === 0) { showToast('没有记忆可清空', 'info'); return; }
+        _clearStep = 1;
+        var overlay = document.getElementById('memory-clear-overlay');
+        var msg = document.getElementById('memory-clear-msg');
+        var inputGroup = document.getElementById('memory-clear-input-group');
+        var confirmInput = document.getElementById('memory-clear-confirm-input');
+        if (msg) msg.textContent = '确定清空全部 ' + _total + ' 条记忆？此操作不可恢复。';
+        if (inputGroup) inputGroup.style.display = 'none';
+        if (confirmInput) confirmInput.value = '';
+        if (overlay) overlay.style.display = 'flex';
+    }
+
+    async function confirmClear() {
+        if (_clearStep === 1) {
+            // Show second step with input
+            _clearStep = 2;
+            var msg = document.getElementById('memory-clear-msg');
+            var inputGroup = document.getElementById('memory-clear-input-group');
+            if (msg) msg.textContent = '再次确认：请在下方输入"清空"以执行操作。';
+            if (inputGroup) inputGroup.style.display = '';
+            document.getElementById('memory-clear-confirm-input')?.focus();
+            return;
+        }
+        // Step 2: validate input
+        var input = document.getElementById('memory-clear-confirm-input');
+        if (!input || input.value.trim() !== '清空') {
+            showToast('请输入"清空"以确认', 'warning');
+            return;
+        }
+        try {
+            var res = await API.deleteAllMemories();
+            if (res.success) {
+                showToast('已清空 ' + _total + ' 条记忆', 'success');
+                closeClearModal();
+                load();
+            } else {
+                showToast(res.error || '清空失败', 'error');
+            }
+        } catch(e) {
+            showToast('清空失败', 'error');
+        }
+    }
+
+    function closeClearModal() {
+        _clearStep = 0;
+        var overlay = document.getElementById('memory-clear-overlay');
+        if (overlay) overlay.style.display = 'none';
+    }
+
+    // ─── Edit / Add modal ───
+    function showEditModal(id) {
+        var m = _memories.find(function(x) { return x.id === id; });
+        if (!m) return;
+        document.getElementById('memory-modal-title').textContent = '编辑记忆';
+        document.getElementById('memory-edit-id').value = id;
+        document.getElementById('memory-edit-content').value = m.content;
+        updateCharCount();
+        var radios = document.querySelectorAll('#memory-edit-category input[name="mem-cat"]');
+        radios.forEach(function(r) { r.checked = (r.value === m.category); });
+        pickStar(m.importance || 3);
+        document.getElementById('memory-modal-overlay').style.display = 'flex';
+    }
+
+    function showAddModal() {
+        document.getElementById('memory-modal-title').textContent = '添加记忆';
+        document.getElementById('memory-edit-id').value = '';
+        document.getElementById('memory-edit-content').value = '';
+        updateCharCount();
+        var radios = document.querySelectorAll('#memory-edit-category input[name="mem-cat"]');
+        radios.forEach(function(r) { r.checked = (r.value === 'fact'); });
+        pickStar(3);
+        document.getElementById('memory-modal-overlay').style.display = 'flex';
+        document.getElementById('memory-edit-content').focus();
+    }
+
+    function closeModal() {
+        document.getElementById('memory-modal-overlay').style.display = 'none';
+    }
+
+    function pickStar(n) {
+        _editStarVal = n;
+        document.querySelectorAll('#memory-edit-importance .memory-star').forEach(function(s) {
+            var v = parseInt(s.getAttribute('data-val'));
+            s.style.opacity = v <= n ? '1' : '0.3';
+        });
+    }
+
+    function updateCharCount() {
+        var ta = document.getElementById('memory-edit-content');
+        var counter = document.getElementById('memory-char-count');
+        if (ta && counter) counter.textContent = (ta.value || '').length + '/500';
+    }
+
+    async function saveModal() {
+        var id = document.getElementById('memory-edit-id').value;
+        var content = (document.getElementById('memory-edit-content').value || '').trim();
+        if (!content) { showToast('内容不能为空', 'warning'); return; }
+        if (content.length > 500) { showToast('内容不能超过 500 字', 'warning'); return; }
+
+        var catRadio = document.querySelector('#memory-edit-category input[name="mem-cat"]:checked');
+        var category = catRadio ? catRadio.value : 'fact';
+
+        var data = { content: content, category: category, importance: _editStarVal };
+
+        try {
+            var res;
+            if (id) {
+                res = await API.updateMemory(id, data);
+            } else {
+                res = await API.createMemory(data);
+            }
+            if (res.success || res.id) {
+                showToast(id ? '已保存' : '已添加', 'success');
+                closeModal();
+                load();
+            } else if (res.error && res.error.indexOf('duplicate') >= 0) {
+                showToast('这条记忆已存在', 'warning');
+            } else {
+                showToast(res.error || '保存失败', 'error');
+            }
+        } catch(e) {
+            showToast('保存失败', 'error');
+        }
+    }
+
+    // Char counter live update
+    document.addEventListener('DOMContentLoaded', function() {
+        var ta = document.getElementById('memory-edit-content');
+        if (ta) ta.addEventListener('input', updateCharCount);
+    });
+
+    return {
+        load: load,
+        switchTab: switchTab,
+        onSearchInput: onSearchInput,
+        deleteOne: deleteOne,
+        startClearAll: startClearAll,
+        confirmClear: confirmClear,
+        closeClearModal: closeClearModal,
+        showEditModal: showEditModal,
+        showAddModal: showAddModal,
+        closeModal: closeModal,
+        pickStar: pickStar,
+        saveModal: saveModal
+    };
+})();
+
+// ===== 灵魂演进 UI (T-092) =====
+var SoulUI = (function() {
+    var PARAM_LABELS = {
+        classical_ratio: { name: '文白比例', icon: '📜' },
+        warmth_level: { name: '温度', icon: '🌡️' },
+        verbosity_level: { name: '话量', icon: '💬' },
+        proactivity_level: { name: '主动性', icon: '🎯' },
+        trust_level: { name: '信任', icon: '🤝' },
+    };
+    var STAGE_LABELS = {
+        stranger: '初识', acquaintance: '相识', familiar: '熟悉',
+        close: '亲近', intimate: '至交'
     };
 
-    var html = memories.map(function(m) {
-        var label = categoryLabels[m.category] || m.category;
-        return '<div class="memory-item" data-id="' + m.id + '">' +
-            '<div class="memory-content">' +
-                '<span class="memory-category memory-cat-' + m.category + '">' + label + '</span>' +
-                '<span class="memory-text">' + escapeHtml(m.content) + '</span>' +
-            '</div>' +
-            '<button class="memory-delete-btn" onclick="deleteMemory(\'' + m.id + '\')" title="删除">&times;</button>' +
-        '</div>';
-    }).join('');
+    function switchTab(tab) {
+        document.querySelectorAll('.soul-tab').forEach(function(t) {
+            t.classList.toggle('active', t.getAttribute('data-tab') === tab);
+        });
+        document.getElementById('soul-params-panel').style.display = tab === 'params' ? '' : 'none';
+        document.getElementById('soul-logs-panel').style.display = tab === 'logs' ? '' : 'none';
+        if (tab === 'logs') loadLogs();
+    }
 
-    container.innerHTML = html;
-}
+    async function loadParams() {
+        var el = document.getElementById('soul-params-panel');
+        if (!el) return;
+        try {
+            var res = await API.getSoulState();
+            if (!res.success) { el.innerHTML = '<div class="soul-empty">加载失败</div>'; return; }
+            var s = res.soul_state;
+            var html = '<div class="soul-relationship">' +
+                '<span class="soul-stage">' + (STAGE_LABELS[s.relationship_stage] || s.relationship_stage) + '</span>' +
+                '<span class="soul-interactions">共 ' + s.total_interactions + ' 次对话</span>' +
+                '</div>';
+            var params = ['classical_ratio', 'warmth_level', 'verbosity_level', 'proactivity_level', 'trust_level'];
+            params.forEach(function(key) {
+                var val = s[key] || 0;
+                var pct = Math.round(val * 100);
+                var info = PARAM_LABELS[key] || { name: key, icon: '' };
+                html += '<div class="soul-param">' +
+                    '<div class="soul-param-header">' +
+                        '<span>' + info.icon + ' ' + info.name + '</span>' +
+                        '<span class="soul-param-value">' + pct + '%</span>' +
+                    '</div>' +
+                    '<div class="soul-bar"><div class="soul-bar-fill" style="width:' + pct + '%"></div></div>' +
+                '</div>';
+            });
+            el.innerHTML = html;
+        } catch(e) {
+            console.error('[SoulUI]', e);
+            el.innerHTML = '<div class="soul-empty">网络异常</div>';
+        }
+    }
 
-function escapeHtml(text) {
-    var d = document.createElement('div');
-    d.textContent = text;
-    return d.innerHTML;
-}
-
-async function deleteMemory(id) {
-    try {
-        var res = await API.deleteMemory(id);
-        if (res.success) {
-            var el = document.querySelector('.memory-item[data-id="' + id + '"]');
-            if (el) el.remove();
-            // Check if list is now empty
-            var container = document.getElementById('memory-list');
-            if (container && container.children.length === 0) {
-                renderMemories([]);
-                var clearBtn = document.getElementById('clear-all-memories-btn');
-                if (clearBtn) clearBtn.style.display = 'none';
+    async function loadLogs() {
+        var el = document.getElementById('soul-logs-panel');
+        if (!el) return;
+        el.innerHTML = '<div class="soul-loading">加载中...</div>';
+        try {
+            var res = await API.getEvolutionLogs();
+            if (!res.success || !res.logs || res.logs.length === 0) {
+                el.innerHTML = '<div class="soul-empty">暂无演化记录</div>';
+                return;
             }
-            showToast('已删除', 'success');
-        } else {
-            showToast(res.message || '删除失败', 'error');
+            var html = res.logs.map(function(log) {
+                var info = PARAM_LABELS[log.parameter] || { name: log.parameter, icon: '📊' };
+                var oldPct = Math.round(log.old_value * 100);
+                var newPct = Math.round(log.new_value * 100);
+                var diff = newPct - oldPct;
+                var diffStr = (diff > 0 ? '+' : '') + diff + '%';
+                var diffClass = diff > 0 ? 'soul-log-up' : (diff < 0 ? 'soul-log-down' : '');
+                var time = relativeTime(log.created_at);
+                var trigger = log.trigger_type === 'auto' ? '对话触发' : '手动调整';
+                return '<div class="soul-log-item">' +
+                    '<div class="soul-log-main">' +
+                        '<span class="soul-log-param">' + info.icon + ' ' + info.name + '</span>' +
+                        '<span class="soul-log-change ' + diffClass + '">' + oldPct + '% → ' + newPct + '% (' + diffStr + ')</span>' +
+                    '</div>' +
+                    '<div class="soul-log-meta">' + trigger + ' · ' + time + '</div>' +
+                '</div>';
+            }).join('');
+            el.innerHTML = html;
+        } catch(e) {
+            console.error('[SoulUI]', e);
+            el.innerHTML = '<div class="soul-empty">加载失败</div>';
         }
-    } catch(e) {
-        showToast('删除失败', 'error');
     }
-}
 
-async function deleteAllMemories() {
-    if (!confirm('确定要清空二狗的所有记忆吗？清空后二狗将不再记得关于你的任何信息。')) return;
-
-    try {
-        var res = await API.deleteAllMemories();
-        if (res.success) {
-            renderMemories([]);
-            var clearBtn = document.getElementById('clear-all-memories-btn');
-            if (clearBtn) clearBtn.style.display = 'none';
-            showToast('已清空所有记忆', 'success');
-        } else {
-            showToast(res.message || '清空失败', 'error');
-        }
-    } catch(e) {
-        showToast('清空失败', 'error');
+    function relativeTime(iso) {
+        if (!iso) return '';
+        var diff = (Date.now() - new Date(iso).getTime()) / 1000;
+        if (diff < 60) return '刚刚';
+        if (diff < 3600) return Math.floor(diff / 60) + ' 分钟前';
+        if (diff < 86400) return Math.floor(diff / 3600) + ' 小时前';
+        if (diff < 604800) return Math.floor(diff / 86400) + ' 天前';
+        return Math.floor(diff / 604800) + ' 周前';
     }
-}
 
-// Hook into settings loading: also load contacts and memories when settings are shown
+    return { switchTab: switchTab, loadParams: loadParams };
+})();
+
+// Hook into settings loading: also load contacts, memories, and soul when settings are shown
 var _origLoadSettingsData = loadSettingsData;
 loadSettingsData = async function() {
     await _origLoadSettingsData();
     Contacts.loadContacts();
-    loadMemories();
+    MemoryUI.load();
+    SoulUI.loadParams();
 };
 
 // BUG-1 fix: settings.js 加载完成后立即应用头像，避免 checkAuth 竞态

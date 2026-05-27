@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>工作任务表 · Cool 动态交互 设计稿</title>
+<style>
+  :root {
+    --bg: #FAF9FC;
+    --bg-card: #FFFFFF;
+    --bg-elev: #F5F2FB;
+    --bg-elev-2: #EFEAF7;
+    --border: #E5E3EE;
+    --border-strong: #D4D0E0;
+    --text: #1F2937;
+    --text-mute: #6B7280;
+    --text-faint: #9CA3AF;
+    --primary: #7C4DFF;
+    --primary-soft: rgba(124, 77, 255, 0.10);
+    --primary-strong: rgba(124, 77, 255, 0.18);
+    --danger: #E11D48;
+    --danger-soft: rgba(225, 29, 72, 0.10);
+    --warn: #F59E0B;
+    --warn-soft: rgba(245, 158, 11, 0.12);
+    --ok: #10B981;
+    --ok-soft: rgba(16, 185, 129, 0.12);
+    --avatar-1: #7C4DFF;
+    --avatar-2: #14B8A6;
+    --avatar-3: #E0A23B;
+    --avatar-4: #3B82F6;
+    --shadow: 0 1px 2px rgba(15, 15, 30, 0.04), 0 4px 12px rgba(15, 15, 30, 0.06);
+    --shadow-lift: 0 8px 32px rgba(124, 77, 255, 0.22), 0 2px 8px rgba(15, 15, 30, 0.08);
+    --ease-spring: cubic-bezier(0.68, -0.4, 0.265, 1.35);
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: var(--bg); color: var(--text);
+    font: 13px/1.5 -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+    overflow-x: hidden;
+  }
+
+  /* ─── 顶栏 ─── */
+  .topbar {
+    padding: 14px 28px;
+    display: flex; align-items: center; gap: 16px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(255,255,255,0.85);
+    backdrop-filter: blur(10px);
+    position: sticky; top: 0; z-index: 50;
+  }
+  .topbar h1 { font-size: 17px; font-weight: 600; }
+  .topbar .tag {
+    background: linear-gradient(135deg, #7C4DFF, #B794F4);
+    color: white; padding: 3px 10px; border-radius: 10px;
+    font-size: 11px; font-weight: 600;
+    box-shadow: 0 2px 8px rgba(124, 77, 255, 0.4);
+    animation: tag-pulse 2.4s ease-in-out infinite;
+  }
+  @keyframes tag-pulse {
+    0%, 100% { box-shadow: 0 2px 8px rgba(124, 77, 255, 0.4); }
+    50% { box-shadow: 0 4px 16px rgba(124, 77, 255, 0.6); }
+  }
+  .topbar .spacer { flex: 1; }
+  .kbd-hint {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 11.5px;
+    color: var(--text-mute);
+    cursor: pointer;
+    transition: all .15s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .kbd-hint:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    transform: translateY(-1px);
+  }
+  .kbd-hint kbd {
+    background: white;
+    border: 1px solid var(--border-strong);
+    border-bottom-width: 2px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-family: ui-monospace, monospace;
+    font-size: 10.5px;
+    color: var(--text);
+  }
+
+  .container { padding: 18px 28px 60px; max-width: 1400px; margin: 0 auto; }
+
+  /* ─── COOL #1: 30 天任务密度心电图 ─── */
+  .heart-strip {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 18px;
+    box-shadow: var(--shadow);
+    margin-bottom: 18px;
+  }
+  .strip-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .strip-title {
+    font-size: 11.5px; color: var(--text-faint);
+    letter-spacing: 0.06em; text-transform: uppercase; font-weight: 600;
+  }
+  .strip-meta { font-size: 11.5px; color: var(--text-mute); }
+  .strip-meta strong { color: var(--text); }
+  .strip-bars {
+    display: flex; gap: 3px; height: 44px;
+    align-items: flex-end;
+  }
+  .strip-bar {
+    flex: 1; min-width: 0;
+    background: var(--primary-soft);
+    border-radius: 3px 3px 1px 1px;
+    cursor: pointer;
+    position: relative;
+    transition: background .15s, transform .2s var(--ease-out);
+    transform-origin: bottom;
+  }
+  .strip-bar:hover {
+    background: var(--primary);
+    transform: scaleY(1.1);
+  }
+  .strip-bar.today {
+    background: var(--primary);
+    box-shadow: 0 0 12px rgba(124, 77, 255, 0.5);
+  }
+  .strip-bar.overdue {
+    background: var(--danger-soft);
+  }
+  .strip-bar.overdue:hover { background: var(--danger); }
+  .strip-bar .tip {
+    position: absolute; bottom: calc(100% + 6px); left: 50%;
+    transform: translateX(-50%) translateY(4px);
+    background: var(--text); color: white;
+    padding: 3px 8px; border-radius: 6px;
+    font-size: 11px; white-space: nowrap;
+    opacity: 0; pointer-events: none;
+    transition: all .15s;
+  }
+  .strip-bar:hover .tip { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .strip-axis {
+    display: flex; justify-content: space-between;
+    font-size: 10px; color: var(--text-faint);
+    margin-top: 4px;
+  }
+
+  /* ─── COOL #2: 时间 Tab + 切换动画 ─── */
+  .time-tabs {
+    display: flex; gap: 4px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 12px;
+    position: relative;
+  }
+  .time-tab {
+    border: 0; background: transparent;
+    padding: 9px 18px 11px;
+    font-size: 13px; color: var(--text-mute);
+    cursor: pointer;
+    margin-bottom: -1px;
+    transition: color .2s;
+    position: relative;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .time-tab:hover { color: var(--text); }
+  .time-tab.active { color: var(--primary); font-weight: 600; }
+  .time-tab .count {
+    font-size: 11px; color: var(--text-faint);
+    background: var(--bg-elev);
+    padding: 1px 6px; border-radius: 10px;
+    transition: all .2s;
+  }
+  .time-tab.active .count {
+    background: var(--primary-soft); color: var(--primary);
+  }
+  .tab-indicator {
+    position: absolute; bottom: -1px;
+    height: 2px; background: var(--primary);
+    border-radius: 2px 2px 0 0;
+    transition: left .35s var(--ease-spring), width .35s var(--ease-spring);
+  }
+
+  /* ─── 表格区域 ─── */
+  .table-wrap {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  table.wt { width: 100%; border-collapse: collapse; }
+  .wt th, .wt td {
+    padding: 9px 14px;
+    text-align: left;
+    font-size: 12.5px;
+    border-bottom: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+  }
+  .wt th:last-child, .wt td:last-child { border-right: 0; }
+  .wt th {
+    background: var(--bg-elev);
+    color: var(--text-mute);
+    font-weight: 600;
+    font-size: 11.5px;
+  }
+  .wt tr.task-row {
+    cursor: pointer;
+    transition: background .15s, transform .35s var(--ease-spring), opacity .25s;
+  }
+  .wt tr.task-row:hover { background: var(--bg-elev); }
+  .wt tr.task-row.dragging {
+    transform: scale(1.02) rotate(0.5deg);
+    box-shadow: var(--shadow-lift);
+    background: white;
+    cursor: grabbing;
+    opacity: 0.95;
+    z-index: 10;
+    position: relative;
+  }
+  .wt tr.task-row.removing {
+    transform: translateX(-30px);
+    opacity: 0;
+  }
+  .wt tr.task-row.entering {
+    animation: row-enter .45s var(--ease-spring) both;
+  }
+  @keyframes row-enter {
+    from { transform: translateY(-12px) scale(0.96); opacity: 0; }
+    to   { transform: translateY(0) scale(1); opacity: 1; }
+  }
+  .wt tr.task-row.done .task-title {
+    text-decoration: line-through;
+    color: var(--text-faint);
+  }
+
+  /* ─── COOL #3: 复选框 ripple + check 动画 ─── */
+  .wt-checkbox {
+    width: 18px; height: 18px;
+    border: 1.5px solid var(--border-strong);
+    border-radius: 5px;
+    flex-shrink: 0;
+    cursor: pointer;
+    background: white;
+    position: relative;
+    transition: all .2s var(--ease-out);
+  }
+  .wt-checkbox:hover {
+    border-color: var(--primary);
+    transform: scale(1.1);
+  }
+  .wt-checkbox.checked {
+    background: var(--primary);
+    border-color: var(--primary);
+    animation: cb-pop .35s var(--ease-spring);
+  }
+  @keyframes cb-pop {
+    0%   { transform: scale(1); }
+    50%  { transform: scale(1.25); }
+    100% { transform: scale(1); }
+  }
+  .wt-checkbox.checked::after {
+    content: '';
+    position: absolute;
+    left: 5px; top: 2px;
+    width: 5px; height: 9px;
+    border: solid white;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg) scale(0);
+    animation: check-draw .25s .12s var(--ease-out) forwards;
+  }
+  @keyframes check-draw {
+    to { transform: rotate(45deg) scale(1); }
+  }
+
+  .pill {
+    padding: 2px 8px; border-radius: 10px;
+    font-size: 11px; display: inline-block; font-weight: 500;
+  }
+  .pill.status-doing { background: #FFF5E5; color: #C77800; }
+  .pill.status-todo  { background: #EEF2FF; color: #4F46E5; }
+  .pill.status-done  { background: var(--ok-soft); color: #047857; }
+  .pill.p-p0   { background: var(--warn-soft); color: #8B5A00; font-weight: 600; }
+  .pill.p-mid  { background: var(--bg-elev); color: var(--text-mute); }
+  .pill.overdue { background: var(--danger-soft); color: var(--danger); font-weight: 600; }
+  .pill.due-soon { background: var(--warn-soft); color: #8B5A00; }
+  .avatar-mini {
+    width: 22px; height: 22px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: white; font-weight: 600; font-size: 10.5px;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+  .progress-mini { display: inline-flex; align-items: center; gap: 6px; width: 110px; }
+  .progress-mini .bar { flex: 1; height: 5px; background: var(--bg-elev); border-radius: 3px; overflow: hidden; }
+  .progress-mini .fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary), #B794F4);
+    border-radius: 3px;
+    transition: width .5s var(--ease-spring);
+  }
+  .progress-mini .num { font-size: 11px; color: var(--text-mute); width: 26px; text-align: right; font-variant-numeric: tabular-nums; }
+
+  /* ─── COOL #4: Cmd+K 命令面板 ─── */
+  .cmdk-mask {
+    position: fixed; inset: 0;
+    background: rgba(20, 24, 40, 0.4);
+    backdrop-filter: blur(6px);
+    z-index: 100;
+    display: none;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 14vh;
+    opacity: 0;
+    transition: opacity .2s;
+  }
+  .cmdk-mask.open { display: flex; opacity: 1; }
+  .cmdk {
+    width: 580px; max-width: 90vw;
+    background: var(--bg-card);
+    border-radius: 14px;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.25);
+    overflow: hidden;
+    transform: translateY(-16px) scale(0.96);
+    transition: transform .35s var(--ease-spring);
+  }
+  .cmdk-mask.open .cmdk { transform: translateY(0) scale(1); }
+  .cmdk-input {
+    width: 100%;
+    padding: 16px 20px;
+    border: 0;
+    font: inherit;
+    font-size: 15px;
+    outline: 0;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+  }
+  .cmdk-input::placeholder { color: var(--text-faint); }
+  .cmdk-list {
+    max-height: 360px;
+    overflow-y: auto;
+    padding: 6px;
+  }
+  .cmdk-item {
+    padding: 8px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 10px;
+    font-size: 13px;
+    transition: background .1s;
+  }
+  .cmdk-item.active {
+    background: var(--primary-soft);
+    color: var(--primary);
+  }
+  .cmdk-item .icon {
+    width: 24px; text-align: center; font-size: 14px;
+  }
+  .cmdk-item .lbl { flex: 1; }
+  .cmdk-item .hint {
+    font-size: 10.5px; color: var(--text-faint);
+    background: var(--bg-elev);
+    padding: 1px 5px; border-radius: 4px;
+    font-family: ui-monospace, monospace;
+  }
+  .cmdk-item.active .hint { background: white; }
+  .cmdk-group {
+    padding: 8px 14px 4px;
+    font-size: 10.5px;
+    color: var(--text-faint);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+  .cmdk-foot {
+    padding: 8px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--bg-elev);
+    font-size: 11px; color: var(--text-faint);
+    display: flex; gap: 16px;
+  }
+  .cmdk-foot kbd {
+    background: white;
+    border: 1px solid var(--border-strong);
+    border-bottom-width: 2px;
+    padding: 0 4px; border-radius: 3px;
+    font-family: ui-monospace, monospace;
+    font-size: 10.5px;
+    color: var(--text-mute);
+    margin: 0 2px;
+  }
+
+  /* ─── COOL #5: 完成时的庆祝彩纸 ─── */
+  .confetti {
+    position: fixed;
+    width: 8px; height: 12px;
+    pointer-events: none;
+    z-index: 200;
+    animation: confetti-fall 1.4s ease-out forwards;
+  }
+  @keyframes confetti-fall {
+    0% {
+      transform: translateY(0) rotate(0deg);
+      opacity: 1;
+    }
+    100% {
+      transform: translateY(360px) rotate(var(--r)) translateX(var(--x));
+      opacity: 0;
+    }
+  }
+
+  /* Ripple */
+  .ripple {
+    position: absolute;
+    border-radius: 50%;
+    background: var(--primary);
+    opacity: 0.4;
+    transform: scale(0);
+    animation: ripple-out .6s ease-out forwards;
+    pointer-events: none;
+  }
+  @keyframes ripple-out {
+    to {
+      transform: scale(4);
+      opacity: 0;
+    }
+  }
+
+  /* ─── Toast ─── */
+  .toast {
+    position: fixed;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: rgba(31, 41, 55, 0.94);
+    color: white;
+    padding: 10px 18px;
+    border-radius: 10px;
+    font-size: 12.5px;
+    opacity: 0;
+    transition: all .3s var(--ease-spring);
+    pointer-events: none;
+    z-index: 150;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+  }
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  /* ─── 设计说明 ─── */
+  .design-note {
+    margin-top: 28px;
+    padding: 20px 24px;
+    background: var(--bg-card);
+    border: 1px dashed var(--border-strong);
+    border-radius: 12px;
+    color: var(--text-mute);
+    font-size: 13px;
+    line-height: 1.7;
+  }
+  .design-note h2 {
+    margin-bottom: 14px; color: var(--primary); font-size: 14px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .design-note h3 {
+    margin: 18px 0 6px;
+    font-size: 13px; color: var(--text);
+    font-weight: 600;
+  }
+  .design-note ul { margin-left: 22px; }
+  .design-note li { margin: 4px 0; }
+  .design-note code {
+    background: var(--bg-elev);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-family: ui-monospace, monospace;
+    font-size: 11.5px;
+    color: var(--primary);
+  }
+  .design-note .perf-note {
+    background: var(--ok-soft);
+    border-left: 3px solid var(--ok);
+    padding: 10px 14px;
+    margin-top: 14px;
+    border-radius: 0 6px 6px 0;
+    font-size: 12px;
+    color: #047857;
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>任务表</h1>
+  <span class="tag">✨ Cool 动效</span>
+  <div class="spacer"></div>
+  <div class="strip-meta">点 ☐ 体验完整完成流程（弹窗 → 拖 100% → 确认 → 彩纸）</div>
+</div>
+
+<div class="container">
+
+  <!-- COOL #1: 30 天心电图 -->
+  <div class="heart-strip">
+    <div class="strip-head">
+      <span class="strip-title">⚡ 30 天负载心电图（点条跳到该日）</span>
+      <span class="strip-meta"><strong>28</strong> 任务 · <strong>3</strong> 逾期 · 本月完成率 <strong>62%</strong></span>
+    </div>
+    <div class="strip-bars" id="heartStrip"></div>
+    <div class="strip-axis">
+      <span>30 天前</span><span>2 周前</span><span>今天</span>
+    </div>
+  </div>
+
+  <!-- COOL #2: 时间 Tab（带 spring 滑动指示条）-->
+  <div class="time-tabs" id="timeTabs">
+    <button class="time-tab" data-tab="all">全部 <span class="count">28</span></button>
+    <button class="time-tab active" data-tab="today">今日 <span class="count">7</span></button>
+    <button class="time-tab" data-tab="week">本周 <span class="count">15</span></button>
+    <button class="time-tab" data-tab="month">本月 <span class="count">24</span></button>
+    <div class="tab-indicator" id="tabIndicator"></div>
+  </div>
+
+  <!-- 表格 -->
+  <div class="table-wrap">
+    <table class="wt">
+      <thead>
+        <tr>
+          <th style="width:46px"></th>
+          <th>任务</th>
+          <th>责任人</th>
+          <th>层级</th>
+          <th>状态</th>
+          <th>优先级</th>
+          <th>截止日</th>
+          <th>进度</th>
+        </tr>
+      </thead>
+      <tbody id="taskBody"></tbody>
+    </table>
+  </div>
+
+  <!-- 设计说明 -->
+  <div class="design-note">
+    <h2>5 个 Cool 动效（皆已可玩）</h2>
+
+    <h3>1. 30 天负载心电图 — 全局俯瞰一秒钟</h3>
+    <ul>
+      <li>顶部一条 30 个柱子，每柱 = 一天任务数；今天高亮 + 发光脉动</li>
+      <li>含逾期的天用红底；hover 上浮 + 显示当天数字 tooltip</li>
+      <li>点柱跳到那天的过滤视图——一眼看出哪天忙、哪天空</li>
+      <li><strong>实用</strong>：避免做计划只看本周，看不见三周后的雪崩；像 GitHub 贡献图但是任务版</li>
+    </ul>
+
+    <h3>2. 时间 Tab 切换 — Spring 滑动指示条</h3>
+    <ul>
+      <li>底部紫色指示条用 spring 缓动滑到目标 Tab（不是 fade，是物理感的滑动）</li>
+      <li>切 Tab 时任务行 stagger 动画依次淡入（FLIP-lite），不是一刀切的 redraw</li>
+      <li><strong>实用</strong>：数据变化看得到过程，知道是"筛选"而不是"换页面"</li>
+    </ul>
+
+    <h3>3. ✓ 完成时的彩纸庆祝（严格走进度弹窗确认流程）</h3>
+    <ul>
+      <li><strong>流程</strong>：点 ☐ → 弹 <code>openProgressDialog</code>(slider) → 用户拖到 100% → 按钮变「确定完成」+ 渐变紫 → 点确认 → <strong>二次确认弹层</strong> → 才彩纸 + spring + 行温柔淡出</li>
+      <li><strong>不允许</strong>：点 ☐ 直接完成（这是 spec § 7.1 percent 行 + T-095 已落地的规则，与 todo 共享同一份 <code>openProgressDialog</code>）</li>
+      <li>彩纸：14 片小方片从复选框位置喷出，6 色随机、旋转随机、x 漂移随机；CSS animation 1.4s 飘下消失</li>
+      <li>checkbox 用 spring 弹（<code>cb-pop</code> animation）；✓ 划入用 transform draw 动画；进度条用紫渐变 + spring 缓动伸长</li>
+      <li><strong>实用</strong>：心理学上「完成」需要正反馈才能形成习惯；二次确认避免误触；Things 3 的核心 cool 点</li>
+    </ul>
+
+    <h3>4. <s>⌘K 命令面板</s> — <strong>已否决</strong>（Boris 决定不做）</h3>
+    <ul>
+      <li>键盘党命令面板不符合 Boris 使用习惯，本次不做</li>
+      <li>HTML 与 JS 代码已从设计稿移除；若后续需求变化再单独立项</li>
+    </ul>
+
+    <h3>5. 拖拽的物理感 — 卡片"飘起来"</h3>
+    <ul>
+      <li>拖任务行：scale 1.02 + 微旋 0.5° + 投影加深 + 背景变白</li>
+      <li>感觉"拿起来一张牌"，不是"光标拽个矩形"</li>
+      <li>drop 时其他行 spring 让位（不是瞬移）</li>
+      <li><strong>实用</strong>：拖拽更稳更准（视觉反馈强 → 不容易拖错）</li>
+    </ul>
+
+    <div class="perf-note">
+      <strong>性能与实施成本：</strong>所有动效用 CSS animation / transition，不用 motion 库；GPU 加速属性（transform / opacity）；总 CSS 增量 ~150 行 + JS ~80 行。<strong>不影响后端、不动数据结构</strong>。可作为现有 4 视图的通用增强。
+    </div>
+
+    <h3>没做但值得考虑（下一波）：</h3>
+    <ul>
+      <li><strong>Focus Mode（F 键）</strong>：选中任务按 F → 全屏聚焦该任务 + 周围淡出 + 仅显示标题+进度 + 大字体；按 Esc 退出。仪式感拉满，配合番茄钟</li>
+      <li><strong>气泡 → 卡片 morph</strong>：人员视图点气泡时气泡变形飞到卡片位置（FLIP / Shared Element），视觉连续</li>
+      <li><strong>阿宝逐字生成 task-card</strong>：阿宝创建任务时卡片从右侧滑入 + 标题逐字打出（像 ChatGPT streaming）</li>
+      <li><strong>拖到日历的虚线轨迹</strong>：拖任务时一条虚线从源到鼠标，过去日期虚线变红</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ─── 进度弹窗（复用 todo openProgressDialog 样式）─── -->
+<div id="pdOverlay" onclick="if(event.target===this) closePD()" style="position:fixed;inset:0;background:rgba(20,24,40,0.35);backdrop-filter:blur(4px);z-index:100;display:none;align-items:center;justify-content:center;opacity:0;transition:opacity .2s">
+  <div id="pdDialog" style="background:white;border-radius:14px;width:380px;padding:22px 24px;box-shadow:0 16px 48px rgba(0,0,0,0.22);transform:translateY(12px) scale(0.96);transition:transform .35s var(--ease-spring)">
+    <div style="font-size:11.5px;color:var(--text-faint);letter-spacing:0.05em;text-transform:uppercase;font-weight:600;margin-bottom:6px">设置完成度</div>
+    <div id="pdTitle" style="font-size:14px;font-weight:600;margin-bottom:18px;color:var(--text)"></div>
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px">
+      <input type="range" id="pdSlider" min="0" max="100" value="0" style="flex:1;accent-color:var(--primary);height:6px">
+      <div id="pdValue" style="font-size:20px;font-weight:600;color:var(--primary);width:60px;text-align:right;font-variant-numeric:tabular-nums">0%</div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button onclick="closePD()" style="padding:7px 18px;border:1px solid var(--border-strong);background:white;border-radius:7px;cursor:pointer;font-size:12.5px;color:var(--text-mute)">取消</button>
+      <button id="pdConfirm" onclick="confirmPD()" style="padding:7px 18px;border:0;background:var(--primary);color:white;border-radius:7px;cursor:pointer;font-size:12.5px;font-weight:500;transition:all .2s">确定</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── 100% 二次确认 ─── -->
+<div id="confirmOverlay" onclick="if(event.target===this) closeConfirm()" style="position:fixed;inset:0;background:rgba(20,24,40,0.4);backdrop-filter:blur(4px);z-index:110;display:none;align-items:center;justify-content:center;opacity:0;transition:opacity .2s">
+  <div id="confirmDialog" style="background:white;border-radius:14px;width:360px;padding:22px 24px;box-shadow:0 16px 48px rgba(0,0,0,0.22);transform:translateY(12px) scale(0.96);transition:transform .35s var(--ease-spring)">
+    <div style="font-size:14px;color:var(--text);margin-bottom:18px;line-height:1.55">确定要将此任务标记为已完成吗？<br><span style="color:var(--text-mute);font-size:12.5px">完成后任务将移至已完成列表。</span></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button onclick="closeConfirm()" style="padding:7px 18px;border:1px solid var(--border-strong);background:white;border-radius:7px;cursor:pointer;font-size:12.5px;color:var(--text-mute)">取消</button>
+      <button onclick="doComplete()" style="padding:7px 18px;border:0;background:var(--primary);color:white;border-radius:7px;cursor:pointer;font-size:12.5px;font-weight:500">确定完成</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── 假数据 ──
+const TASKS = [
+  { id:1, title:'院学术委员会评审准备', assignee:'陈老师',   level:'院',  status:'doing', priority:'P0',  due:'今天',     dueClass:'overdue',  progress:60, done:false },
+  { id:2, title:'所务会材料',           assignee:'王主任',   level:'所',  status:'todo',  priority:'P0',  due:'明天',     dueClass:'due-soon', progress:0,  done:false },
+  { id:3, title:'论文校对(Nature)',     assignee:'赵研究员', level:'组',  status:'doing', priority:'mid', due:'下周二',   dueClass:'',         progress:35, done:false },
+  { id:4, title:'复印资料',             assignee:'李秘书',   level:'个人',status:'doing', priority:'low', due:'今天',     dueClass:'due-soon', progress:80, done:false },
+  { id:5, title:'季度经费报表',         assignee:'陈老师',   level:'院',  status:'todo',  priority:'P0',  due:'逾期 2 天',dueClass:'overdue',  progress:50, done:false },
+  { id:6, title:'服务器迁移',           assignee:'刘工',     level:'组',  status:'doing', priority:'mid', due:'本周',     dueClass:'',         progress:25, done:false },
+];
+
+const STATUS_LABEL = { doing:'●进行中', todo:'○待办', done:'✓已完成' };
+const PRIORITY_LABEL = { P0:'P0', mid:'中', low:'低' };
+const PRIORITY_CLASS = { P0:'p-p0', mid:'p-mid', low:'p-mid' };
+
+const AVATAR_COLORS = ['var(--avatar-1)','var(--avatar-2)','var(--avatar-3)','var(--avatar-4)'];
+function colorOf(name) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return AVATAR_COLORS[h % 4];
+}
+
+// ── 渲染表格（带 stagger 入场） ──
+function renderTable() {
+  const tbody = document.getElementById('taskBody');
+  tbody.innerHTML = '';
+  TASKS.forEach((t, i) => {
+    const tr = document.createElement('tr');
+    tr.className = 'task-row entering' + (t.done ? ' done' : '');
+    tr.dataset.id = t.id;
+    tr.draggable = true;
+    tr.style.animationDelay = (i * 35) + 'ms';
+    tr.innerHTML = `
+      <td><div class="wt-checkbox ${t.done ? 'checked' : ''}" onclick="event.stopPropagation(); toggleDone(${t.id}, this)"></div></td>
+      <td><strong class="task-title">${t.title}</strong></td>
+      <td><span class="avatar-mini" style="background:${colorOf(t.assignee)}">${t.assignee.slice(0,1)}</span>${t.assignee}</td>
+      <td>${t.level}</td>
+      <td><span class="pill status-${t.status}">${STATUS_LABEL[t.status]}</span></td>
+      <td><span class="pill ${PRIORITY_CLASS[t.priority]}">${PRIORITY_LABEL[t.priority]}</span></td>
+      <td><span class="pill ${t.dueClass}">${t.due}</span></td>
+      <td>
+        <div class="progress-mini">
+          <div class="bar"><div class="fill" style="width:${t.progress}%"></div></div>
+          <span class="num">${t.progress}%</span>
+        </div>
+      </td>
+    `;
+    tr.onclick = () => toast(`打开任务 #${t.id}：${t.title}（点抽屉，模拟）`);
+    bindDrag(tr);
+    tbody.appendChild(tr);
+  });
+}
+
+// ── COOL #3：完成流程 = openProgressDialog → 拖到 100% → 二次确认 → 彩纸 + 淡出 ──
+// （严格对应 spec § 7.1 percent 行；与 todo 共享同一份 openProgressDialog）
+let pdCurrent = null;  // 当前编辑的 { task, cb }
+function toggleDone(id, cb) {
+  const task = TASKS.find(t => t.id === id);
+  if (!task) return;
+  if (task.done) {
+    // 取消完成（demo 简化:直接复原)
+    task.done = false;
+    cb.classList.remove('checked');
+    cb.closest('tr').classList.remove('done');
+    return;
+  }
+  pdCurrent = { task, cb };
+  openPD();
+}
+function openPD() {
+  if (!pdCurrent) return;
+  document.getElementById('pdTitle').textContent = pdCurrent.task.title;
+  const slider = document.getElementById('pdSlider');
+  const value  = document.getElementById('pdValue');
+  const confirm = document.getElementById('pdConfirm');
+  slider.value = pdCurrent.task.progress;
+  value.textContent = pdCurrent.task.progress + '%';
+  confirm.textContent = '确定';
+  confirm.style.background = 'var(--primary)';
+  slider.oninput = () => {
+    const v = parseInt(slider.value);
+    value.textContent = v + '%';
+    if (v >= 100) {
+      confirm.textContent = '确定完成';
+      confirm.style.background = 'linear-gradient(135deg, var(--primary), #B794F4)';
+    } else {
+      confirm.textContent = '确定';
+      confirm.style.background = 'var(--primary)';
+    }
+  };
+  const overlay = document.getElementById('pdOverlay');
+  overlay.style.display = 'flex';
+  requestAnimationFrame(() => {
+    overlay.style.opacity = '1';
+    document.getElementById('pdDialog').style.transform = 'translateY(0) scale(1)';
+  });
+}
+function closePD() {
+  const overlay = document.getElementById('pdOverlay');
+  overlay.style.opacity = '0';
+  document.getElementById('pdDialog').style.transform = 'translateY(12px) scale(0.96)';
+  setTimeout(() => { overlay.style.display = 'none'; pdCurrent = null; }, 220);
+}
+function confirmPD() {
+  if (!pdCurrent) return;
+  const v = parseInt(document.getElementById('pdSlider').value);
+  if (v >= 100) {
+    closePD();
+    setTimeout(() => openConfirm(), 200);
+  } else {
+    pdCurrent.task.progress = v;
+    closePD();
+    toast(`✓ 进度已更新到 ${v}%`);
+    setTimeout(renderTable, 100);
+  }
+}
+function openConfirm() {
+  const overlay = document.getElementById('confirmOverlay');
+  overlay.style.display = 'flex';
+  requestAnimationFrame(() => {
+    overlay.style.opacity = '1';
+    document.getElementById('confirmDialog').style.transform = 'translateY(0) scale(1)';
+  });
+}
+function closeConfirm() {
+  const overlay = document.getElementById('confirmOverlay');
+  overlay.style.opacity = '0';
+  document.getElementById('confirmDialog').style.transform = 'translateY(12px) scale(0.96)';
+  setTimeout(() => { overlay.style.display = 'none'; pdCurrent = null; }, 220);
+}
+function doComplete() {
+  if (!pdCurrent) return;
+  const { task, cb } = pdCurrent;
+  task.done = true; task.progress = 100;
+  closeConfirm();
+  // ✨ 二次确认通过 → 彩纸 + checkbox spring + 行温柔淡出
+  setTimeout(() => {
+    cb.classList.add('checked');
+    cb.closest('tr').classList.add('done');
+    confettiBurst(cb);
+    setTimeout(() => {
+      cb.closest('tr').classList.add('removing');
+      setTimeout(() => {
+        TASKS.splice(TASKS.findIndex(x => x.id === task.id), 1);
+        renderTable();
+      }, 320);
+    }, 700);
+  }, 250);
+}
+
+function confettiBurst(anchor) {
+  const rect = anchor.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  const colors = ['#7C4DFF', '#14B8A6', '#E0A23B', '#3B82F6', '#E11D48', '#10B981'];
+  for (let i = 0; i < 14; i++) {
+    const c = document.createElement('div');
+    c.className = 'confetti';
+    c.style.left = cx + 'px';
+    c.style.top  = cy + 'px';
+    c.style.background = colors[i % colors.length];
+    c.style.setProperty('--r', (Math.random() * 720 - 360) + 'deg');
+    c.style.setProperty('--x', (Math.random() * 200 - 100) + 'px');
+    c.style.transform = `rotate(${Math.random() * 360}deg)`;
+    document.body.appendChild(c);
+    setTimeout(() => c.remove(), 1500);
+  }
+}
+
+// ── COOL #2：时间 Tab 指示条 spring 滑动 ──
+function setupTabs() {
+  const tabs = document.querySelectorAll('.time-tab');
+  const indicator = document.getElementById('tabIndicator');
+  function moveTo(btn) {
+    const r = btn.getBoundingClientRect();
+    const parentR = btn.parentElement.getBoundingClientRect();
+    indicator.style.left = (r.left - parentR.left) + 'px';
+    indicator.style.width = r.width + 'px';
+  }
+  const init = document.querySelector('.time-tab.active');
+  setTimeout(() => moveTo(init), 50);
+  tabs.forEach(t => {
+    t.onclick = () => {
+      tabs.forEach(x => x.classList.remove('active'));
+      t.classList.add('active');
+      moveTo(t);
+      // 表格行 stagger 重渲（模拟筛选）
+      const body = document.getElementById('taskBody');
+      body.style.opacity = '0.3';
+      setTimeout(() => {
+        renderTable();
+        body.style.opacity = '1';
+        toast(`已切换到「${t.textContent.trim().split(' ')[0]}」`);
+      }, 180);
+    };
+  });
+}
+
+// ── COOL #5：拖拽 ──
+function bindDrag(tr) {
+  tr.addEventListener('dragstart', e => {
+    tr.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', tr.dataset.id);
+  });
+  tr.addEventListener('dragend', () => {
+    tr.classList.remove('dragging');
+  });
+}
+
+// ── COOL #1：心电图 ──
+function renderStrip() {
+  const wrap = document.getElementById('heartStrip');
+  // 30 天的假数据：随机 0-8 任务，每天；模拟今天 + 几天逾期
+  const days = [];
+  for (let i = 0; i < 30; i++) {
+    const isToday = i === 29;
+    const count = isToday ? 7 : Math.floor(Math.random() * 7);
+    const isOverdue = (i === 22 || i === 26) && !isToday;
+    days.push({ count, isToday, isOverdue });
+  }
+  const maxCount = Math.max(...days.map(d => d.count));
+  wrap.innerHTML = days.map((d, i) => {
+    const h = d.count === 0 ? 6 : Math.max(8, (d.count / maxCount) * 44);
+    const cls = d.isToday ? ' today' : (d.isOverdue ? ' overdue' : '');
+    const label = d.isToday ? '今天' : (29 - i) + ' 天前';
+    return `<div class="strip-bar${cls}" style="height:${h}px" data-i="${i}">
+      <span class="tip">${label} · ${d.count} 任务</span>
+    </div>`;
+  }).join('');
+  wrap.querySelectorAll('.strip-bar').forEach(b => {
+    b.onclick = () => toast(`跳到 ${b.querySelector('.tip').textContent}（模拟）`);
+  });
+}
+
+// ── COOL #4 Cmd+K 已移除（用户决定不做：键盘党命令面板不符合 Boris 使用习惯）──
+
+// ── Toast ──
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+// ── 启动 ──
+renderTable();
+renderStrip();
+setupTabs();
+</script>
+
+</body>
+</html>
