@@ -38,8 +38,12 @@ var WorkBoard = (function() {
             c.addEventListener('dragstart', function() {
                 _dragId = +c.dataset.id;
                 c.classList.add('dragging');
+                c.classList.add('wt-dragging');   // T-103 B.4:物理感共用类
             });
-            c.addEventListener('dragend', function() { c.classList.remove('dragging'); });
+            c.addEventListener('dragend', function() {
+                c.classList.remove('dragging');
+                c.classList.remove('wt-dragging');
+            });
         });
         host.querySelectorAll('.wt-col').forEach(function(col) {
             var body = col.querySelector('.wt-col-body');
@@ -64,9 +68,10 @@ var WorkBoard = (function() {
     }
 
     function _visibleRows() {
+        // T-098:先过时间镜头 Tab,再过责任人(两层叠加,与表格视图一致)
+        var rows = Work.applyTimeTabFilter(Work.rows());
         var fEl = document.getElementById('wt-filter');
         var f = fEl ? fEl.value : '';
-        var rows = Work.rows();
         if (!f) return rows;
         return rows.filter(function(t) { return t.assignee === f; });
     }
@@ -80,7 +85,9 @@ var WorkBoard = (function() {
               + 'onclick="event.stopPropagation();WorkTable.openText(' + t.id + ',\'desc\')" '
               + 'title="查看简介">📄</span>'
             : '';
-        return '<div class="wt-card" draggable="true" data-id="' + t.id + '">'
+        // T-100:卡片点击(空白处)打开详情;内部 desc 图标依然 stopPropagation 走原弹层。
+        return '<div class="wt-card" draggable="true" data-id="' + t.id + '" '
+            +    'onclick="WorkBoard._openFromCard(event,' + t.id + ')">'
             +   '<div class="wt-card-title">' + esc(t.title || '(无标题)') + '</div>'
             +   '<div class="wt-card-meta">'
             +     WorkTable._avatar(t.assignee || '?')
@@ -93,5 +100,13 @@ var WorkBoard = (function() {
             + '</div>';
     }
 
-    return { render: render };
+    // T-100:卡片空白处单击打开抽屉;落在描述图标等可点元素上 → 跳过。
+    function _openFromCard(ev, id) {
+        if (typeof WorkDetail === 'undefined') return;
+        if (ev && ev.target && ev.target.closest && ev.target.closest('.wt-desc-expand, .wt-pill')) return;
+        var ids = _visibleRows().map(function(r) { return r.id; });
+        WorkDetail.openDetail(id, ids);
+    }
+
+    return { render: render, _openFromCard: _openFromCard };
 })();

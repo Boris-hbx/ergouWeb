@@ -265,6 +265,10 @@ function switchPage(page) {
     if (lifeView) lifeView.style.display = page === 'life' ? '' : 'none';
     var workView = document.getElementById('work-view');
     if (workView) workView.style.display = page === 'work' ? '' : 'none';
+    // T-100:离开工作模块时自动关闭任务详情抽屉(否则 fixed 抽屉会盖到其它模块)
+    if (page !== 'work' && typeof WorkDetail !== 'undefined' && WorkDetail.isOpen && WorkDetail.isOpen()) {
+        WorkDetail.closeDetail();
+    }
     document.getElementById('settings-view').style.display = page === 'settings' ? '' : 'none';
     var adminView = document.getElementById('admin-view');
     if (adminView) adminView.style.display = page === 'admin' ? '' : 'none';

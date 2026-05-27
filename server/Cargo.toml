@@ -37,6 +37,8 @@ sha2 = "0.10"
 base64 = "0.22"
 url = "2"
 parking_lot = "0.12"
+# T-096: 用于 OWNER_RECOVERY_KEY 的常数时间比较,防 timing side-channel(ADR-006 § 安全护栏)
+subtle = "2"
 zip = { version = "2", default-features = false, features = ["deflate"] }
 urlencoding = "2"
 rust_xlsxwriter = "0"

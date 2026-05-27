@@ -8,7 +8,7 @@ use rusqlite::Connection;
 use serde::Deserialize;
 use serde_json::json;
 
-use crate::auth::{check_guest_ai_quota, ActiveUserId, UserId};
+use crate::auth::{check_guest_ai_quota, extract_client_ip, ActiveUserId, UserId};
 use crate::models::trip::*;
 use crate::services::llm::LlmClient;
 use crate::state::AppState;
@@ -1416,10 +1416,12 @@ pub struct AnalyzeItemRequest {
 pub async fn analyze_item(
     State(state): State<AppState>,
     user_id: ActiveUserId,
+    headers: http::HeaderMap,
     Json(req): Json<AnalyzeItemRequest>,
 ) -> (StatusCode, Json<serde_json::Value>) {
-    // Guest AI quota check
-    let guest_ai_remaining = match check_guest_ai_quota(&state, &user_id.0) {
+    // Guest AI quota check (T-089: IP aggregate)
+    let client_ip = extract_client_ip(&headers);
+    let guest_ai_remaining = match check_guest_ai_quota(&state, &user_id.0, &client_ip) {
         Ok(r) => r,
         Err(e) => return e,
     };

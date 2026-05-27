@@ -110,6 +110,10 @@ pub fn execute_tool(db: &Connection, user_id: &str, tool_name: &str, input: &Val
         "search_memory" => tool_search_memory(db, user_id, input),
         "delete_memory" => tool_delete_memory(db, user_id, input),
         "report_security_event" => tool_report_security_event(db, user_id, input),
+        // ─── work_task tools (T-101) ───
+        "create_work_task" => tool_create_work_task(db, user_id, input),
+        "update_work_task" => tool_update_work_task(db, user_id, input),
+        "query_work_tasks" => tool_query_work_tasks(db, user_id, input),
         _ => json!({"error": format!("Unknown tool: {}", tool_name)}),
     }
 }
@@ -731,6 +735,65 @@ pub fn tool_definitions() -> Vec<Value> {
                     "description": {"type": "string", "description": "简要描述发生了什么"}
                 },
                 "required": ["event_type", "severity", "description"]
+            }
+        }),
+        // ─── work_task tools (T-101 / SPEC work-task-table 附录 A) ───
+        // 跟个人 todo 的分流见 system-prompt:带组织属性/责任人/部门层级的事走这里。
+        json!({
+            "name": "create_work_task",
+            "description": "新建一条工作任务（独立于个人 todo 的工作任务表）。用于带组织属性、有责任人、有部门层级的事——比如『让陈老师下周三前交季度经费报表』。assignee 是纯文本（不关联真实账号），留空 = 未指派。",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string", "description": "任务标题"},
+                    "assignee": {"type": "string", "description": "责任人姓名（纯文本，如『陈老师』『王主任』）；留空 = 未指派"},
+                    "level": {"type": "string", "description": "层级（自由文本，建议:院/所/组/个人）"},
+                    "freq": {"type": "string", "description": "频率（自由文本，建议:一次性/每周/每月/每季）"},
+                    "status": {"type": "string", "enum": ["todo", "doing", "blocked", "done"], "description": "状态，默认 todo"},
+                    "priority": {"type": "string", "enum": ["high", "mid", "low", "P0"], "description": "优先级，默认 mid;P0 = high 别名"},
+                    "due_date": {"type": "string", "description": "截止日 YYYY-MM-DD"},
+                    "desc": {"type": "string", "description": "长文本简介(背景/要点)"}
+                },
+                "required": ["title"]
+            }
+        }),
+        json!({
+            "name": "update_work_task",
+            "description": "更新已存在的工作任务的某些字段(部分更新)。只传 id + 要改的字段。边界:status=done 时自动 progress=100;progress=100 时自动 status=done(与 work-board 拖拽行为一致)。due_date 传空字符串 = 清空。",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer", "description": "任务 id(数字)"},
+                    "title": {"type": "string"},
+                    "assignee": {"type": "string"},
+                    "level": {"type": "string"},
+                    "freq": {"type": "string"},
+                    "status": {"type": "string", "enum": ["todo", "doing", "blocked", "done"]},
+                    "priority": {"type": "string", "enum": ["high", "mid", "low", "P0"], "description": "P0 = high 别名"},
+                    "due_date": {"type": "string", "description": "YYYY-MM-DD;传空字符串清空"},
+                    "progress": {"type": "integer", "minimum": 0, "maximum": 100},
+                    "desc": {"type": "string"}
+                },
+                "required": ["id"]
+            }
+        }),
+        json!({
+            "name": "query_work_tasks",
+            "description": "查询工作任务列表(支持多种过滤)。所有条件 AND 关系;不传任何条件 → 返回当前用户所有未删除任务。返回值附带 summary={overdue, p0, by_status},方便一句话概述如『5 条未完成,1 条逾期,1 条 P0』。找不到任务时,建议先 query 标题模糊搜,而非凭空猜 id。",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "q": {"type": "string", "description": "标题/简介模糊搜(SQL LIKE %q%)"},
+                    "assignee": {"type": "string", "description": "按责任人精确匹配"},
+                    "level": {"type": "string", "description": "按层级精确匹配"},
+                    "status": {"type": "string", "enum": ["todo", "doing", "blocked", "done"]},
+                    "status_not": {"type": "string", "enum": ["todo", "doing", "blocked", "done"], "description": "排除该 status(常用:status_not=done 查未完成)"},
+                    "priority": {"type": "string", "enum": ["high", "mid", "low", "P0"]},
+                    "due_before": {"type": "string", "description": "截止日 ≤ 该日(YYYY-MM-DD)"},
+                    "due_after": {"type": "string", "description": "截止日 ≥ 该日(YYYY-MM-DD)"},
+                    "has_overdue": {"type": "boolean", "description": "true = 只看逾期未完成(due<today AND status≠done)"},
+                    "limit": {"type": "integer", "description": "返回最多多少条,默认 10,最大 50", "minimum": 1, "maximum": 50}
+                }
             }
         }),
     ]
@@ -3158,5 +3221,246 @@ fn tool_report_security_event(db: &Connection, user_id: &str, input: &Value) -> 
             result
         }
         Err(e) => json!({"error": format!("记录安全事件失败: {}", e)}),
+    }
+}
+
+// ============================================================
+// T-101:work_task LLM 工具
+//
+// 3 个工具(create / update / query)直接复用 routes::work_tasks 里的 *_impl 函数,
+// 不重复 SQL。input 解析时:
+//   - id 接 number 或 string(LLM 输出有时是字符串数字)
+//   - priority 接受 'P0' 别名(impl 内部 normalize 到 'high')
+// 返回结构与其它工具一致:成功 -> {success: true, ...};错误 -> {error: "..."}。
+// abao.js 的 addToolInfo 用 `tool === 'create_work_task'` 等 key 渲染 inline 卡片。
+// ============================================================
+
+use crate::models::work_task::{CreateWorkTaskRequest, UpdateWorkTaskRequest};
+use crate::routes::work_tasks::{
+    create_task_impl, query_tasks_impl, update_task_impl, QueryFilters,
+};
+
+/// 把 input["id"] 接 number / string,转 i64
+fn extract_i64_id(input: &Value) -> Option<i64> {
+    if let Some(n) = input["id"].as_i64() {
+        return Some(n);
+    }
+    if let Some(s) = input["id"].as_str() {
+        return s.parse::<i64>().ok();
+    }
+    None
+}
+
+fn opt_string(input: &Value, key: &str) -> Option<String> {
+    input[key].as_str().map(|s| s.to_string())
+}
+
+fn tool_create_work_task(db: &Connection, user_id: &str, input: &Value) -> Value {
+    let title = input["title"].as_str().unwrap_or("").trim().to_string();
+    if title.is_empty() {
+        return json!({"error": "title is required"});
+    }
+    let req = CreateWorkTaskRequest {
+        title,
+        desc: opt_string(input, "desc").unwrap_or_default(),
+        assignee: opt_string(input, "assignee").unwrap_or_default(),
+        level: opt_string(input, "level").unwrap_or_default(),
+        freq: opt_string(input, "freq").unwrap_or_default(),
+        status: opt_string(input, "status").unwrap_or_else(|| "todo".to_string()),
+        priority: opt_string(input, "priority").unwrap_or_else(|| "mid".to_string()),
+        due_date: opt_string(input, "due_date").filter(|s| !s.is_empty()),
+        progress: input["progress"].as_i64().unwrap_or(0) as i32,
+        custom_fields: None,
+    };
+    match create_task_impl(db, user_id, &req) {
+        Ok(item) => match serde_json::to_value(&item) {
+            Ok(mut v) => {
+                v["success"] = json!(true);
+                v
+            }
+            Err(e) => json!({"error": format!("serialize: {}", e)}),
+        },
+        Err(e) => json!({"error": format!("创建任务失败: {}", e)}),
+    }
+}
+
+fn tool_update_work_task(db: &Connection, user_id: &str, input: &Value) -> Value {
+    let id = match extract_i64_id(input) {
+        Some(n) => n,
+        None => return json!({"error": "id is required (number)"}),
+    };
+    let patch = UpdateWorkTaskRequest {
+        title: opt_string(input, "title"),
+        desc: opt_string(input, "desc"),
+        assignee: opt_string(input, "assignee"),
+        level: opt_string(input, "level"),
+        freq: opt_string(input, "freq"),
+        status: opt_string(input, "status"),
+        priority: opt_string(input, "priority"),
+        due_date: opt_string(input, "due_date"), // 空字符串 = 清空(impl 已处理)
+        progress: input["progress"].as_i64().map(|n| n as i32),
+        custom_fields: None,
+        sort_order: None,
+    };
+    match update_task_impl(db, user_id, id, patch) {
+        Ok(Some(item)) => match serde_json::to_value(&item) {
+            Ok(mut v) => {
+                v["success"] = json!(true);
+                v
+            }
+            Err(e) => json!({"error": format!("serialize: {}", e)}),
+        },
+        Ok(None) => json!({"error": format!("任务 T-{} 不存在(或已被删除)", id)}),
+        Err(e) => json!({"error": format!("更新任务失败: {}", e)}),
+    }
+}
+
+fn tool_query_work_tasks(db: &Connection, user_id: &str, input: &Value) -> Value {
+    let filters = QueryFilters {
+        q: opt_string(input, "q"),
+        assignee: opt_string(input, "assignee"),
+        level: opt_string(input, "level"),
+        status: opt_string(input, "status"),
+        status_not: opt_string(input, "status_not"),
+        priority: opt_string(input, "priority"),
+        due_before: opt_string(input, "due_before"),
+        due_after: opt_string(input, "due_after"),
+        has_overdue: input["has_overdue"].as_bool(),
+        // LLM 默认拿 10 条,避免回复过长(spec § A.1)
+        limit: Some(input["limit"].as_i64().unwrap_or(10).clamp(1, 50)),
+    };
+    match query_tasks_impl(db, user_id, &filters) {
+        Ok((items, summary)) => match (
+            serde_json::to_value(&items),
+            serde_json::to_value(&summary),
+        ) {
+            (Ok(items_v), Ok(sum_v)) => json!({
+                "success": true,
+                "count": items.len(),
+                "tasks": items_v,
+                "summary": sum_v,
+            }),
+            _ => json!({"error": "serialize failed"}),
+        },
+        Err(e) => json!({"error": format!("查询任务失败: {}", e)}),
+    }
+}
+
+#[cfg(test)]
+mod work_task_tool_tests {
+    use super::*;
+
+    fn setup() -> Connection {
+        let db = Connection::open_in_memory().expect("in-memory db");
+        crate::db::init_connection(&db);
+        // work_tasks 表有 FK to users(id),测试前先种几个 user 行
+        let now = chrono::Utc::now().to_rfc3339();
+        for uid in ["u-test", "u-alice", "u-bob"] {
+            db.execute(
+                "INSERT INTO users (id, username, password_hash, display_name, created_at, updated_at) VALUES (?1, ?2, 'x', ?2, ?3, ?3)",
+                rusqlite::params![uid, uid, now],
+            )
+            .expect("seed user");
+        }
+        db
+    }
+
+    const UID: &str = "u-test";
+
+    #[test]
+    fn create_returns_full_task_with_id() {
+        let db = setup();
+        let r = tool_create_work_task(
+            &db,
+            UID,
+            &json!({"title": "x", "assignee": "陈老师", "priority": "P0"}),
+        );
+        assert_eq!(r["success"], true, "response: {r}");
+        assert!(r["id"].as_i64().is_some());
+        assert_eq!(r["title"], "x");
+        assert_eq!(r["priority"], "high"); // P0 别名规整
+    }
+
+    #[test]
+    fn update_status_done_auto_progress_100() {
+        let db = setup();
+        let c = tool_create_work_task(&db, UID, &json!({"title": "y"}));
+        let id = c["id"].as_i64().unwrap();
+        let r = tool_update_work_task(&db, UID, &json!({"id": id, "status": "done"}));
+        assert_eq!(r["status"], "done");
+        assert_eq!(r["progress"], 100);
+    }
+
+    #[test]
+    fn update_nonexistent_id_returns_error() {
+        let db = setup();
+        let r = tool_update_work_task(&db, UID, &json!({"id": 999999, "status": "done"}));
+        assert!(r["error"].as_str().unwrap().contains("不存在"));
+    }
+
+    #[test]
+    fn query_status_not_excludes_done() {
+        let db = setup();
+        tool_create_work_task(&db, UID, &json!({"title": "a", "status": "todo"}));
+        let c = tool_create_work_task(&db, UID, &json!({"title": "b"}));
+        tool_update_work_task(
+            &db,
+            UID,
+            &json!({"id": c["id"], "status": "done"}),
+        );
+        let r = tool_query_work_tasks(&db, UID, &json!({"status_not": "done"}));
+        assert_eq!(r["success"], true);
+        assert_eq!(r["count"], 1);
+        assert_eq!(r["tasks"][0]["title"], "a");
+    }
+
+    #[test]
+    fn query_q_searches_title_and_desc() {
+        let db = setup();
+        tool_create_work_task(
+            &db,
+            UID,
+            &json!({"title": "季度经费报表"}),
+        );
+        tool_create_work_task(
+            &db,
+            UID,
+            &json!({"title": "院评审", "desc": "含经费明细"}),
+        );
+        tool_create_work_task(&db, UID, &json!({"title": "复印资料"}));
+        let r = tool_query_work_tasks(&db, UID, &json!({"q": "经费"}));
+        assert_eq!(r["count"], 2);
+    }
+
+    #[test]
+    fn query_summary_overdue_and_p0() {
+        let db = setup();
+        tool_create_work_task(
+            &db,
+            UID,
+            &json!({"title": "old", "due_date": "2020-01-01", "priority": "high"}),
+        );
+        tool_create_work_task(
+            &db,
+            UID,
+            &json!({"title": "future", "due_date": "2099-01-01", "priority": "mid"}),
+        );
+        let r = tool_query_work_tasks(&db, UID, &json!({}));
+        assert_eq!(r["count"], 2);
+        assert_eq!(r["summary"]["overdue"], 1);
+        assert_eq!(r["summary"]["p0"], 1);
+    }
+
+    #[test]
+    fn user_isolation_no_cross_read() {
+        let db = setup();
+        tool_create_work_task(&db, "u-alice", &json!({"title": "alice's"}));
+        tool_create_work_task(&db, "u-bob", &json!({"title": "bob's"}));
+        let r_alice = tool_query_work_tasks(&db, "u-alice", &json!({}));
+        assert_eq!(r_alice["count"], 1);
+        assert_eq!(r_alice["tasks"][0]["title"], "alice's");
+        let r_bob = tool_query_work_tasks(&db, "u-bob", &json!({}));
+        assert_eq!(r_bob["count"], 1);
+        assert_eq!(r_bob["tasks"][0]["title"], "bob's");
     }
 }

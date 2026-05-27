@@ -1,0 +1,14 @@
+agents: []
+ignore_patterns:
+- __pycache__
+- .git
+- node_modules
+- .boris
+- '*.pyc'
+- .env
+- .venv
+max_file_size_kb: 500
+name: ergouWeb
+rules_dir: rules
+watch_paths:
+- .

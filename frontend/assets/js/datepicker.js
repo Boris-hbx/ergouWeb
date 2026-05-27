@@ -1,9 +1,24 @@
 // ========== 智能日期选择器 ==========
+//
+// 两种使用模式:
+//   1) modal 模式(默认,SPEC-025 todo modal):toggleDatePicker() 无参,
+//      读写隐藏 input `#modal-due-date`,锚定 `#date-display` 按钮。
+//   2) callback 模式(T-104,任意调用方,如工作任务表 date 单元格):
+//      toggleDatePicker({ anchor, initial, onSelect })
+//        anchor:   触发元素(用于定位 popover 弹出位置)
+//        initial:  初始日期字符串 'YYYY-MM-DD' 或空
+//        onSelect: function(ymd) — 选完调用('' = 清空)
+//      此模式不读写任何隐藏 input,弹层用完关闭后自动归位到原 DOM 父节点。
+//
+// 两种模式共用一个 popover DOM(`#date-popover`),callback 模式开时
+// 临时把它 reparent 到 document.body,避免被 modal 的 display:none 隐藏。
 
 (function() {
     var isOpen = false;
     var currentDate = null; // Date object or null
     var calendarYear, calendarMonth;
+    // T-104: callback 模式状态 — null 表示在 modal 模式
+    var _cbMode = null;  // { anchor, onSelect, originalParent, originalNextSibling }
 
     // --- Natural language date parser (CN + EN) ---
     function parseNaturalDate(input) {
@@ -275,8 +290,14 @@
     }
 
     // --- Public API (global functions) ---
-    window.toggleDatePicker = function() {
-        if (modalMode === 'view') {
+    window.toggleDatePicker = function(opts) {
+        // T-104: callback 模式分支(opts 含 anchor)
+        if (opts && opts.anchor) {
+            return _openCallbackMode(opts);
+        }
+
+        // ─── modal 模式(原 SPEC-025 todo 弹窗) ───
+        if (typeof modalMode !== 'undefined' && modalMode === 'view') {
             if (typeof switchToEditMode === 'function') switchToEditMode();
         }
         var popover = document.getElementById('date-popover');
@@ -313,7 +334,102 @@
         }
     };
 
+    // T-104:打开 callback 模式 — 工作任务表 date 单元格 / 任意非 modal 调用方
+    function _openCallbackMode(opts) {
+        var popover = document.getElementById('date-popover');
+        if (!popover) {
+            console.error('[Datepicker] #date-popover not in DOM');
+            return;
+        }
+        // 已经在 callback 模式开着 → 当成 toggle 关闭
+        if (_cbMode) {
+            _closeCallbackMode();
+            return;
+        }
+        // 把 popover 临时 reparent 到 body,免得被 modal `display:none` 隐藏
+        _cbMode = {
+            anchor: opts.anchor,
+            onSelect: opts.onSelect || function() {},
+            originalParent: popover.parentNode,
+            originalNextSibling: popover.nextSibling,
+        };
+        document.body.appendChild(popover);
+
+        // 解析初始日期
+        currentDate = null;
+        if (opts.initial) {
+            var s = ('' + opts.initial).trim();
+            // 支持 'YYYY-MM-DD' / 'MM-DD'(补当前年)
+            if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+                var d = new Date(s + 'T00:00:00');
+                if (!isNaN(d.getTime())) currentDate = d;
+            } else if (/^\d{2}-\d{2}$/.test(s)) {
+                var yr = new Date().getFullYear();
+                var d2 = new Date(yr + '-' + s + 'T00:00:00');
+                if (!isNaN(d2.getTime())) currentDate = d2;
+            }
+        }
+        var now = currentDate || new Date();
+        calendarYear = now.getFullYear();
+        calendarMonth = now.getMonth();
+        renderDateChips();
+        renderMiniCalendar();
+
+        // 清自然语言输入
+        var nl = document.getElementById('date-nl-input');
+        var nlp = document.getElementById('date-nl-preview');
+        if (nl) nl.value = '';
+        if (nlp) nlp.textContent = '';
+
+        popover.style.display = 'block';
+        // z-index 必须高于工作模块抽屉(1050)和 wt-modal(1080)
+        popover.style.zIndex = '1100';
+        isOpen = true;
+
+        // 锚点定位
+        var rect = opts.anchor.getBoundingClientRect();
+        popover.style.position = 'fixed';
+        popover.style.left = rect.left + 'px';
+        popover.style.top = (rect.bottom + 4) + 'px';
+        requestAnimationFrame(function() {
+            var pr = popover.getBoundingClientRect();
+            if (pr.right > window.innerWidth - 8) {
+                popover.style.left = Math.max(8, window.innerWidth - pr.width - 8) + 'px';
+            }
+            if (pr.bottom > window.innerHeight - 8) {
+                popover.style.top = Math.max(8, rect.top - pr.height - 4) + 'px';
+            }
+        });
+    }
+
+    function _closeCallbackMode() {
+        var popover = document.getElementById('date-popover');
+        if (!popover) { _cbMode = null; isOpen = false; return; }
+        popover.style.display = 'none';
+        popover.style.position = '';
+        popover.style.left = '';
+        popover.style.top = '';
+        popover.style.zIndex = '';
+        isOpen = false;
+        // 归位到原 DOM 父节点(不破坏 todo modal 布局)
+        if (_cbMode && _cbMode.originalParent) {
+            if (_cbMode.originalNextSibling && _cbMode.originalNextSibling.parentNode === _cbMode.originalParent) {
+                _cbMode.originalParent.insertBefore(popover, _cbMode.originalNextSibling);
+            } else {
+                _cbMode.originalParent.appendChild(popover);
+            }
+        }
+        _cbMode = null;
+    }
+
     window.selectDate = function(dateStr) {
+        // T-104: callback 模式 — 不写 #modal-due-date,直接调 onSelect
+        if (_cbMode) {
+            var cb = _cbMode.onSelect;
+            _closeCallbackMode();
+            try { cb(dateStr); } catch (e) { console.error('[Datepicker] onSelect failed:', e); }
+            return;
+        }
         currentDate = new Date(dateStr + 'T00:00:00');
         updateDisplay();
         renderDateChips();
@@ -325,6 +441,13 @@
 
     window.clearDueDate = function(e) {
         if (e) e.stopPropagation();
+        // T-104: callback 模式 — 把 '' 喂给 onSelect 表示清空
+        if (_cbMode) {
+            var cb = _cbMode.onSelect;
+            _closeCallbackMode();
+            try { cb(''); } catch (e2) { console.error('[Datepicker] onSelect failed:', e2); }
+            return;
+        }
         currentDate = null;
         updateDisplay();
         var popover = document.getElementById('date-popover');
@@ -392,7 +515,12 @@
             }
             if (e.key === 'Escape') {
                 e.preventDefault();
-                window.toggleDatePicker();
+                // T-104: callback 模式直接关掉,不要走 modal toggle 逻辑
+                if (_cbMode) {
+                    _closeCallbackMode();
+                } else {
+                    window.toggleDatePicker();
+                }
             }
             if (e.key === 'Backspace' && !nlInput.value) {
                 window.clearDueDate();
@@ -403,6 +531,15 @@
     // Close popover when clicking outside
     document.addEventListener('mousedown', function(e) {
         if (!isOpen) return;
+        // T-104: callback 模式 — popover 已 reparent 到 body,用 popover + anchor 自己判
+        if (_cbMode) {
+            var popover = document.getElementById('date-popover');
+            var anchor = _cbMode.anchor;
+            if (popover && !popover.contains(e.target) && (!anchor || !anchor.contains(e.target))) {
+                _closeCallbackMode();
+            }
+            return;
+        }
         var picker = document.getElementById('smart-date-picker');
         if (picker && !picker.contains(e.target)) {
             document.getElementById('date-popover').style.display = 'none';

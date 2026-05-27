@@ -1,0 +1,1064 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二狗 · 工作任务表 — 设计预览</title>
+
+<!-- ===== 挂载 Next 真实 CSS,确保和线上视觉一致 ===== -->
+<link rel="stylesheet" href="assets/css/base.css">
+<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/components.css">
+<link rel="stylesheet" href="assets/css/mobile.css">
+<link rel="stylesheet" href="assets/css/english.css">
+
+<style>
+  /* ===== 仅「工作任务表」新功能样式,前缀 wt-;其余复用真实 CSS ===== */
+
+  /* Next 的 .life-main-layout 写死了 max-width:600px;工作表需铺满,覆盖掉 */
+  #work-view { max-width: none !important; margin: 0 !important; padding: 20px 28px !important; }
+  #work-table-view { max-width: none; width: 100%; }
+
+  .wt-back-btn {
+    background: none; border: none; color: var(--primary-color);
+    cursor: pointer; font-size: 0.92rem; padding: 6px 0; margin-bottom: 6px;
+  }
+  .wt-toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+  .wt-toolbar h2 { font-size: 1.45rem; margin: 0 6px 0 0; color: var(--text-primary); letter-spacing: .01em; }
+  .wt-total {
+    font-size: 0.82rem; color: #475569; margin-right: auto;
+    background: #F1F5F9; border: 1px solid #E2E8F0;
+    border-radius: 20px; padding: 4px 12px;
+  }
+
+  .wt-seg {
+    display: inline-flex; background: var(--bg-secondary);
+    border: 1px solid var(--border-color); border-radius: 10px; overflow: hidden;
+  }
+  .wt-seg button {
+    background: none; border: none; color: var(--text-secondary);
+    padding: 8px 16px; font-size: 0.88rem; cursor: pointer; transition: .15s;
+  }
+  .wt-seg button:hover { color: var(--text-primary); }
+  .wt-seg button.active { background: var(--primary-gradient); color: #fff; }
+  .wt-select {
+    background: var(--bg-input); color: var(--text-primary);
+    border: 1px solid var(--border-color); border-radius: 10px;
+    padding: 8px 13px; font-size: 0.88rem; cursor: pointer;
+  }
+  .wt-newbtn {
+    background: var(--primary-gradient); border: none; color: #fff; font-weight: 600;
+    border-radius: 10px; padding: 9px 17px; font-size: 0.88rem; cursor: pointer;
+  }
+
+  /* ============ 表格视图 ============ */
+  .wt-table-wrap {
+    border: 1px solid var(--border-color); border-radius: 16px;
+    overflow: hidden; background: var(--bg-card); box-shadow: var(--shadow-medium);
+  }
+  .wt-table-scroll { overflow-x: auto; }
+  table.wt-table {
+    /* width:auto + table-layout:fixed → 表格宽度 = 各列固定宽度之和。
+       拖动只在左右两列之间平移,总宽不变,其它列不动。 */
+    width: auto; border-collapse: collapse; table-layout: fixed;
+    font-size: 0.95rem;
+  }
+  .wt-table th {
+    text-align: left; padding: 14px 18px;
+    color: var(--text-muted); font-weight: 600; font-size: 0.8rem; letter-spacing: .03em;
+    background: #FAF9FC; border-bottom: 1px solid var(--border-color);
+    position: relative;
+  }
+  /* 列宽拖动条:贴在每个表头的右边缘 */
+  .wt-resizer {
+    position: absolute; top: 0; right: -3px; width: 7px; height: 100%;
+    cursor: col-resize; user-select: none; z-index: 2;
+  }
+  .wt-resizer::after {
+    content: ''; position: absolute; top: 22%; bottom: 22%; left: 50%;
+    width: 2px; margin-left: -1px; border-radius: 2px;
+    background: transparent; transition: background .12s;
+  }
+  .wt-resizer:hover::after, .wt-resizer.active::after { background: var(--primary-color); }
+  .wt-table td {
+    padding: 14px 18px; border-bottom: 1px solid var(--border-light);
+    color: var(--text-primary); vertical-align: middle;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .wt-table tbody tr:last-child td { border-bottom: none; }
+  .wt-table tbody tr:hover td { background: rgba(var(--primary-rgb), 0.055); }
+  .wt-table tr.wt-group-row td {
+    background: #F5F2FB; font-weight: 700;
+    color: var(--text-secondary); font-size: 0.82rem; cursor: pointer;
+    border-left: 3px solid var(--primary-color); padding-top: 10px; padding-bottom: 10px;
+  }
+
+  /* 序号列 */
+  .wt-num-th, .wt-num { text-align: center !important; padding-left: 8px !important; padding-right: 8px !important; }
+  .wt-num { color: var(--text-muted); font-size: 0.82rem; font-variant-numeric: tabular-nums; }
+
+  .wt-cell-title {
+    font-weight: 550; font-size: 1.02rem; color: var(--text-primary);
+    white-space: normal; line-height: 1.55; padding-right: 14px;
+    word-break: break-word;
+  }
+  .wt-editable { cursor: pointer; transition: box-shadow .12s; }
+  .wt-editable:hover { box-shadow: inset 0 0 0 1.5px rgba(var(--primary-rgb),.28); border-radius: 6px; }
+  .wt-empty { color: var(--text-muted); }
+  .wt-add-row td {
+    color: var(--primary-color); cursor: pointer; font-size: 0.9rem; font-weight: 500;
+    padding-top: 15px; padding-bottom: 15px;
+  }
+  .wt-add-row:hover td { background: rgba(var(--primary-rgb), 0.09); }
+
+  /* 药丸:状态 / 优先级 / 单选 */
+  .wt-pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 0.8rem; padding: 4px 11px; border-radius: 20px;
+    cursor: pointer; white-space: nowrap; border: 1px solid transparent; transition: filter .12s;
+  }
+  .wt-pill:hover { filter: none; box-shadow: 0 0 0 2px rgba(var(--primary-rgb),.14); }
+  .wt-pdot { width: 7px; height: 7px; border-radius: 50%; flex: 0 0 7px; }
+  /* 状态:柔和的语义浅彩 */
+  .s-todo    { background: #F1F5F9; color: #475569; }
+  .s-doing   { background: #FEF6E0; color: #8A5A1F; }
+  .s-blocked { background: #FDECEC; color: #A53636; }
+  .s-done    { background: #E7F6EC; color: #2A6E45; }
+  /* 优先级:统一描边款,饱和度更低 */
+  .p-high { background: #FDECEC; color: #A53636; border-color: #F3C9C9; }
+  .p-mid  { background: #FEF6E0; color: #8A5A1F; border-color: #F2DEA8; }
+  .p-low  { background: #F4F6F9; color: #64748B; border-color: #E2E8F0; }
+  /* 自定义单选:层级=雾紫,频率=雾蓝 */
+  .lv { background: #EEE9FA; color: #5B3E9E; }
+  .fq { background: #E6EEF8; color: #335E94; }
+  .wt-pill-empty { background: #F4F6F9; color: #94A3B8; }
+
+  .wt-assignee { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+  .wt-assignee .wt-aname { overflow: hidden; text-overflow: ellipsis; }
+  .wt-avatar {
+    width: 26px; height: 26px; border-radius: 50%; flex: 0 0 26px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.72rem; font-weight: 700; color: #fff;
+  }
+  .wt-due { font-variant-numeric: tabular-nums; }
+  .wt-due.overdue { color: var(--danger-color); font-weight: 600; }
+  .wt-tagchip {
+    display: inline-block; font-size: 0.74rem; padding: 2px 8px; margin: 1px 4px 1px 0;
+    border-radius: 6px; background: #EEE9FA; color: #5B3E9E;
+  }
+  .wt-check { cursor: pointer; font-size: 1.15rem; color: var(--text-secondary); }
+  .wt-check:hover { color: var(--primary-color); }
+
+  .wt-progress { display: flex; align-items: center; gap: 9px; }
+  .wt-track { flex: 1; height: 7px; background: #E8EAF0; border-radius: 4px; overflow: hidden; }
+  .wt-fill { height: 100%; border-radius: 4px; background: var(--primary-gradient); }
+  .wt-pct { font-size: 0.8rem; color: var(--text-muted); font-variant-numeric: tabular-nums; flex: 0 0 34px; text-align: right; }
+
+  /* 长文本:折叠成一个小图标,点击弹层 */
+  .wt-desc-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px; border-radius: 9px; cursor: pointer;
+    background: #F4F6F9; color: #94A3B8;
+    font-size: 0.95rem; transition: .12s;
+  }
+  .wt-desc-btn:hover { background: #E8EAF0; color: var(--primary-color); }
+  .wt-desc-btn.filled { background: #EEE9FA; color: #5B3E9E; }
+
+  /* 简介单元格:行内预览 + 展开按钮(默认能看到一段内容) */
+  .wt-desc-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .wt-desc-text {
+    flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    color: var(--text-secondary); font-size: 0.84rem; cursor: pointer; line-height: 1.5;
+  }
+  .wt-desc-text:hover { color: var(--text-primary); }
+  .wt-desc-expand {
+    flex: 0 0 auto; cursor: pointer; border: none;
+    background: #EEE9FA; color: #5B3E9E;
+    font-size: 0.74rem; font-weight: 500; padding: 4px 11px; border-radius: 12px;
+    transition: background .12s;
+  }
+  .wt-desc-expand:hover { background: #DCCFF3; }
+  .wt-desc-add {
+    cursor: pointer; color: #94A3B8; font-size: 0.84rem;
+  }
+  .wt-desc-add:hover { color: var(--primary-color); }
+
+  /* 弹层(简介 / 列设置共用) */
+  .wt-modal-overlay {
+    position: fixed; inset: 0; background: var(--overlay-bg);
+    display: none; align-items: center; justify-content: center;
+    z-index: 1000; padding: 24px; backdrop-filter: blur(2px);
+  }
+  .wt-modal-overlay.open { display: flex; }
+  .wt-modal {
+    background: var(--bg-card); border: 1px solid var(--border-color);
+    border-radius: 18px; width: 100%; max-width: 580px;
+    box-shadow: var(--shadow-medium); padding: 24px 24px 20px;
+  }
+  .wt-modal-title { font-size: 1.12rem; color: var(--text-primary); font-weight: 600; }
+  .wt-modal-sub { font-size: 0.8rem; color: var(--text-muted); margin: 3px 0 16px; }
+  .wt-modal textarea {
+    width: 100%; min-height: 240px; resize: vertical; box-sizing: border-box;
+    background: var(--bg-input); color: var(--text-primary);
+    border: 1px solid var(--border-color); border-radius: 12px;
+    padding: 14px 16px; font-size: 0.94rem; line-height: 1.8; font-family: inherit;
+  }
+  .wt-modal textarea:focus { outline: none; border-color: var(--primary-color); }
+  .wt-modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
+  .wt-mbtn {
+    padding: 9px 20px; border-radius: 10px; font-size: 0.88rem; cursor: pointer;
+    border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-secondary);
+  }
+  .wt-mbtn.primary { background: var(--primary-gradient); border: none; color: #fff; font-weight: 600; }
+
+  /* 列设置弹层内容 */
+  #wtColList { max-height: 58vh; overflow-y: auto; margin: 0 -4px; padding: 0 4px; }
+  .wt-colcfg { padding: 13px 2px; border-bottom: 1px solid var(--border-light); transition: background .12s; }
+  .wt-colcfg.dragging { opacity: 0.4; }
+  .wt-colcfg.dragover { background: rgba(124,77,255,.08); border-radius: 8px; }
+  .wt-colcfg-top { display: flex; gap: 10px; align-items: center; }
+  .wt-colcfg-handle {
+    flex: 0 0 22px; cursor: grab; color: #B0BFCE;
+    font-size: 1.2rem; text-align: center; user-select: none; line-height: 1;
+  }
+  .wt-colcfg-handle:hover { color: var(--primary-color); }
+  .wt-colcfg-handle:active { cursor: grabbing; }
+  .wt-colcfg-name {
+    flex: 1; min-width: 0; background: var(--bg-input); color: var(--text-primary);
+    border: 1px solid var(--border-color); border-radius: 9px; padding: 8px 12px; font-size: 0.92rem;
+  }
+  .wt-colcfg-name:focus { outline: none; border-color: var(--primary-color); }
+  .wt-colcfg-type {
+    background: var(--bg-input); color: var(--text-primary);
+    border: 1px solid var(--border-color); border-radius: 9px; padding: 8px 10px; font-size: 0.86rem; cursor: pointer;
+  }
+  .wt-colcfg-del, .wt-colcfg-lock {
+    flex: 0 0 32px; width: 32px; height: 32px; display: flex; align-items: center;
+    justify-content: center; border-radius: 8px; font-size: 0.9rem;
+  }
+  .wt-colcfg-del { cursor: pointer; }
+  .wt-colcfg-del:hover { background: var(--danger-color); }
+  .wt-colcfg-lock { opacity: .35; }
+  .wt-colcfg-opts { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; align-items: center; }
+  .wt-opt-chip {
+    display: inline-flex; align-items: center; gap: 4px; font-size: 0.8rem;
+    background: #EEE9FA; color: #5B3E9E; padding: 3px 4px 3px 11px; border-radius: 14px;
+  }
+  .wt-opt-label { cursor: pointer; }
+  .wt-opt-label:hover { text-decoration: underline; }
+  .wt-opt-x {
+    cursor: pointer; width: 17px; height: 17px; display: flex; align-items: center;
+    justify-content: center; border-radius: 50%; background: #E5E7EB; color: #64748B; font-size: 0.78rem;
+  }
+  .wt-opt-x:hover { background: var(--danger-color); color: #fff; }
+  .wt-opt-add {
+    font-size: 0.8rem; color: var(--primary-color); cursor: pointer;
+    padding: 4px 10px; border: 1px dashed var(--border-color); border-radius: 14px;
+  }
+  .wt-opt-add:hover { background: rgba(var(--primary-rgb),.1); }
+  .wt-colcfg-hint { font-size: 0.76rem; color: var(--text-muted); margin-top: 8px; }
+  .wt-addcol {
+    margin-top: 14px; width: 100%; padding: 11px; border: 1px dashed var(--border-color);
+    border-radius: 10px; background: none; color: var(--primary-color);
+    font-size: 0.9rem; font-weight: 500; cursor: pointer;
+  }
+  .wt-addcol:hover { background: rgba(var(--primary-rgb),.08); }
+
+  /* ============ 看板视图 ============ */
+  .wt-board { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 8px; }
+  .wt-col {
+    flex: 1 1 0; min-width: 250px;
+    background: #F6F4FA; border: 1px solid #E8E4F0;
+    border-radius: 14px; padding: 12px;
+  }
+  .wt-col-head {
+    display: flex; align-items: center; gap: 7px; padding: 2px 5px 0;
+    font-size: 0.92rem; font-weight: 600; margin-bottom: 12px; color: var(--text-primary);
+  }
+  .wt-count {
+    margin-left: auto; background: #F1F5F9;
+    color: #64748B; border-radius: 10px; padding: 2px 9px; font-size: 0.76rem;
+  }
+  .wt-col-body { min-height: 50px; display: flex; flex-direction: column; gap: 9px; }
+  .wt-col-body.drop-hover { outline: 2px dashed rgba(var(--primary-rgb),.5); border-radius: 10px; }
+  .wt-card {
+    background: var(--bg-card); border: 1px solid var(--border-color);
+    border-radius: 12px; padding: 12px 13px; cursor: grab; box-shadow: var(--shadow-soft);
+  }
+  .wt-card.dragging { opacity: .4; }
+  .wt-card-title { font-size: 0.92rem; line-height: 1.5; margin-bottom: 10px; color: var(--text-primary); }
+  .wt-card-meta { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+
+  /* ============ 日历视图 ============ */
+  .wt-cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+  .wt-cal-dow { text-align: center; font-size: 0.78rem; color: var(--text-muted); padding: 6px 0; }
+  .wt-cal-cell {
+    min-height: 96px; background: #F6F4FA;
+    border: 1px solid #E8E4F0; border-radius: 10px; padding: 7px;
+  }
+  .wt-cal-cell.dim { opacity: .3; }
+  .wt-cal-num { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 5px; }
+  .wt-cal-today { border-color: var(--primary-color); }
+  .wt-cal-today .wt-cal-num { color: var(--primary-color); font-weight: 700; }
+  .wt-cal-task {
+    font-size: 0.74rem; padding: 3px 7px; border-radius: 6px; margin-bottom: 4px;
+    background: #EEE9FA; color: #4B3284;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  /* 单选 / 多选弹出选项框(点药丸 → 弹候选 → 选 → 确认) */
+  .wt-pick-bd { position: fixed; inset: 0; z-index: 800; display: none; }
+  .wt-pick-bd.open { display: block; }
+  .wt-pick {
+    position: absolute; z-index: 810;
+    min-width: 200px; max-width: 300px;
+    background: #fff; border: 1px solid var(--border-color);
+    border-radius: 12px; box-shadow: var(--shadow-medium);
+    padding: 6px; display: none;
+  }
+  .wt-pick.open { display: block; }
+  .wt-pick-list { max-height: 280px; overflow-y: auto; }
+  .wt-pick-opt {
+    padding: 9px 12px; border-radius: 7px; cursor: pointer; font-size: 0.88rem;
+    color: var(--text-primary); display: flex; align-items: center; gap: 10px;
+  }
+  .wt-pick-opt:hover { background: #F4F6F9; }
+  .wt-pick-opt.selected { background: #EEE9FA; color: #5B3E9E; font-weight: 500; }
+  .wt-pick-check {
+    color: #B0BFCE; font-size: 0.95rem; width: 16px; text-align: center;
+    flex: 0 0 16px; line-height: 1;
+  }
+  .wt-pick-opt.selected .wt-pick-check { color: #5B3E9E; }
+  .wt-pick-actions {
+    display: flex; gap: 8px; justify-content: flex-end;
+    padding: 8px 4px 2px; border-top: 1px solid var(--border-light); margin-top: 6px;
+  }
+  .wt-pick-actions .wt-mbtn { padding: 6px 14px; font-size: 0.82rem; border-radius: 8px; }
+
+  .wt-hidden { display: none; }
+  .wt-note {
+    margin-top: 26px; padding: 15px 18px; font-size: 0.84rem; line-height: 1.85;
+    color: var(--text-secondary); background: #F8F6FC;
+    border: 1px solid #E8E4F0; border-radius: 12px;
+  }
+  .wt-note b { color: var(--primary-color); }
+  .preview-flag {
+    position: fixed; right: 12px; bottom: 12px; z-index: 999;
+    background: var(--primary-gradient); color: #fff;
+    font-size: 0.72rem; padding: 5px 11px; border-radius: 20px;
+  }
+</style>
+</head>
+<body>
+
+<header class="top-header" id="top-header">
+  <div class="header-left">
+    <span class="moment-icon">⛅</span>
+    <span class="moment-text">下午好，3件在推进</span>
+  </div>
+  <div class="header-right">
+    <div class="header-avatar-wrapper">
+      <div class="header-avatar"><span class="avatar-text">B</span></div>
+    </div>
+  </div>
+</header>
+
+<canvas id="living-line"></canvas>
+
+<div class="container">
+
+  <nav class="sidebar" id="sidebar">
+    <div class="nav-links">
+      <a class="nav-link" data-page="todo">Todo</a>
+      <a class="nav-link" data-page="review">例行</a>
+      <a class="nav-link" data-page="english">学习</a>
+      <a class="nav-link" data-page="life">生活</a>
+      <a class="nav-link active" data-page="work">工作</a>
+    </div>
+  </nav>
+
+  <main class="main-content" id="main-content">
+    <div class="life-main-layout" id="work-view">
+
+      <!-- 工作 Hub -->
+      <div class="life-hub" id="work-hub">
+        <div class="life-hub-header"><h2>工作</h2></div>
+        <div class="life-hub-grid">
+          <div class="life-hub-card" onclick="wtShowTable()">
+            <div class="life-hub-card-icon">📋</div>
+            <div class="life-hub-card-title">任务表</div>
+            <div class="life-hub-card-desc">表格 · 看板 · 日历 多视图</div>
+          </div>
+          <div class="life-hub-card life-hub-card-disabled">
+            <div class="life-hub-card-icon">📊</div>
+            <div class="life-hub-card-title">周报</div>
+            <div class="life-hub-card-desc">自动汇总本周进展</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 任务表 -->
+      <div id="work-table-view" style="display:none;">
+        <button class="wt-back-btn" onclick="wtShowHub()">&larr; 工作</button>
+        <div class="wt-toolbar">
+          <h2>任务表</h2>
+          <span class="wt-total" id="wtTotal">共 0 项</span>
+          <div class="wt-seg">
+            <button id="wtSegTable" class="active" onclick="wtSetView('table')">▦ 表格</button>
+            <button id="wtSegBoard" onclick="wtSetView('board')">▤ 看板</button>
+            <button id="wtSegCal"   onclick="wtSetView('cal')">▥ 日历</button>
+          </div>
+          <select class="wt-select" id="wtFilter" onchange="wtRender()">
+            <option value="">全部责任人</option>
+          </select>
+          <select class="wt-select" id="wtGroup" onchange="wtRender()">
+            <option value="">不分组</option>
+            <option value="level">按层级分组</option>
+            <option value="assignee">按责任人分组</option>
+            <option value="status">按状态分组</option>
+          </select>
+          <button class="wt-select" onclick="wtOpenCols()" title="编辑表头、列类型、增删列">⚙ 列设置</button>
+          <button class="wt-newbtn" onclick="wtAddRow()">+ 新建任务</button>
+        </div>
+
+        <div id="wtTableView" class="wt-table-wrap"></div>
+        <div id="wtBoardView" class="wt-board wt-hidden"></div>
+        <div id="wtCalView" class="wt-hidden"></div>
+
+        <div class="wt-note">
+          <b>设计要点</b> · 工作 Hub 下一张<b>独立的 work_tasks 表</b>,完全由<b>列配置驱动</b> —— 单元格按列类型动态生成。
+          <br>每行带<b>序号</b>,工具栏左侧显示<b>总数</b>。「+ 新建任务」在工具栏(右上)和表格底部都有 —— <b>首行不再是"新建",避免误点</b>。
+          <br><b>「⚙ 列设置」</b>里可改列名 / 列类型 / 单选选项,<b>拖动 ≡ 调整列顺序</b>,并能<b>新增列、删除自定义列</b>(内置 9 列带 🔒 不可删)。
+          <br>列与列<b>之间</b>的竖条悬停 → 出现 ↔ 光标,按住左右拖 —— <b>Excel 风格</b>:
+          只改变这根竖条<b>左右两列</b>的宽度(左增多少、右就减多少),其它列纹丝不动,
+          <b>表格总宽度也不变</b>。每列各自有<b>最小宽度</b>(任务 200 / 简介 140 / 责任人 100 / 各药丸列 60–90 等),
+          拖到对方触底就拖不动了 —— 不会把列挤没。最右一列右侧是表格边界,所以没有拖动条。
+          <br><b>简介</b>列默认显示一段预览(超出部分用 … 截断),点「展开」按钮 / 直接点文字 弹层看全文并编辑。
+          <br>试试:列设置 →「+ 新增列」 · 点状态/优先级/层级/频率的药丸 → <b>弹出候选 → 选 → 确认</b>(不再是循环切换,避免误改) · 切换表格 / 看板 / 日历。
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<!-- 长文本弹层 -->
+<div class="wt-modal-overlay" id="wtModal" onclick="if(event.target===this)wtCloseDesc()">
+  <div class="wt-modal">
+    <div class="wt-modal-title" id="wtModalTitle">任务标题</div>
+    <div class="wt-modal-sub" id="wtModalSub">长文本 · 可输入大段说明、背景、要点</div>
+    <textarea id="wtModalText" placeholder="在这里写详细内容……"></textarea>
+    <div class="wt-modal-actions">
+      <button class="wt-mbtn" onclick="wtCloseDesc()">取消</button>
+      <button class="wt-mbtn primary" onclick="wtSaveDesc()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 列设置弹层 -->
+<div class="wt-modal-overlay" id="wtColModal" onclick="if(event.target===this)wtCloseCols()">
+  <div class="wt-modal" style="max-width:640px">
+    <div class="wt-modal-title">列设置</div>
+    <div class="wt-modal-sub">拖动 ≡ 调整列顺序 · 改列名 / 设类型 / 增删选项 · 底部可新增列</div>
+    <div id="wtColList"></div>
+    <div class="wt-modal-actions">
+      <button class="wt-mbtn primary" onclick="wtCloseCols()">完成</button>
+    </div>
+  </div>
+</div>
+
+<!-- 单选 / 多选弹出选项框 -->
+<div class="wt-pick-bd" id="wtPickBd" onclick="wtClosePick()"></div>
+<div class="wt-pick" id="wtPick"></div>
+
+<div class="preview-flag">设计预览 · 非线上界面</div>
+
+<script>
+  /* ===== 示例数据:work_tasks 表的行 ===== */
+  var WT = [
+    { id:1, title:'牵头编制学院年度科研规划', assignee:'我',    level:'院', freq:'一次性', status:'doing',   priority:'high', due:'05-30', progress:60,
+      desc:'依据学校十五五规划要求，牵头组织学院各系所提交科研方向与重点项目清单。\n\n关键节点：\n· 5 月底前完成初稿\n· 6 月上旬上院学术委员会评审\n\n重点关注：\n1) 国家重大专项的对接与申报；\n2) 青年人才科研启动经费的统筹安排；\n3) 与产业界联合实验室的布局方案。' },
+    { id:2, title:'所务会材料准备',           assignee:'二狗W', level:'所', freq:'每周',   status:'doing',   priority:'high', due:'05-25', progress:30,
+      desc:'每周五所务会前，整理三部分材料：本周进展、待决议事项、下周计划。模板见所内共享盘。' },
+    { id:3, title:'实验室安全月度自查',       assignee:'李工',  level:'所', freq:'每月',   status:'todo',    priority:'mid',  due:'05-31', progress:0,  desc:'' },
+    { id:4, title:'等院里下发考核口径',       assignee:'院办',  level:'院', freq:'一次性', status:'blocked', priority:'high', due:'05-22', progress:0,
+      desc:'考核口径未明确前无法启动后续分解，已向院办发函催办，预计本周内答复。' },
+    { id:5, title:'课题组周例会',             assignee:'我',    level:'组', freq:'每周',   status:'todo',    priority:'low',  due:'05-26', progress:0,  desc:'' },
+    { id:6, title:'季度经费报表归集',         assignee:'王会计',level:'所', freq:'每季',   status:'todo',    priority:'mid',  due:'06-15', progress:0,  desc:'' },
+    { id:7, title:'确认任务表字段定稿',       assignee:'我',    level:'个人',freq:'一次性', status:'done',    priority:'high', due:'05-21', progress:100, desc:'字段已定稿。' },
+    { id:8, title:'院学术委员会评审准备',     assignee:'二狗W', level:'院', freq:'一次性', status:'blocked', priority:'mid',  due:'05-24', progress:0,  desc:'' },
+  ];
+  var WT_TODAY = '05-22';
+  var wtView = 'table';
+  var wtSeq = 100;       /* 行 id 自增 */
+  var wtColSeq = 1;      /* 自定义列 key 自增 */
+
+  var WT_STATUS = [
+    { key:'todo',    label:'待办',   cls:'s-todo',    dot:'#94a3b8' },
+    { key:'doing',   label:'进行中', cls:'s-doing',   dot:'#fbbf24' },
+    { key:'blocked', label:'阻塞',   cls:'s-blocked', dot:'#f87171' },
+    { key:'done',    label:'已完成', cls:'s-done',    dot:'#34d399' },
+  ];
+  var WT_PRIO  = [ {key:'high',label:'高'}, {key:'mid',label:'中'}, {key:'low',label:'低'} ];
+  var WT_PCLS  = { high:'p-high', mid:'p-mid', low:'p-low' };
+  /* 单选列的可选值 —— 在「列设置」里由你自己增删改 */
+  var WT_LEVELS = ['院','所','组','个人'];
+  var WT_FREQS  = ['一次性','每日','每周','每月','每季'];
+
+  /* ===== 列类型 ===== */
+  var WT_TYPES = [
+    {key:'text',    label:'单行文本'}, {key:'longtext', label:'长文本'},
+    {key:'select',  label:'单选'},     {key:'multi',    label:'多选'},
+    {key:'number',  label:'数字'},     {key:'percent',  label:'百分比'},
+    {key:'date',    label:'日期'},     {key:'checkbox', label:'勾选'},
+    {key:'status',  label:'状态'},
+  ];
+  /* ===== 列配置:整张表完全由这个数组驱动 ===== */
+  /* 每列有 w(默认宽度)和 min(最小宽度);拖动时双方都不能被挤到 min 以下 */
+  var WT_COLS = [
+    {key:'title',    name:'任务',   type:'text',     builtin:true, w:'320px', min:'200px'},
+    {key:'desc',     name:'简介',   type:'longtext', builtin:true, w:'240px', min:'140px'},
+    {key:'assignee', name:'责任人', type:'text',     builtin:true, w:'132px', min:'100px'},
+    {key:'level',    name:'层级',   type:'select',   builtin:true, w:'88px',  min:'70px',  opts:WT_LEVELS},
+    {key:'freq',     name:'频率',   type:'select',   builtin:true, w:'96px',  min:'80px',  opts:WT_FREQS},
+    {key:'status',   name:'状态',   type:'status',   builtin:true, sys:true,  w:'104px', min:'90px'},
+    {key:'priority', name:'优先级', type:'select',   builtin:true, sys:true,  w:'78px',  min:'60px'},
+    {key:'due',      name:'截止日', type:'date',     builtin:true, w:'96px',  min:'80px'},
+    {key:'progress', name:'进度',   type:'percent',  builtin:true, w:'130px', min:'100px'},
+  ];
+  function wtColByKey(k){ for(var i=0;i<WT_COLS.length;i++) if(WT_COLS[i].key===k) return WT_COLS[i]; return null; }
+
+  function wtSt(k){ return WT_STATUS.filter(function(s){return s.key===k;})[0]; }
+  /* 头像配色:4 个低饱和色,减少视觉噪音 */
+  var WT_COLORS = {}, WT_PAL = ['#7C4DFF','#14B8A6','#E0A23B','#3B82F6'];
+  function wtColor(n){
+    if(!WT_COLORS[n]) WT_COLORS[n] = WT_PAL[Object.keys(WT_COLORS).length % WT_PAL.length];
+    return WT_COLORS[n];
+  }
+  function wtRow(id){ return WT.filter(function(x){return x.id===id;})[0]; }
+  function wtEsc(s){ return (''+s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  function wtShowHub(){
+    document.getElementById('work-hub').style.display='';
+    document.getElementById('work-table-view').style.display='none';
+  }
+  function wtShowTable(){
+    document.getElementById('work-hub').style.display='none';
+    document.getElementById('work-table-view').style.display='';
+    wtRender();
+  }
+  function wtSetView(v){
+    wtView=v;
+    document.getElementById('wtSegTable').classList.toggle('active',v==='table');
+    document.getElementById('wtSegBoard').classList.toggle('active',v==='board');
+    document.getElementById('wtSegCal').classList.toggle('active',v==='cal');
+    document.getElementById('wtTableView').classList.toggle('wt-hidden',v!=='table');
+    document.getElementById('wtBoardView').classList.toggle('wt-hidden',v!=='board');
+    document.getElementById('wtCalView').classList.toggle('wt-hidden',v!=='cal');
+    wtRender();
+  }
+
+  var wtFilled=false;
+  function wtFillFilter(){
+    if(wtFilled) return;
+    var sel=document.getElementById('wtFilter'), names=[];
+    WT.forEach(function(t){ if(names.indexOf(t.assignee)<0) names.push(t.assignee); });
+    names.forEach(function(n){ var o=document.createElement('option'); o.value=n; o.textContent=n; sel.appendChild(o); });
+    wtFilled=true;
+  }
+  function wtVisible(){
+    var f=document.getElementById('wtFilter').value;
+    return WT.filter(function(t){ return !f || t.assignee===f; });
+  }
+
+  /* ===== 单元格编辑(按类型) ===== */
+  function wtEdit(id,key){
+    var t=wtRow(id); if(!t) return;
+    var c=wtColByKey(key);
+    var v=prompt('修改「'+(c?c.name:key)+'」:', t[key]==null?'':t[key]);
+    if(v!==null){ t[key]=v.trim(); wtRender(); }
+  }
+  function wtEditNum(id,key){
+    var t=wtRow(id); if(!t) return;
+    var c=wtColByKey(key);
+    var v=prompt('修改「'+(c?c.name:key)+'」(数字):', t[key]==null?'':t[key]);
+    if(v!==null){ var n=parseFloat(v); t[key]=isNaN(n)?0:n; wtRender(); }
+  }
+  function wtEditMulti(id,key){
+    var t=wtRow(id); if(!t) return;
+    var c=wtColByKey(key);
+    var v=prompt('修改「'+(c?c.name:key)+'」(多个值用、或 , 分隔):', (t[key]||[]).join('、'));
+    if(v!==null){ t[key]=v.split(/[、,，]/).map(function(s){return s.trim();}).filter(Boolean); wtRender(); }
+  }
+  function wtToggle(id,key){ var t=wtRow(id); if(t){ t[key]=!t[key]; wtRender(); } }
+  function wtCycleCol(id,key){
+    var t=wtRow(id); if(!t) return;
+    var c=wtColByKey(key), opts=(c&&c.opts)?c.opts:[];
+    if(!opts.length){ alert('该列还没有选项 —— 请在「⚙ 列设置」里添加'); return; }
+    t[key]=opts[(opts.indexOf(t[key])+1)%opts.length];
+    wtRender();
+  }
+  function wtCycleStatus(id){
+    var t=wtRow(id); if(!t) return;
+    var keys=WT_STATUS.map(function(s){return s.key;});
+    t.status=keys[(keys.indexOf(t.status)+1)%keys.length];
+    if(t.status==='done') t.progress=100;
+    wtRender();
+  }
+  function wtCyclePrio(id){
+    var t=wtRow(id); if(!t) return;
+    var keys=WT_PRIO.map(function(p){return p.key;});
+    t.priority=keys[(keys.indexOf(t.priority)+1)%keys.length];
+    wtRender();
+  }
+  function wtAddRow(){
+    var name=prompt('新任务标题:'); if(!name||!name.trim()) return;
+    WT.push({ id:++wtSeq, title:name.trim(), assignee:'我', level:'个人', freq:'一次性',
+              status:'todo', priority:'mid', due:WT_TODAY, progress:0, desc:'' });
+    if(wtView!=='table') wtSetView('table'); else wtRender();
+  }
+
+  function wtAvatar(n){ return '<span class="wt-avatar" style="background:'+wtColor(n)+'">'+wtEsc((''+n).slice(0,1))+'</span>'; }
+  function wtStatusPill(t){
+    var s=wtSt(t.status)||WT_STATUS[0];
+    return '<span class="wt-pill '+s.cls+'" onclick="wtOpenPick('+t.id+',\'status\',this)"><span class="wt-pdot" style="background:'+s.dot+'"></span>'+s.label+'</span>';
+  }
+  function wtPrioPill(t){
+    var p=WT_PRIO.filter(function(x){return x.key===t.priority;})[0]||WT_PRIO[1];
+    return '<span class="wt-pill '+WT_PCLS[p.key]+'" onclick="wtOpenPick('+t.id+',\'priority\',this)">'+p.label+'</span>';
+  }
+  /* 长文本单元格:有内容时显示预览 + 展开按钮;空时显示"+ 添加简介" */
+  function wtDescCell(t,field){
+    var v=t[field], has=v&&(''+v).trim();
+    if(!has){
+      return '<span class="wt-desc-add" onclick="wtOpenDesc('+t.id+',\''+field+'\')">+ 添加简介</span>';
+    }
+    var preview=(''+v).replace(/\s+/g,' ').trim();
+    return '<div class="wt-desc-row">'
+      + '<span class="wt-desc-text" title="点击展开看全文" onclick="wtOpenDesc('+t.id+',\''+field+'\')">'+wtEsc(preview)+'</span>'
+      + '<button class="wt-desc-expand" onclick="wtOpenDesc('+t.id+',\''+field+'\')">展开</button>'
+      + '</div>';
+  }
+
+  /* ===== 长文本弹层 ===== */
+  var wtDescId=null, wtDescField='desc';
+  function wtOpenDesc(id,field){
+    var t=wtRow(id); if(!t) return;
+    wtDescId=id; wtDescField=field||'desc';
+    var c=wtColByKey(wtDescField);
+    document.getElementById('wtModalTitle').textContent=t.title||'(无标题)';
+    document.getElementById('wtModalSub').textContent=(c?c.name:'长文本')+' · 可输入大段文字、换行、分点';
+    document.getElementById('wtModalText').value=t[wtDescField]||'';
+    document.getElementById('wtModal').classList.add('open');
+    document.getElementById('wtModalText').focus();
+  }
+  function wtCloseDesc(){ document.getElementById('wtModal').classList.remove('open'); wtDescId=null; }
+  function wtSaveDesc(){
+    var t=wtRow(wtDescId);
+    if(t) t[wtDescField]=document.getElementById('wtModalText').value;
+    wtCloseDesc(); wtRender();
+  }
+
+  /* ===== 列设置弹层 ===== */
+  function wtOpenCols(){ wtRenderColList(); document.getElementById('wtColModal').classList.add('open'); }
+  function wtCloseCols(){ document.getElementById('wtColModal').classList.remove('open'); }
+  function wtTypeHint(tp){
+    var m={ text:'单元格内点击输入短文字', longtext:'折叠成图标,点击弹层编辑大段文字',
+      number:'纯数字,点击输入', percent:'0–100,显示为进度条', date:'点击输入日期(正式版出日期选择器)',
+      checkbox:'勾选框,是 / 否' };
+    return m[tp]||'';
+  }
+  function wtRenderColList(){
+    var html='';
+    WT_COLS.forEach(function(c,i){
+      html+='<div class="wt-colcfg"'
+        +' ondragover="wtColDragOver(event,'+i+')"'
+        +' ondragleave="wtColDragLeave('+i+')"'
+        +' ondrop="wtColDrop(event,'+i+')">';
+      html+='<div class="wt-colcfg-top">';
+      html+='<span class="wt-colcfg-handle" draggable="true"'
+        +' ondragstart="wtColDragStart(event,'+i+')" ondragend="wtColDragEnd()"'
+        +' title="按住拖动 ↕ 调整列顺序">≡</span>';
+      html+='<input class="wt-colcfg-name" value="'+wtEsc(c.name)+'" onchange="wtColRename('+i+',this.value)">';
+      html+='<select class="wt-colcfg-type" onchange="wtColType('+i+',this.value)">';
+      WT_TYPES.forEach(function(tp){
+        html+='<option value="'+tp.key+'"'+(tp.key===c.type?' selected':'')+'>'+tp.label+'</option>';
+      });
+      html+='</select>';
+      if(c.builtin) html+='<span class="wt-colcfg-lock" title="内置列,不可删除">🔒</span>';
+      else html+='<span class="wt-colcfg-del" title="删除此列" onclick="wtColDelete('+i+')">🗑</span>';
+      html+='</div>';
+      if(c.sys){
+        html+='<div class="wt-colcfg-hint">系统列 —— 选项语义固定(驱动看板 / 优先级配色)</div>';
+      } else if(c.type==='select'||c.type==='multi'){
+        if(!c.opts) c.opts=[];
+        html+='<div class="wt-colcfg-opts">';
+        c.opts.forEach(function(o,oi){
+          html+='<span class="wt-opt-chip"><span class="wt-opt-label" title="点击重命名" onclick="wtColRenOpt('+i+','+oi+')">'+wtEsc(o)+'</span>'
+            +'<span class="wt-opt-x" title="删除" onclick="wtColDelOpt('+i+','+oi+')">×</span></span>';
+        });
+        html+='<span class="wt-opt-add" onclick="wtColAddOpt('+i+')">+ 选项</span></div>';
+      } else {
+        html+='<div class="wt-colcfg-hint">'+wtTypeHint(c.type)+'</div>';
+      }
+      html+='</div>';
+    });
+    html+='<button class="wt-addcol" onclick="wtColAdd()">+ 新增列</button>';
+    document.getElementById('wtColList').innerHTML=html;
+  }
+  function wtColRename(i,v){ if(v&&v.trim()){ WT_COLS[i].name=v.trim(); wtRender(); } }
+  function wtColType(i,v){
+    WT_COLS[i].type=v;
+    if((v==='select'||v==='multi') && !WT_COLS[i].sys && !WT_COLS[i].opts) WT_COLS[i].opts=[];
+    wtRenderColList(); wtRender();
+  }
+  function wtColAddOpt(i){
+    var v=prompt('新选项名称:');
+    if(v&&v.trim()){ WT_COLS[i].opts.push(v.trim()); wtRenderColList(); wtRender(); }
+  }
+  function wtColDelOpt(i,oi){ WT_COLS[i].opts.splice(oi,1); wtRenderColList(); wtRender(); }
+  function wtColRenOpt(i,oi){
+    var col=WT_COLS[i], old=col.opts[oi];
+    var v=prompt('重命名选项:',old);
+    if(v&&v.trim()){
+      v=v.trim();
+      WT.forEach(function(t){ if(t[col.key]===old) t[col.key]=v; });
+      col.opts[oi]=v;
+      wtRenderColList(); wtRender();
+    }
+  }
+  function wtColAdd(){
+    var name=prompt('新列名称:'); if(!name||!name.trim()) return;
+    WT_COLS.push({ key:'c'+(wtColSeq++), name:name.trim(), type:'text', w:'140px', min:'80px' });
+    wtRenderColList(); wtRender();
+  }
+  function wtColDelete(i){
+    var c=WT_COLS[i];
+    if(c.builtin) return;
+    if(!confirm('删除列「'+c.name+'」?该列数据会一并移除。')) return;
+    WT.forEach(function(t){ delete t[c.key]; });
+    WT_COLS.splice(i,1);
+    wtRenderColList(); wtRender();
+  }
+
+  /* ===== 列顺序拖动 ===== */
+  var wtDragColIdx=null;
+  function wtColDragStart(e,i){
+    wtDragColIdx=i;
+    e.dataTransfer.effectAllowed='move';
+    try{ e.dataTransfer.setData('text/plain',''+i); }catch(_){}
+    var rows=document.querySelectorAll('#wtColList .wt-colcfg');
+    if(rows[i]) rows[i].classList.add('dragging');
+  }
+  function wtColDragEnd(){
+    document.querySelectorAll('#wtColList .wt-colcfg').forEach(function(r){
+      r.classList.remove('dragging','dragover');
+    });
+    wtDragColIdx=null;
+  }
+  function wtColDragOver(e,i){
+    if(wtDragColIdx===null||wtDragColIdx===i) return;
+    e.preventDefault();
+    var rows=document.querySelectorAll('#wtColList .wt-colcfg');
+    if(rows[i]) rows[i].classList.add('dragover');
+  }
+  function wtColDragLeave(i){
+    var rows=document.querySelectorAll('#wtColList .wt-colcfg');
+    if(rows[i]) rows[i].classList.remove('dragover');
+  }
+  function wtColDrop(e,i){
+    e.preventDefault();
+    if(wtDragColIdx===null||wtDragColIdx===i){ wtColDragEnd(); return; }
+    var moved=WT_COLS.splice(wtDragColIdx,1)[0];
+    /* splice 后,目标位置如果在源之后会前移 1 */
+    var target = (wtDragColIdx<i) ? i-1 : i;
+    WT_COLS.splice(target,0,moved);
+    wtColDragEnd();
+    wtRenderColList(); wtRender();
+  }
+
+  /* ===== 列宽拖动:Excel 风格 —— 只调整竖条左右两列,其余列不动,表格总宽不变 ===== */
+  var wtResize = null;
+  function wtResizeStart(e, idx){
+    e.preventDefault(); e.stopPropagation();
+    var table = document.querySelector('#wtTableView table.wt-table');
+    if(!table) return;
+    /* colgroup / thead:第 0 列是「序号」,WT_COLS 第 i 列对应 col[i+1] / th[i+1] */
+    var cols = table.querySelectorAll('colgroup col');
+    var ths  = table.querySelectorAll('thead th');
+    var col = cols[idx+1], nextCol = cols[idx+2];
+    var th  = ths[idx+1],  nextTh  = ths[idx+2];
+    if(!col || !nextCol) return;        /* 最后一列没有 nextCol,不应进入这里 */
+    wtResize = {
+      col: col, nextCol: nextCol, idx: idx, handle: e.target,
+      startX: e.clientX,
+      startW: th.getBoundingClientRect().width,
+      nextW:  nextTh.getBoundingClientRect().width
+    };
+    if(e.target && e.target.classList) e.target.classList.add('active');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    document.addEventListener('mousemove', wtResizeMove);
+    document.addEventListener('mouseup', wtResizeEnd);
+  }
+  function wtResizeMove(e){
+    if(!wtResize) return;
+    /* 每列各自的最小宽度(WT_COLS[i].min),没设则用 60 兜底 */
+    var leftMin  = parseInt((WT_COLS[wtResize.idx  ]||{}).min, 10) || 60;
+    var rightMin = parseInt((WT_COLS[wtResize.idx+1]||{}).min, 10) || 60;
+    var delta = e.clientX - wtResize.startX;
+    var maxDelta =   wtResize.nextW  - rightMin;   /* 右列最多被吃到自己的 min */
+    var minDelta = -(wtResize.startW - leftMin);   /* 左列最多被吃到自己的 min */
+    delta = Math.max(minDelta, Math.min(maxDelta, delta));
+    /* 左 +delta,右 -delta —— 总宽不变 */
+    wtResize.col.style.width     = (wtResize.startW + delta) + 'px';
+    wtResize.nextCol.style.width = (wtResize.nextW  - delta) + 'px';
+  }
+  function wtResizeEnd(){
+    if(!wtResize) return;
+    WT_COLS[wtResize.idx].w     = wtResize.col.style.width;       /* 持久化 */
+    WT_COLS[wtResize.idx+1].w   = wtResize.nextCol.style.width;
+    if(wtResize.handle && wtResize.handle.classList) wtResize.handle.classList.remove('active');
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    document.removeEventListener('mousemove', wtResizeMove);
+    document.removeEventListener('mouseup', wtResizeEnd);
+    wtResize = null;
+  }
+
+  /* ===== 单选 / 多选弹出选项框 ===== */
+  var wtPickState = null;
+  function wtOpenPick(id, key, anchor){
+    var t = wtRow(id); if(!t) return;
+    var c = wtColByKey(key); if(!c) return;
+    var isMulti = (c.type==='multi');
+    var opts;
+    if(key==='status') opts = WT_STATUS.map(function(s){ return {key:s.key,label:s.label}; });
+    else if(key==='priority') opts = WT_PRIO.map(function(p){ return {key:p.key,label:p.label}; });
+    else opts = (c.opts||[]).map(function(o){ return {key:o,label:o}; });
+    if(!opts.length){ alert('该列还没有选项 —— 请在「⚙ 列设置」里添加'); return; }
+    var chosen;
+    if(isMulti) chosen = (t[key]||[]).slice();
+    else chosen = (t[key]!=null && t[key]!=='') ? [t[key]] : [];
+    wtPickState = { id:id, key:key, isMulti:isMulti, opts:opts, chosen:chosen };
+    wtRenderPick();
+    /* 定位:贴在锚点药丸下方,溢出屏幕右侧时左移 */
+    var rect = anchor.getBoundingClientRect();
+    var pop = document.getElementById('wtPick');
+    var vw = window.innerWidth || document.documentElement.clientWidth;
+    var maxLeft = vw - 310;
+    pop.style.left = Math.max(8, Math.min(maxLeft, rect.left + window.scrollX)) + 'px';
+    pop.style.top = (rect.bottom + window.scrollY + 6) + 'px';
+    document.getElementById('wtPickBd').classList.add('open');
+    pop.classList.add('open');
+  }
+  function wtRenderPick(){
+    var s = wtPickState; if(!s) return;
+    var html = '<div class="wt-pick-list">';
+    s.opts.forEach(function(o,oi){
+      var checked = s.chosen.indexOf(o.key)>=0;
+      var mark = s.isMulti ? (checked?'☑':'☐') : (checked?'●':'○');
+      html += '<div class="wt-pick-opt'+(checked?' selected':'')+'" onclick="wtPickToggle('+oi+')">'
+           +  '<span class="wt-pick-check">'+mark+'</span>'
+           +  '<span>'+wtEsc(o.label)+'</span>'
+           +  '</div>';
+    });
+    html += '</div>';
+    html += '<div class="wt-pick-actions">'
+         +  '<button class="wt-mbtn" onclick="wtClosePick()">取消</button>'
+         +  '<button class="wt-mbtn primary" onclick="wtPickConfirm()">确认</button></div>';
+    document.getElementById('wtPick').innerHTML = html;
+  }
+  function wtPickToggle(idx){
+    var s = wtPickState; if(!s) return;
+    var k = s.opts[idx].key;
+    if(s.isMulti){
+      var i = s.chosen.indexOf(k);
+      if(i>=0) s.chosen.splice(i,1); else s.chosen.push(k);
+    } else {
+      s.chosen = [k];
+    }
+    wtRenderPick();
+  }
+  function wtPickConfirm(){
+    var s = wtPickState; if(!s) return;
+    var t = wtRow(s.id);
+    if(t){
+      if(s.isMulti) t[s.key] = s.chosen.slice();
+      else {
+        var k = s.chosen[0] != null ? s.chosen[0] : '';
+        t[s.key] = k;
+        if(s.key==='status' && k==='done') t.progress = 100;
+      }
+    }
+    wtClosePick(); wtRender();
+  }
+  function wtClosePick(){
+    var pop = document.getElementById('wtPick');
+    var bd = document.getElementById('wtPickBd');
+    if(pop) pop.classList.remove('open');
+    if(bd) bd.classList.remove('open');
+    wtPickState = null;
+  }
+
+  function wtRender(){
+    wtFillFilter();
+    var rows=wtVisible();
+    document.getElementById('wtTotal').textContent='共 '+rows.length+' 项';
+    if(wtView==='table') wtRenderTable(rows);
+    else if(wtView==='board') wtRenderBoard(rows);
+    else wtRenderCal(rows);
+  }
+
+  /* ---- 表格视图:单元格按列类型动态生成 ---- */
+  function wtCell(t,c){
+    var k=c.key, v=t[k];
+    if(k==='title')
+      return '<td class="wt-cell-title wt-editable" onclick="wtEdit('+t.id+',\''+k+'\')">'+(v?wtEsc(v):'<span class="wt-empty">(无标题)</span>')+'</td>';
+    if(k==='assignee')
+      return '<td class="wt-editable" onclick="wtEdit('+t.id+',\''+k+'\')"><span class="wt-assignee">'+wtAvatar(v||'?')+'<span class="wt-aname">'+wtEsc(v||'—')+'</span></span></td>';
+    if(k==='priority') return '<td>'+wtPrioPill(t)+'</td>';
+    if(c.type==='status') return '<td>'+wtStatusPill(t)+'</td>';
+    switch(c.type){
+      case 'longtext':
+        return '<td>'+wtDescCell(t,k)+'</td>';
+      case 'select': {
+        var has=v!=null&&v!=='';
+        var cls=(k==='freq')?'fq':'lv';
+        return '<td>'+(has
+          ? '<span class="wt-pill '+cls+'" onclick="wtOpenPick('+t.id+',\''+k+'\',this)">'+wtEsc(v)+'</span>'
+          : '<span class="wt-pill wt-pill-empty" onclick="wtOpenPick('+t.id+',\''+k+'\',this)">选择</span>')+'</td>';
+      }
+      case 'multi': {
+        var arr=v||[];
+        var inner=arr.length
+          ? arr.map(function(x){return '<span class="wt-tagchip">'+wtEsc(x)+'</span>';}).join('')
+          : '<span class="wt-empty">—</span>';
+        return '<td class="wt-editable" onclick="wtOpenPick('+t.id+',\''+k+'\',this)">'+inner+'</td>';
+      }
+      case 'number':
+        return '<td class="wt-editable" onclick="wtEditNum('+t.id+',\''+k+'\')">'+(v!=null&&v!==''?wtEsc(v):'<span class="wt-empty">—</span>')+'</td>';
+      case 'percent': {
+        var p=Math.max(0,Math.min(100,+v||0));
+        return '<td class="wt-editable" onclick="wtEditNum('+t.id+',\''+k+'\')"><div class="wt-progress"><span class="wt-track"><span class="wt-fill" style="width:'+p+'%"></span></span><span class="wt-pct">'+p+'%</span></div></td>';
+      }
+      case 'date': {
+        var overdue=(k==='due'&&t.status!=='done'&&v&&v<WT_TODAY)?' overdue':'';
+        return '<td class="wt-editable wt-due'+overdue+'" onclick="wtEdit('+t.id+',\''+k+'\')">'+(v?wtEsc(v):'<span class="wt-empty">—</span>')+'</td>';
+      }
+      case 'checkbox':
+        return '<td><span class="wt-check" onclick="wtToggle('+t.id+',\''+k+'\')">'+(v?'☑':'☐')+'</span></td>';
+      default:
+        return '<td class="wt-editable" onclick="wtEdit('+t.id+',\''+k+'\')">'+(v?wtEsc(v):'<span class="wt-empty">—</span>')+'</td>';
+    }
+  }
+  function wtRowHTML(t,num){
+    var tds='<td class="wt-num">'+num+'</td>';
+    WT_COLS.forEach(function(c){ tds+=wtCell(t,c); });
+    return '<tr>'+tds+'</tr>';
+  }
+  function wtRenderTable(rows){
+    var SERIAL_W = 54;
+    /* 表格宽度 = 序号列 + 各列宽之和;table-layout:fixed 要求 table 有显式宽度才严格按 col 走。
+       缺省宽度 130,作为列没设宽度时的兜底。 */
+    var sumW = SERIAL_W + WT_COLS.reduce(function(a,c){
+      return a + (parseInt(c.w,10) || 130);
+    }, 0);
+    var cols='<colgroup><col style="width:'+SERIAL_W+'px">'
+      + WT_COLS.map(function(c){ var w = c.w || '130px'; return '<col style="width:'+w+'">'; }).join('')
+      + '</colgroup>';
+    var head='<thead><tr><th class="wt-num-th">#</th>'
+      + WT_COLS.map(function(c,i){
+          /* 竖条 = 两列之间的分界线;最右一列右侧是表格边界,没有"下一列"可换空间,不出拖动条 */
+          var rz = (i < WT_COLS.length - 1)
+            ? '<span class="wt-resizer" title="拖动调整左右两列的列宽" onmousedown="wtResizeStart(event,'+i+')"></span>'
+            : '';
+          return '<th>'+wtEsc(c.name)+rz+'</th>';
+        }).join('')
+      + '</tr></thead>';
+    var span=WT_COLS.length+1;
+    var group=document.getElementById('wtGroup').value;
+    var n=0, body='';
+    function block(list){ return list.map(function(t){ n++; return wtRowHTML(t,n); }).join(''); }
+    if(!group){
+      body=block(rows);
+    } else {
+      var keys=[];
+      rows.forEach(function(t){ if(keys.indexOf(t[group])<0) keys.push(t[group]); });
+      keys.forEach(function(k){
+        var label=group==='status'?(wtSt(k)?wtSt(k).label:k):(k||'(空)');
+        var items=rows.filter(function(t){ return t[group]===k; });
+        body+='<tr class="wt-group-row"><td colspan="'+span+'">'+wtEsc(label)+' · '+items.length+'</td></tr>';
+        body+=block(items);
+      });
+    }
+    /* 加行按钮:只在底部(首行不放,避免误点) */
+    body+='<tr class="wt-add-row" onclick="wtAddRow()"><td colspan="'+span+'">+ 新建任务</td></tr>';
+    document.getElementById('wtTableView').innerHTML=
+      '<div class="wt-table-scroll"><table class="wt-table" style="width:'+sumW+'px">'+cols+head+'<tbody>'+body+'</tbody></table></div>';
+  }
+
+  /* ---- 看板视图 ---- */
+  function wtCardHTML(t){
+    var overdue=(t.status!=='done' && t.due<WT_TODAY)?' overdue':'';
+    return '<div class="wt-card" draggable="true" data-id="'+t.id+'">'
+      + '<div class="wt-card-title">'+wtEsc(t.title)+'</div>'
+      + '<div class="wt-card-meta">'+wtAvatar(t.assignee)
+      +   '<span style="font-size:.8rem;color:var(--text-secondary)">'+wtEsc(t.assignee)+'</span>'
+      +   '<span class="wt-pill lv">'+wtEsc(t.level)+'</span>'
+      +   '<span class="wt-pill fq">'+wtEsc(t.freq)+'</span>'
+      +   (t.desc && (''+t.desc).trim() ? '<span class="wt-desc-btn filled" style="width:24px;height:24px;font-size:.78rem" onclick="event.stopPropagation();wtOpenDesc('+t.id+',\'desc\')">📄</span>' : '')
+      +   '<span class="wt-due'+overdue+'" style="font-size:.78rem;margin-left:auto">📅 '+t.due+'</span>'
+      + '</div></div>';
+  }
+  var wtDragId=null;
+  function wtRenderBoard(rows){
+    var host=document.getElementById('wtBoardView'); host.innerHTML='';
+    WT_STATUS.forEach(function(col){
+      var items=rows.filter(function(t){ return t.status===col.key; });
+      var div=document.createElement('div');
+      div.className='wt-col'; div.dataset.col=col.key;
+      div.innerHTML='<div class="wt-col-head"><span class="wt-pdot" style="width:9px;height:9px;flex:0 0 9px;background:'+col.dot+'"></span>'
+        +col.label+'<span class="wt-count">'+items.length+'</span></div>'
+        +'<div class="wt-col-body">'+items.map(wtCardHTML).join('')+'</div>';
+      host.appendChild(div);
+    });
+    host.querySelectorAll('.wt-card').forEach(function(c){
+      c.addEventListener('dragstart',function(){ wtDragId=+c.dataset.id; c.classList.add('dragging'); });
+      c.addEventListener('dragend',function(){ c.classList.remove('dragging'); });
+    });
+    host.querySelectorAll('.wt-col').forEach(function(col){
+      var body=col.querySelector('.wt-col-body');
+      col.addEventListener('dragover',function(e){ e.preventDefault(); body.classList.add('drop-hover'); });
+      col.addEventListener('dragleave',function(){ body.classList.remove('drop-hover'); });
+      col.addEventListener('drop',function(e){
+        e.preventDefault(); body.classList.remove('drop-hover');
+        var t=wtRow(wtDragId);
+        if(t){ t.status=col.dataset.col; if(t.status==='done') t.progress=100; }
+        wtRender();
+      });
+    });
+  }
+
+  /* ---- 日历视图(2026-05) ---- */
+  function wtRenderCal(rows){
+    var host=document.getElementById('wtCalView');
+    var dow=['一','二','三','四','五','六','日'];
+    var html='<div style="margin-bottom:10px;color:var(--text-secondary);font-size:.92rem">2026 年 5 月 · 按截止日</div><div class="wt-cal">';
+    dow.forEach(function(d){ html+='<div class="wt-cal-dow">'+d+'</div>'; });
+    var lead=4, days=31;   /* 2026-05-01 为周五 */
+    for(var i=0;i<lead;i++) html+='<div class="wt-cal-cell dim"></div>';
+    for(var d=1;d<=days;d++){
+      var mm=(d<10?'0':'')+d, key='05-'+mm;
+      var todayCls=(key===WT_TODAY)?' wt-cal-today':'';
+      html+='<div class="wt-cal-cell'+todayCls+'"><div class="wt-cal-num">'+d+'</div>';
+      rows.filter(function(t){ return t.due===key; }).forEach(function(t){
+        html+='<div class="wt-cal-task" title="'+wtEsc(t.title)+'">'+(wtSt(t.status)?wtSt(t.status).label[0]:'')+' '+wtEsc(t.title)+'</div>';
+      });
+      html+='</div>';
+    }
+    host.innerHTML=html+'</div>';
+  }
+</script>
+</body>
+</html>

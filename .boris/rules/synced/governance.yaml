@@ -1,0 +1,27 @@
+- id: no-skip-hooks
+  name: No Skipping Git Hooks
+  display_name: 禁止跳过 Git Hooks
+  description: Agent 不得使用 --no-verify 跳过 git hooks
+  severity: error
+  rule_type: pattern
+  governance_layer: observer
+  tags: [governance, essential, universal]
+  ut_ref: "1.2.2"
+  ut_category: "Agent 个体行为 > 违反显式规则"
+  pattern: "--no-verify"
+  file_glob: "*.sh"
+  expect: absent
+
+- id: no-force-push
+  name: No Force Push
+  display_name: 禁止强制推送
+  description: Agent 不得 force push 到任何分支
+  severity: error
+  rule_type: pattern
+  governance_layer: observer
+  tags: [governance, essential, universal]
+  ut_ref: "1.2.3"
+  ut_category: "Agent 个体行为 > 违反显式规则"
+  pattern: "git push.*--force|git push.*-f\\b"
+  file_glob: "*.sh"
+  expect: absent

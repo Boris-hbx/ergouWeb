@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>工作任务表 · 任务详情侧拉抽屉 设计稿</title>
+<style>
+  :root {
+    --bg: #FAF9FC;
+    --bg-card: #FFFFFF;
+    --bg-elev: #F5F2FB;
+    --bg-elev-2: #EFEAF7;
+    --border: #E5E3EE;
+    --border-strong: #D4D0E0;
+    --text: #1F2937;
+    --text-mute: #6B7280;
+    --text-faint: #9CA3AF;
+    --primary: #7C4DFF;
+    --primary-soft: rgba(124, 77, 255, 0.10);
+    --primary-strong: rgba(124, 77, 255, 0.18);
+    --danger: #E11D48;
+    --danger-soft: rgba(225, 29, 72, 0.10);
+    --warn: #F59E0B;
+    --warn-soft: rgba(245, 158, 11, 0.12);
+    --ok: #10B981;
+    --ok-soft: rgba(16, 185, 129, 0.10);
+    --avatar-1: #7C4DFF;
+    --avatar-2: #14B8A6;
+    --avatar-3: #E0A23B;
+    --avatar-4: #3B82F6;
+    --shadow: 0 1px 2px rgba(15, 15, 30, 0.04), 0 4px 12px rgba(15, 15, 30, 0.06);
+    --shadow-drawer: -8px 0 32px rgba(15, 15, 30, 0.12);
+    --drawer-w: 540px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--bg); color: var(--text); font: 13px/1.5 -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; height: 100%; overflow: hidden; }
+
+  /* ── 顶栏 ── */
+  .topbar {
+    padding: 14px 28px;
+    display: flex; align-items: center; gap: 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-card);
+  }
+  .topbar h1 { font-size: 18px; font-weight: 600; }
+  .seg {
+    display: inline-flex; background: var(--bg-elev); border-radius: 8px; padding: 3px;
+    border: 1px solid var(--border);
+  }
+  .seg button {
+    border: 0; background: transparent; padding: 5px 12px; font-size: 12.5px;
+    color: var(--text-mute); border-radius: 6px; cursor: pointer;
+  }
+  .seg button.active { background: var(--bg-card); color: var(--primary); font-weight: 600; }
+  .spacer { flex: 1; }
+  .hint {
+    background: var(--primary-soft);
+    color: var(--primary);
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  /* ── 主体：左表格 + 右抽屉 ── */
+  .main {
+    display: flex;
+    height: calc(100vh - 56px);
+    position: relative;
+  }
+  .table-pane {
+    flex: 1;
+    overflow: auto;
+    padding: 18px 28px;
+    transition: filter .25s;
+  }
+  .main.drawer-open .table-pane {
+    /* 抽屉打开时背景表格淡化但不模糊（保持可点切换） */
+  }
+
+  /* ── 模拟表格 ── */
+  table.wt {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--bg-card);
+    box-shadow: var(--shadow);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .wt th, .wt td {
+    padding: 9px 14px;
+    text-align: left;
+    font-size: 12.5px;
+    border-bottom: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+  }
+  .wt th:last-child, .wt td:last-child { border-right: 0; }
+  .wt th {
+    background: var(--bg-elev);
+    color: var(--text-mute);
+    font-weight: 600;
+    font-size: 11.5px;
+    text-transform: none;
+  }
+  .wt tr { cursor: pointer; transition: background .12s; }
+  .wt tr:hover { background: var(--bg-elev); }
+  .wt tr.selected {
+    background: var(--primary-soft);
+  }
+  .wt tr.selected td:first-child {
+    box-shadow: inset 3px 0 0 var(--primary);
+  }
+  .wt .num { width: 40px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+  .pill {
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    display: inline-block;
+    font-weight: 500;
+  }
+  .pill.status-doing { background: #FFF5E5; color: #C77800; }
+  .pill.status-todo  { background: #EEF2FF; color: #4F46E5; }
+  .pill.status-done  { background: var(--ok-soft); color: #047857; }
+  .pill.status-block { background: var(--danger-soft); color: var(--danger); }
+  .pill.p-p0 { background: var(--warn-soft); color: #8B5A00; font-weight: 600; }
+  .pill.p-mid { background: var(--bg-elev); color: var(--text-mute); }
+  .pill.p-low { background: var(--bg-elev); color: var(--text-faint); }
+  .pill.overdue { background: var(--danger-soft); color: var(--danger); font-weight: 600; }
+  .pill.due-soon { background: var(--warn-soft); color: #8B5A00; }
+  .avatar-mini {
+    width: 22px; height: 22px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: white; font-weight: 600; font-size: 10.5px;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+  .progress-mini {
+    display: inline-flex; align-items: center; gap: 6px;
+    width: 110px;
+  }
+  .progress-mini .bar {
+    flex: 1; height: 5px; background: var(--bg-elev); border-radius: 3px;
+    overflow: hidden;
+  }
+  .progress-mini .fill {
+    height: 100%; background: var(--primary); border-radius: 3px;
+  }
+  .progress-mini .num {
+    font-size: 11px; color: var(--text-mute); width: 26px; text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── 蒙层（轻量、可穿透点击关闭） ── */
+  .scrim {
+    position: fixed;
+    inset: 56px 0 0 0;
+    background: rgba(31, 41, 55, 0.18);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s;
+    z-index: 5;
+  }
+  .main.drawer-open .scrim { opacity: 1; pointer-events: auto; }
+
+  /* ── 侧拉抽屉 ── */
+  .drawer {
+    position: fixed;
+    top: 56px; right: 0; bottom: 0;
+    width: var(--drawer-w);
+    background: var(--bg-card);
+    box-shadow: var(--shadow-drawer);
+    transform: translateX(100%);
+    transition: transform .28s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex; flex-direction: column;
+    z-index: 10;
+  }
+  .main.drawer-open .drawer { transform: translateX(0); }
+
+  /* 抽屉头部 */
+  .d-head {
+    padding: 14px 18px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .d-head-top {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
+  }
+  .icon-btn {
+    width: 28px; height: 28px;
+    border: 0; background: transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--text-mute);
+    font-size: 14px;
+    transition: all .12s;
+  }
+  .icon-btn:hover { background: var(--bg-elev); color: var(--text); }
+  .d-nav {
+    display: flex; align-items: center; gap: 2px;
+    margin-left: auto;
+    background: var(--bg-elev);
+    border-radius: 8px;
+    padding: 2px;
+  }
+  .d-nav .pos {
+    font-size: 11.5px; color: var(--text-mute);
+    padding: 0 8px;
+    font-variant-numeric: tabular-nums;
+  }
+  .d-title-row {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding-bottom: 12px;
+  }
+  .d-title {
+    flex: 1;
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--text);
+    border: 0;
+    background: transparent;
+    padding: 4px 8px;
+    border-radius: 6px;
+    margin: -4px -8px;
+    width: calc(100% + 16px);
+    cursor: text;
+    resize: none;
+    font-family: inherit;
+    overflow: hidden;
+  }
+  .d-title:hover { background: var(--bg-elev); }
+  .d-title:focus {
+    outline: 0;
+    background: var(--bg-elev);
+    box-shadow: 0 0 0 2px var(--primary-soft);
+  }
+  .d-quickrow {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    padding-bottom: 14px;
+  }
+
+  /* 抽屉主体 */
+  .d-body {
+    flex: 1; overflow: auto;
+    padding: 14px 18px 24px;
+  }
+  .d-section {
+    margin-bottom: 22px;
+  }
+  .d-label {
+    font-size: 11px;
+    color: var(--text-faint);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+  .d-grid {
+    display: grid;
+    grid-template-columns: 110px 1fr;
+    row-gap: 4px;
+    column-gap: 12px;
+    align-items: center;
+  }
+  .d-grid .k {
+    color: var(--text-mute);
+    font-size: 12.5px;
+    padding: 6px 0;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .d-grid .v {
+    padding: 4px 0;
+  }
+  .d-field {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background .12s;
+    min-height: 28px;
+    border: 1px solid transparent;
+    font-size: 12.5px;
+  }
+  .d-field:hover { background: var(--bg-elev); }
+  .d-field.editing {
+    background: var(--bg-card);
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px var(--primary-soft);
+  }
+  .d-field .caret { color: var(--text-faint); font-size: 10px; margin-left: auto; }
+  .d-field input, .d-field select {
+    border: 0; background: transparent; font: inherit; outline: 0;
+    flex: 1; min-width: 0;
+  }
+  .d-progress {
+    display: flex; align-items: center; gap: 10px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    min-width: 200px;
+  }
+  .d-progress:hover { background: var(--bg-elev); }
+  .d-progress .bar {
+    flex: 1; height: 6px; background: var(--bg-elev-2); border-radius: 3px;
+    overflow: hidden;
+  }
+  .d-progress .fill {
+    height: 100%; background: var(--primary); border-radius: 3px;
+    transition: width .25s;
+  }
+  .d-progress .pct {
+    font-size: 12.5px; color: var(--text); font-weight: 500;
+    width: 36px; text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* 简介 */
+  .d-desc {
+    width: 100%;
+    min-height: 90px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text);
+    background: var(--bg-card);
+    resize: vertical;
+    transition: border-color .15s;
+  }
+  .d-desc:hover { border-color: var(--border-strong); }
+  .d-desc:focus {
+    outline: 0;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-soft);
+  }
+  .d-desc-empty {
+    padding: 10px 12px;
+    border: 1px dashed var(--border-strong);
+    border-radius: 8px;
+    color: var(--text-faint);
+    cursor: text;
+    font-size: 12.5px;
+  }
+  .d-desc-empty:hover { border-color: var(--primary); color: var(--primary); }
+
+  /* 活动时间线 */
+  .timeline {
+    position: relative;
+    padding-left: 18px;
+  }
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 5px; top: 8px; bottom: 8px;
+    width: 1px;
+    background: var(--border);
+  }
+  .timeline-item {
+    position: relative;
+    padding: 6px 0;
+    font-size: 12px;
+    color: var(--text-mute);
+    line-height: 1.5;
+  }
+  .timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -16px; top: 11px;
+    width: 7px; height: 7px;
+    background: var(--primary);
+    border-radius: 50%;
+    border: 2px solid var(--bg-card);
+    box-shadow: 0 0 0 1px var(--primary-soft);
+  }
+  .timeline-item .when {
+    color: var(--text-faint);
+    margin-left: 8px;
+    font-size: 11.5px;
+  }
+  .timeline-item .who {
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  /* 抽屉底部元信息 */
+  .d-foot {
+    padding: 10px 18px;
+    border-top: 1px solid var(--border);
+    background: var(--bg-elev);
+    color: var(--text-faint);
+    font-size: 11.5px;
+    display: flex; gap: 12px;
+    flex-wrap: wrap;
+  }
+  .d-foot .meta-item::before {
+    content: '·';
+    margin-right: 12px;
+    color: var(--border-strong);
+  }
+  .d-foot .meta-item:first-child::before { content: ''; margin: 0; }
+
+  /* ── 提示条 ── */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: calc(50% - var(--drawer-w) / 2);
+    transform: translateX(-50%) translateY(20px);
+    background: rgba(31, 41, 55, 0.94);
+    color: white;
+    padding: 9px 16px;
+    border-radius: 8px;
+    font-size: 12.5px;
+    opacity: 0;
+    transition: all .25s;
+    pointer-events: none;
+    z-index: 100;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ── 设计说明 ── */
+  .design-note {
+    margin-top: 28px;
+    padding: 18px 22px;
+    background: var(--bg-card);
+    border: 1px dashed var(--border-strong);
+    border-radius: 10px;
+    color: var(--text-mute);
+    font-size: 12.5px;
+    line-height: 1.65;
+  }
+  .design-note h3 { margin-bottom: 10px; color: var(--primary); font-size: 13px; }
+  .design-note ul { margin-left: 20px; }
+  .design-note li { margin: 4px 0; }
+  .design-note code {
+    background: var(--bg-elev); padding: 1px 5px; border-radius: 3px;
+    font-family: ui-monospace, monospace; font-size: 11.5px; color: var(--primary);
+  }
+  .design-note kbd {
+    background: var(--bg-elev); border: 1px solid var(--border-strong);
+    padding: 1px 6px; border-radius: 4px;
+    font-family: ui-monospace, monospace; font-size: 11px;
+    box-shadow: 0 1px 0 var(--border-strong);
+  }
+
+</style>
+</head>
+<body>
+
+<!-- 顶栏 -->
+<div class="topbar">
+  <h1>任务表</h1>
+  <div class="seg">
+    <button class="active">表格</button>
+    <button>看板</button>
+    <button>日历</button>
+    <button>人员</button>
+  </div>
+  <div class="spacer"></div>
+  <div class="hint">提示：点击任一行打开详情抽屉 · <kbd style="font-size:11px;padding:1px 5px;background:rgba(255,255,255,0.5);border-radius:3px">↑↓</kbd> 切换 · <kbd style="font-size:11px;padding:1px 5px;background:rgba(255,255,255,0.5);border-radius:3px">Esc</kbd> 关闭</div>
+</div>
+
+<!-- 主体 -->
+<div class="main" id="main">
+  <!-- 左侧：模拟表格 -->
+  <div class="table-pane">
+    <table class="wt" id="taskTable">
+      <thead>
+        <tr>
+          <th class="num">#</th>
+          <th>任务</th>
+          <th>责任人</th>
+          <th>层级</th>
+          <th>频率</th>
+          <th>状态</th>
+          <th>优先级</th>
+          <th>截止日</th>
+          <th>进度</th>
+        </tr>
+      </thead>
+      <tbody id="taskBody"></tbody>
+    </table>
+
+    <div class="design-note">
+      <h3>设计说明（PM 草稿）</h3>
+      <ul>
+        <li><strong>形态</strong>：右侧滑入的 540px 抽屉（手机全屏），背景表格仍可见且可点切换，<strong>不是 modal</strong>。Linear/Asana/Notion 通用做法。</li>
+        <li><strong>关闭方式</strong>：✕ 按钮 / <kbd>Esc</kbd> / 点蒙层 / 切到其它视图（自动关）。</li>
+        <li><strong>上下任务导航</strong>：抽屉头部 <kbd>↑</kbd> <kbd>↓</kbd> 按钮（含计数 5/28），快捷键全局生效。让你能连续看任务而不用关→点→关→点。</li>
+        <li><strong>就地编辑</strong>：标题点一下变 input；元数据字段点一下高亮 + 弹出 select / picker（复用 T-095 抽出的 dialog 组件）；简介就是 textarea，失焦或 <kbd>Cmd+Enter</kbd> 保存。</li>
+        <li><strong>复用 dialog</strong>：进度条点击 → <code>openProgressDialog</code>（T-095）；标题/数字 → <code>openTextInputDialog</code>；日期 → <code>datepicker.js</code>。<strong>不要新写组件</strong>。</li>
+        <li><strong>活动时间线</strong>：按事件溯源记录（progress变化、status变化、assignee变化、创建/编辑），来源 = <code>events/ledger.jsonl</code> 同等机制（任务级 ledger，建议新建 <code>work_task_events</code> 表 or 复用 audit log）；MVP 可先只显示「创建 / 编辑」两条。</li>
+        <li><strong>抽屉宽度</strong>：540px（桌面默认），可拖左边手柄调整（MVP 不做，Phase 2 加）。</li>
+        <li><strong>哪里能打开抽屉</strong>：① 表格行任意空白处单击 ② 看板卡片点击 ③ 日历项点击 ④ 人员卡片任务标题点击。<strong>不打断现有单元格内联编辑</strong>——点单元格里的药丸/进度条仍走原弹层逻辑。</li>
+        <li><strong>实施成本</strong>：1 个新文件 <code>work-detail.js</code> + <code>work.css</code> 加 ~150 行；复用 T-095 的 dialog；后端无变；活动时间线如果做要 1 张新表或扩展 events 系统（看后端排期）。</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- 蒙层 -->
+<div class="scrim" id="scrim"></div>
+
+<!-- 侧拉抽屉 -->
+<aside class="drawer" id="drawer">
+  <div class="d-head">
+    <div class="d-head-top">
+      <button class="icon-btn" id="btnClose" title="关闭 (Esc)">✕</button>
+      <div class="d-nav">
+        <button class="icon-btn" id="btnPrev" title="上一条 (↑)" style="width:22px;height:22px;font-size:12px">↑</button>
+        <span class="pos"><span id="navPos">1</span> / <span id="navTotal">6</span></span>
+        <button class="icon-btn" id="btnNext" title="下一条 (↓)" style="width:22px;height:22px;font-size:12px">↓</button>
+      </div>
+      <button class="icon-btn" title="复制链接">🔗</button>
+      <button class="icon-btn" title="更多">⋯</button>
+    </div>
+    <div class="d-title-row">
+      <textarea class="d-title" id="dTitle" rows="1" placeholder="任务标题"></textarea>
+    </div>
+    <div class="d-quickrow">
+      <span class="pill" id="dStatus">●待办</span>
+      <span class="pill" id="dPriority">中</span>
+      <span class="pill" id="dDuePill" style="display:none"></span>
+    </div>
+  </div>
+
+  <div class="d-body">
+
+    <!-- 字段网格 -->
+    <div class="d-section">
+      <div class="d-grid">
+        <div class="k">👤 责任人</div>
+        <div class="v">
+          <div class="d-field" data-field="assignee">
+            <div class="avatar-mini" id="dAvatar"></div>
+            <span id="dAssignee">陈老师</span>
+            <span class="caret">▾</span>
+          </div>
+        </div>
+
+        <div class="k">🏛 层级</div>
+        <div class="v">
+          <div class="d-field" data-field="level">
+            <span id="dLevel">院</span>
+            <span class="caret">▾</span>
+          </div>
+        </div>
+
+        <div class="k">🔁 频率</div>
+        <div class="v">
+          <div class="d-field" data-field="freq">
+            <span id="dFreq">一次性</span>
+            <span class="caret">▾</span>
+          </div>
+        </div>
+
+        <div class="k">⚡ 优先级</div>
+        <div class="v">
+          <div class="d-field" data-field="priority">
+            <span id="dPriorityField">P0</span>
+            <span class="caret">▾</span>
+          </div>
+        </div>
+
+        <div class="k">📅 截止日</div>
+        <div class="v">
+          <div class="d-field" data-field="due">
+            <span id="dDue">2026-05-26</span>
+            <span class="caret">📅</span>
+          </div>
+        </div>
+
+        <div class="k">📊 进度</div>
+        <div class="v">
+          <div class="d-progress" id="dProgress" title="点击改进度（弹 openProgressDialog）">
+            <div class="bar"><div class="fill" id="dProgressFill" style="width:60%"></div></div>
+            <span class="pct" id="dProgressPct">60%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 简介 -->
+    <div class="d-section">
+      <div class="d-label">简介</div>
+      <textarea class="d-desc" id="dDesc" placeholder="点击添加简介……"></textarea>
+    </div>
+
+    <!-- 活动时间线 -->
+    <div class="d-section">
+      <div class="d-label">活动</div>
+      <div class="timeline" id="dTimeline"></div>
+    </div>
+
+  </div>
+
+  <!-- 抽屉底部元信息 -->
+  <div class="d-foot">
+    <span class="meta-item">创建 <span id="dCreated"></span></span>
+    <span class="meta-item">修改 <span id="dUpdated"></span> by <span class="who" id="dUpdater"></span></span>
+  </div>
+</aside>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── 假数据 ──
+const TASKS = [
+  {
+    id: 1, title: '院学术委员会评审准备',
+    assignee: '陈老师', level: '院', freq: '一次性',
+    status: 'doing', priority: 'P0',
+    due: '2026-05-26', dueLabel: '今天', dueState: 'overdue',
+    progress: 60,
+    desc: '需要准备一年的工作总结、研究进展、论文清单、对外合作情况。陈老师主导起草，王主任审。会议定在本周五下午两点，材料周四晚上必须打印好分发。',
+    created: '2026-05-20',
+    updated: '2小时前', updater: '陈老师',
+    timeline: [
+      { txt: '进度 40 → 60', when: '2 小时前', who: '陈老师' },
+      { txt: '简介更新', when: '昨天 16:30', who: '陈老师' },
+      { txt: '状态 待办 → 进行中', when: '昨天 14:12', who: '陈老师' },
+      { txt: '指派给 陈老师', when: '2026-05-21', who: '自己' },
+      { txt: '创建', when: '2026-05-20', who: '自己' },
+    ],
+  },
+  {
+    id: 2, title: '所务会材料',
+    assignee: '王主任', level: '所', freq: '每周',
+    status: 'todo', priority: 'P0',
+    due: '2026-05-27', dueLabel: '明天', dueState: 'due-soon',
+    progress: 0,
+    desc: '周二上午所务会用的汇报材料。包括本周新增项目、人事变动、经费动向。',
+    created: '2026-05-25',
+    updated: '昨天 09:00', updater: '王主任',
+    timeline: [
+      { txt: '指派给 王主任', when: '昨天 09:00', who: '自己' },
+      { txt: '创建', when: '昨天 08:55', who: '自己' },
+    ],
+  },
+  {
+    id: 3, title: '论文校对（Nature 投稿稿）',
+    assignee: '赵研究员', level: '组', freq: '一次性',
+    status: 'doing', priority: 'mid',
+    due: '2026-06-02', dueLabel: '下周二', dueState: '',
+    progress: 35,
+    desc: '通讯作者署名要确认；图 3 清晰度不够；参考文献按 Nature 格式重排；补充材料还差一节。',
+    created: '2026-05-18',
+    updated: '3 天前', updater: '赵研究员',
+    timeline: [
+      { txt: '进度 20 → 35', when: '3 天前', who: '赵研究员' },
+      { txt: '状态 待办 → 进行中', when: '5 天前', who: '赵研究员' },
+      { txt: '创建', when: '2026-05-18', who: '自己' },
+    ],
+  },
+  {
+    id: 4, title: '复印资料',
+    assignee: '李秘书', level: '个人', freq: '一次性',
+    status: 'doing', priority: 'low',
+    due: '2026-05-26', dueLabel: '今天', dueState: 'due-soon',
+    progress: 80,
+    desc: '会议室用，30 份，彩印。',
+    created: '今天 09:00',
+    updated: '1 小时前', updater: '李秘书',
+    timeline: [
+      { txt: '进度 30 → 80', when: '1 小时前', who: '李秘书' },
+      { txt: '创建', when: '今天 09:00', who: '自己' },
+    ],
+  },
+  {
+    id: 5, title: '季度经费报表',
+    assignee: '陈老师', level: '院', freq: '每季',
+    status: 'block', priority: 'P0',
+    due: '2026-05-24', dueLabel: '逾期 2 天', dueState: 'overdue',
+    progress: 50,
+    desc: '财务卡了一张发票，需要补开收据。等院财务回应。',
+    created: '2026-05-10',
+    updated: '今天 10:30', updater: '陈老师',
+    timeline: [
+      { txt: '状态 进行中 → 阻塞', when: '今天 10:30', who: '陈老师' },
+      { txt: '进度 30 → 50', when: '前天', who: '陈老师' },
+      { txt: '创建', when: '2026-05-10', who: '自己' },
+    ],
+  },
+  {
+    id: 6, title: '服务器迁移',
+    assignee: '刘工', level: '组', freq: '一次性',
+    status: 'doing', priority: 'mid',
+    due: '2026-05-30', dueLabel: '本周', dueState: '',
+    progress: 25,
+    desc: '从老机房迁到新机房。注意 DNS 切换前先 staging 验证，避免线上长时间不可用。',
+    created: '2026-05-15',
+    updated: '昨天', updater: '刘工',
+    timeline: [
+      { txt: '进度 10 → 25', when: '昨天', who: '刘工' },
+      { txt: '指派给 刘工', when: '2026-05-15', who: '自己' },
+      { txt: '创建', when: '2026-05-15', who: '自己' },
+    ],
+  },
+];
+
+const AVATAR_COLORS = ['var(--avatar-1)','var(--avatar-2)','var(--avatar-3)','var(--avatar-4)'];
+function colorOf(name) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return AVATAR_COLORS[h % 4];
+}
+
+// ── 渲染表格 ──
+const STATUS_LABEL = { doing: '●进行中', todo: '○待办', done: '✓已完成', block: '⛔阻塞' };
+const PRIORITY_LABEL = { P0: 'P0', mid: '中', low: '低' };
+function renderTable() {
+  const tbody = document.getElementById('taskBody');
+  tbody.innerHTML = TASKS.map((t, idx) => `
+    <tr data-id="${t.id}">
+      <td class="num">${idx + 1}</td>
+      <td><strong>${t.title}</strong></td>
+      <td>
+        <span class="avatar-mini" style="background:${colorOf(t.assignee)}">${t.assignee.slice(0,1)}</span>
+        ${t.assignee}
+      </td>
+      <td>${t.level}</td>
+      <td>${t.freq}</td>
+      <td><span class="pill status-${t.status}">${STATUS_LABEL[t.status]}</span></td>
+      <td><span class="pill p-${t.priority === 'P0' ? 'p0' : t.priority === 'low' ? 'low' : 'mid'}">${PRIORITY_LABEL[t.priority]}</span></td>
+      <td><span class="pill ${t.dueState}">${t.dueLabel}</span></td>
+      <td>
+        <div class="progress-mini">
+          <div class="bar"><div class="fill" style="width:${t.progress}%"></div></div>
+          <span class="num">${t.progress}%</span>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+  tbody.querySelectorAll('tr').forEach(tr => {
+    tr.onclick = () => openDrawer(parseInt(tr.dataset.id));
+  });
+}
+
+// ── 抽屉打开/关闭 ──
+let currentId = null;
+function openDrawer(id) {
+  currentId = id;
+  document.getElementById('main').classList.add('drawer-open');
+  renderDrawer(id);
+  updateSelected();
+}
+function closeDrawer() {
+  currentId = null;
+  document.getElementById('main').classList.remove('drawer-open');
+  updateSelected();
+}
+function updateSelected() {
+  document.querySelectorAll('#taskBody tr').forEach(tr => {
+    tr.classList.toggle('selected', parseInt(tr.dataset.id) === currentId);
+  });
+}
+
+// ── 渲染抽屉内容 ──
+function renderDrawer(id) {
+  const t = TASKS.find(x => x.id === id);
+  if (!t) return;
+
+  const idx = TASKS.findIndex(x => x.id === id);
+
+  // 头部
+  document.getElementById('dTitle').value = t.title;
+  document.getElementById('dStatus').textContent = STATUS_LABEL[t.status];
+  document.getElementById('dStatus').className = `pill status-${t.status}`;
+  document.getElementById('dPriority').textContent = t.priority === 'P0' ? 'P0' : (t.priority === 'low' ? '低优' : '中优');
+  document.getElementById('dPriority').className = `pill p-${t.priority === 'P0' ? 'p0' : t.priority === 'low' ? 'low' : 'mid'}`;
+  const duePill = document.getElementById('dDuePill');
+  if (t.dueState) {
+    duePill.style.display = 'inline-block';
+    duePill.textContent = (t.dueState === 'overdue' ? '⏰ ' : '📅 ') + t.dueLabel;
+    duePill.className = `pill ${t.dueState}`;
+  } else {
+    duePill.style.display = 'none';
+  }
+
+  // 字段
+  const ava = document.getElementById('dAvatar');
+  ava.textContent = t.assignee.slice(0, 1);
+  ava.style.background = colorOf(t.assignee);
+  document.getElementById('dAssignee').textContent = t.assignee;
+  document.getElementById('dLevel').textContent = t.level;
+  document.getElementById('dFreq').textContent = t.freq;
+  document.getElementById('dPriorityField').textContent = t.priority === 'P0' ? 'P0 高优' : (t.priority === 'low' ? '低优' : '中优');
+  document.getElementById('dDue').textContent = t.due;
+  document.getElementById('dProgressFill').style.width = t.progress + '%';
+  document.getElementById('dProgressPct').textContent = t.progress + '%';
+
+  // 简介
+  document.getElementById('dDesc').value = t.desc || '';
+
+  // 时间线
+  document.getElementById('dTimeline').innerHTML = t.timeline.map(e => `
+    <div class="timeline-item">
+      ${e.txt}
+      <span class="who">${e.who ? '· ' + e.who : ''}</span>
+      <span class="when">${e.when}</span>
+    </div>
+  `).join('');
+
+  // 元信息
+  document.getElementById('dCreated').textContent = t.created;
+  document.getElementById('dUpdated').textContent = t.updated;
+  document.getElementById('dUpdater').textContent = t.updater;
+
+  // 导航
+  document.getElementById('navPos').textContent = idx + 1;
+  document.getElementById('navTotal').textContent = TASKS.length;
+}
+
+// ── 上下导航 ──
+function navigate(delta) {
+  if (currentId === null) return;
+  const idx = TASKS.findIndex(x => x.id === currentId);
+  const next = (idx + delta + TASKS.length) % TASKS.length;
+  openDrawer(TASKS[next].id);
+}
+
+document.getElementById('btnClose').onclick = closeDrawer;
+document.getElementById('btnPrev').onclick = () => navigate(-1);
+document.getElementById('btnNext').onclick = () => navigate(1);
+document.getElementById('scrim').onclick = closeDrawer;
+
+// ── 键盘快捷键 ──
+document.addEventListener('keydown', e => {
+  if (currentId === null) return;
+  // 编辑中不响应方向键
+  if (document.activeElement && ['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) {
+    if (e.key === 'Escape') {
+      document.activeElement.blur();
+      e.preventDefault();
+    }
+    return;
+  }
+  if (e.key === 'Escape') { closeDrawer(); e.preventDefault(); }
+  if (e.key === 'ArrowUp') { navigate(-1); e.preventDefault(); }
+  if (e.key === 'ArrowDown') { navigate(1); e.preventDefault(); }
+});
+
+// ── 标题自适应高度 + 保存模拟 ──
+const dTitle = document.getElementById('dTitle');
+function autoResize() {
+  dTitle.style.height = 'auto';
+  dTitle.style.height = dTitle.scrollHeight + 'px';
+}
+dTitle.addEventListener('input', autoResize);
+dTitle.addEventListener('blur', () => {
+  if (currentId !== null) {
+    const t = TASKS.find(x => x.id === currentId);
+    if (t && t.title !== dTitle.value) {
+      t.title = dTitle.value;
+      renderTable();
+      updateSelected();
+      toast('✓ 标题已更新');
+    }
+  }
+});
+dTitle.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    dTitle.blur();
+  }
+});
+
+// ── 字段点击模拟（真实接 openProgressDialog / openTextInputDialog 等） ──
+document.querySelectorAll('.d-field').forEach(f => {
+  f.onclick = () => {
+    const field = f.dataset.field;
+    const map = {
+      assignee: '弹候选：陈老师 / 王主任 / 赵研究员 / 李秘书 / 刘工 / 未指派',
+      level: '弹候选：院 / 所 / 组 / 个人',
+      freq: '弹候选：一次性 / 每周 / 每月 / 每季',
+      priority: '弹候选：P0 / 中 / 低',
+      due: '弹日期选择器（复用 datepicker.js）',
+    };
+    toast('编辑 「' + field + '」 → ' + (map[field] || ''));
+  };
+});
+
+document.getElementById('dProgress').onclick = () => {
+  toast('打开 openProgressDialog（T-095 共享组件）');
+};
+
+document.getElementById('dDesc').addEventListener('blur', () => {
+  if (currentId !== null) {
+    const t = TASKS.find(x => x.id === currentId);
+    if (t && t.desc !== document.getElementById('dDesc').value) {
+      t.desc = document.getElementById('dDesc').value;
+      toast('✓ 简介已保存');
+    }
+  }
+});
+
+// ── 提示 ──
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+// ── 启动：默认打开第 1 条让 Boris 一进来就看到效果 ──
+renderTable();
+setTimeout(() => {
+  openDrawer(1);
+  autoResize();
+}, 200);
+</script>
+
+</body>
+</html>

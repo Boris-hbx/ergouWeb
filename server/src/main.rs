@@ -34,7 +34,9 @@ pub fn build_app(state: AppState) -> Router {
         .route("/guest", post(auth::guest_login))
         .route("/me", get(auth::me))
         .route("/change-password", post(auth::change_password))
-        .route("/avatar", put(auth::update_avatar));
+        .route("/avatar", put(auth::update_avatar))
+        // T-096 / ADR-006:owner 紧急密码重置(需要 OWNER_RECOVERY_KEY 环境变量)
+        .route("/owner-recovery", post(auth::owner_recovery));
 
     // Todo routes (session required via UserId extractor)
     let todo_routes = Router::new()
@@ -381,7 +383,13 @@ pub fn build_app(state: AppState) -> Router {
                 .route("/audit-log", get(routes::admin::audit_log))
                 // People (人物档案)
                 .route("/people", get(routes::admin::list_people).post(routes::admin::create_person))
-                .route("/people/{id}", put(routes::admin::update_person).delete(routes::admin::delete_person)),
+                .route("/people/{id}", put(routes::admin::update_person).delete(routes::admin::delete_person))
+                // T-089 块2:30 req/min/user 限流 —— 防暴力枚举 / DoS。
+                // route_layer 比 layer 更紧凑;仅作用于 admin 路由子树。
+                .route_layer(axum::middleware::from_fn_with_state(
+                    state.clone(),
+                    auth::admin_rate_limit_middleware,
+                )),
         )
         .route("/moment", get(routes::moment::get_moment))
         .route(
@@ -485,6 +493,10 @@ async fn main() {
         ai_rate_limits: Arc::new(Mutex::new(std::collections::HashMap::new())),
         guest_ip_rate_limits: Arc::new(Mutex::new(std::collections::HashMap::new())),
         error_report_limits: Arc::new(Mutex::new(std::collections::HashMap::new())),
+        recovery_ip_attempts: Arc::new(Mutex::new(std::collections::HashMap::new())),
+        recovery_ip_lockouts: Arc::new(Mutex::new(std::collections::HashMap::new())),
+        admin_user_rate_limits: Arc::new(Mutex::new(std::collections::HashMap::new())),
+        guest_ai_ip_aggregate: Arc::new(Mutex::new(std::collections::HashMap::new())),
     };
 
     // Spawn reminder poller (checks every 30s for due reminders)

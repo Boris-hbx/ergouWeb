@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>狗窝按钮呼吸预览</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #1a1a2e;
+    color: #ccc;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 20px;
+    min-height: 100vh;
+  }
+  h2 { font-size: 16px; margin-bottom: 28px; opacity: 0.6; font-weight: 400; }
+
+  /* 两列并排 */
+  .preview-row {
+    display: flex;
+    gap: 32px;
+    margin-bottom: 40px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .preview-case {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  .case-label {
+    font-size: 12px;
+    opacity: 0.45;
+    margin-bottom: 4px;
+  }
+
+  /* 模拟底部导航栏 - 通用 */
+  .nav-mock {
+    border-radius: 20px;
+    padding: 12px 32px 18px;
+    display: flex;
+    align-items: flex-end;
+    gap: 28px;
+  }
+  .nav-mock.dark {
+    background: #16213e;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  }
+  .nav-mock.light {
+    background: #ffffff;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+  }
+
+  .nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    opacity: 0.35;
+  }
+  .nav-item svg { width: 22px; height: 22px; fill: none; stroke-width: 2; }
+  .dark .nav-item svg { stroke: #aaa; }
+  .dark .nav-item span { font-size: 11px; color: #aaa; }
+  .light .nav-item svg { stroke: #888; }
+  .light .nav-item span { font-size: 11px; color: #888; }
+
+  /* 二狗按钮 */
+  .breathe-btn {
+    width: 48px;
+    height: 48px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: -20px;
+  }
+  .dark .breathe-btn {
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.35);
+    animation: breathe-dark 3.5s ease-in-out infinite;
+  }
+  .light .breathe-btn {
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    animation: breathe-light 3.5s ease-in-out infinite;
+  }
+  .breathe-btn svg { width: 22px; height: 22px; }
+
+  .breathe-label { font-size: 11px; margin-top: 4px; }
+  .dark .breathe-label { color: #aaa; }
+  .light .breathe-label { color: #888; }
+
+  @keyframes breathe-dark {
+    0%, 100% {
+      transform: scale(1);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.35);
+    }
+    50% {
+      transform: scale(1.06);
+      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.55);
+    }
+  }
+  @keyframes breathe-light {
+    0%, 100% {
+      transform: scale(1);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    }
+    50% {
+      transform: scale(1.06);
+      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.45);
+    }
+  }
+
+  /* 调参面板 */
+  .controls {
+    background: #16213e;
+    border-radius: 12px;
+    padding: 20px 24px;
+    width: 100%;
+    max-width: 400px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .controls h3 { font-size: 13px; opacity: 0.5; font-weight: 400; margin-bottom: 2px; }
+  .ctrl-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .ctrl-row label { font-size: 13px; min-width: 70px; opacity: 0.7; }
+  .ctrl-row input[type="range"] {
+    flex: 1;
+    height: 4px;
+    -webkit-appearance: none;
+    background: #333;
+    border-radius: 2px;
+    outline: none;
+  }
+  .ctrl-row input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: #667eea;
+    cursor: pointer;
+  }
+  .ctrl-row .val { font-size: 12px; min-width: 42px; text-align: right; opacity: 0.5; }
+</style>
+</head>
+<body>
+
+<h2>狗窝按钮 · 呼吸效果预览</h2>
+
+<div class="preview-row">
+  <!-- 深色 -->
+  <div class="preview-case">
+    <span class="case-label">深色模式</span>
+    <div class="nav-mock dark">
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+        <span>Todo</span>
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+        <span>例行</span>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;">
+        <div class="breathe-btn" id="btn-dark">
+          <svg viewBox="0 0 24 24"><g fill="#fff"><ellipse cx="3.8" cy="4.5" rx="1.2" ry="1.5"/><ellipse cx="6.5" cy="3.5" rx="1.1" ry="1.4"/><ellipse cx="9" cy="4.8" rx="1" ry="1.4"/><ellipse cx="10.5" cy="7.2" rx="0.9" ry="1.2" transform="rotate(20 10.5 7.2)"/><ellipse cx="6.6" cy="9.2" rx="3" ry="2.6" transform="rotate(-5 6.6 9.2)"/></g><g fill="#fff" transform="translate(24 2) scale(-1 1)"><ellipse cx="3.8" cy="4.5" rx="1.2" ry="1.5"/><ellipse cx="6.5" cy="3.5" rx="1.1" ry="1.4"/><ellipse cx="9" cy="4.8" rx="1" ry="1.4"/><ellipse cx="10.5" cy="7.2" rx="0.9" ry="1.2" transform="rotate(20 10.5 7.2)"/><ellipse cx="6.6" cy="9.2" rx="3" ry="2.6" transform="rotate(-5 6.6 9.2)"/></g></svg>
+        </div>
+        <span class="breathe-label">二狗</span>
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+        <span>学习</span>
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        <span>生活</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 浅色 -->
+  <div class="preview-case">
+    <span class="case-label">浅色模式</span>
+    <div class="nav-mock light">
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+        <span>Todo</span>
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+        <span>例行</span>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;">
+        <div class="breathe-btn" id="btn-light">
+          <svg viewBox="0 0 24 24"><g fill="#fff"><ellipse cx="3.8" cy="4.5" rx="1.2" ry="1.5"/><ellipse cx="6.5" cy="3.5" rx="1.1" ry="1.4"/><ellipse cx="9" cy="4.8" rx="1" ry="1.4"/><ellipse cx="10.5" cy="7.2" rx="0.9" ry="1.2" transform="rotate(20 10.5 7.2)"/><ellipse cx="6.6" cy="9.2" rx="3" ry="2.6" transform="rotate(-5 6.6 9.2)"/></g><g fill="#fff" transform="translate(24 2) scale(-1 1)"><ellipse cx="3.8" cy="4.5" rx="1.2" ry="1.5"/><ellipse cx="6.5" cy="3.5" rx="1.1" ry="1.4"/><ellipse cx="9" cy="4.8" rx="1" ry="1.4"/><ellipse cx="10.5" cy="7.2" rx="0.9" ry="1.2" transform="rotate(20 10.5 7.2)"/><ellipse cx="6.6" cy="9.2" rx="3" ry="2.6" transform="rotate(-5 6.6 9.2)"/></g></svg>
+        </div>
+        <span class="breathe-label">二狗</span>
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+        <span>学习</span>
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        <span>生活</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="controls">
+  <h3>调参（同步两侧）</h3>
+  <div class="ctrl-row">
+    <label>周期</label>
+    <input type="range" min="1.5" max="6" step="0.5" value="3.5" id="dur">
+    <span class="val" id="dur-v">3.5s</span>
+  </div>
+  <div class="ctrl-row">
+    <label>缩放</label>
+    <input type="range" min="1.00" max="1.20" step="0.01" value="1.06" id="scale">
+    <span class="val" id="scale-v">1.06x</span>
+  </div>
+  <div class="ctrl-row">
+    <label>光晕扩散</label>
+    <input type="range" min="0" max="30" step="2" value="20" id="glow">
+    <span class="val" id="glow-v">20px</span>
+  </div>
+  <div class="ctrl-row">
+    <label>光晕强度</label>
+    <input type="range" min="0.10" max="0.80" step="0.05" value="0.55" id="alpha">
+    <span class="val" id="alpha-v">0.55</span>
+  </div>
+</div>
+
+<script>
+var btnDark = document.getElementById('btn-dark');
+var btnLight = document.getElementById('btn-light');
+var styleEl = document.createElement('style');
+document.head.appendChild(styleEl);
+
+function update() {
+  var dur = document.getElementById('dur').value;
+  var scale = document.getElementById('scale').value;
+  var glow = document.getElementById('glow').value;
+  var alpha = parseFloat(document.getElementById('alpha').value);
+
+  document.getElementById('dur-v').textContent = parseFloat(dur).toFixed(1) + 's';
+  document.getElementById('scale-v').textContent = parseFloat(scale).toFixed(2) + 'x';
+  document.getElementById('glow-v').textContent = glow + 'px';
+  document.getElementById('alpha-v').textContent = alpha.toFixed(2);
+
+  btnDark.style.animationDuration = dur + 's';
+  btnLight.style.animationDuration = dur + 's';
+
+  // 浅色模式光晕稍弱一些，避免在白底上太刺眼
+  var alphaLight = Math.max(0.1, alpha - 0.1);
+
+  styleEl.textContent =
+    '@keyframes breathe-dark {' +
+      '0%, 100% { transform: scale(1); box-shadow: 0 4px 12px rgba(102,126,234,0.35); }' +
+      '50% { transform: scale(' + scale + '); box-shadow: 0 6px ' + glow + 'px rgba(102,126,234,' + alpha + '); }' +
+    '}' +
+    '@keyframes breathe-light {' +
+      '0%, 100% { transform: scale(1); box-shadow: 0 4px 12px rgba(102,126,234,0.3); }' +
+      '50% { transform: scale(' + scale + '); box-shadow: 0 6px ' + glow + 'px rgba(102,126,234,' + alphaLight + '); }' +
+    '}';
+}
+
+document.querySelectorAll('input[type="range"]').forEach(function(s) {
+  s.addEventListener('input', update);
+});
+</script>
+</body>
+</html>

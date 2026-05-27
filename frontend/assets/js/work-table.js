@@ -33,14 +33,11 @@ var WorkTable = (function() {
     function _statusBy(k) { for (var i = 0; i < STATUS.length; i++) if (STATUS[i].key === k) return STATUS[i]; return STATUS[0]; }
     function _prioBy(k)   { for (var i = 0; i < PRIORITY.length; i++) if (PRIORITY[i].key === k) return PRIORITY[i]; return PRIORITY[1]; }
 
-    // ============ 头像配色(4 色低饱和)============
-    var PAL = ['#7C4DFF', '#14B8A6', '#E0A23B', '#3B82F6'];
-    var _avatarColors = {};
+    // ============ 头像配色 ============
+    // T-099:统一改走 Work.colorOf(name) hash 取色,所有视图同人同色。
+    // 原本是"按出现顺序分配",会导致表格和人员视图同人异色。
     function _avatarColor(name) {
-        if (!_avatarColors[name]) {
-            _avatarColors[name] = PAL[Object.keys(_avatarColors).length % PAL.length];
-        }
-        return _avatarColors[name];
+        return Work.colorOf(name);
     }
 
     function _esc(s) {
@@ -58,9 +55,10 @@ var WorkTable = (function() {
         return el ? el.value : '';
     }
     function _visibleRows() {
+        // T-098:先过时间镜头 Tab,再过责任人(两层叠加)
+        var rows = Work.applyTimeTabFilter(Work.rows());
         var f = _filterValue();
-        var rows = Work.rows();
-        if (!f) return rows.slice();
+        if (!f) return rows;
         return rows.filter(function(t) { return t.assignee === f; });
     }
 
@@ -134,15 +132,25 @@ var WorkTable = (function() {
                     + (v != null && v !== '' ? _esc(v) : '<span class="wt-empty">—</span>') + '</td>';
             case 'percent': {
                 var p = Math.max(0, Math.min(100, +v || 0));
-                return '<td class="wt-editable" onclick="WorkTable.editNumber(' + t.id + ',\'' + _escAttr(k) + '\')">'
+                // T-095:进度列点击复用 todo 的 slider 弹窗(openProgressDialog),不再走 prompt。
+                return '<td class="wt-editable" onclick="WorkTable.editProgress(' + t.id + ',\'' + _escAttr(k) + '\')">'
                     + '<div class="wt-progress"><span class="wt-track"><span class="wt-fill" style="width:' + p + '%"></span></span>'
                     + '<span class="wt-pct">' + p + '%</span></div></td>';
             }
             case 'date': {
-                var today = _todayMD();
-                var overdue = (k === 'due' && t.status !== 'done' && v && v < today) ? ' overdue' : '';
-                return '<td class="wt-editable wt-due' + overdue + '" onclick="WorkTable.editText(' + t.id + ',\'' + _escAttr(k) + '\')">'
-                    + (v ? _esc(v) : '<span class="wt-empty">—</span>') + '</td>';
+                // T-098:用 YYYY-MM-DD 比较(lex 顺序 = 时间顺序);兼容 'MM-DD' 简写自动补当前年
+                var todayY = _todayYMD();
+                var dueY = _normalizeDueLocal(v);
+                var isOverdue = (k === 'due' && t.status !== 'done' && dueY && dueY < todayY);
+                var overdueClass = isOverdue ? ' overdue' : '';
+                var badge = '';
+                if (isOverdue) {
+                    var n = _daysOverdue(dueY, todayY);
+                    badge = ' <span class="wt-overdue-badge" title="逾期 ' + n + ' 天">⏰ 逾期 ' + n + ' 天</span>';
+                }
+                // T-104:date 单元格点击改用 datepicker(spec § 5 + § 7.1),不再走 text input dialog
+                return '<td class="wt-editable wt-due' + overdueClass + '" onclick="WorkTable.editDate(event,' + t.id + ',\'' + _escAttr(k) + '\')">'
+                    + (v ? _esc(v) : '<span class="wt-empty">—</span>') + badge + '</td>';
             }
             case 'checkbox':
                 return '<td><span class="wt-check" onclick="WorkTable.toggleCheck(' + t.id + ',\'' + _escAttr(k) + '\')">'
@@ -175,19 +183,44 @@ var WorkTable = (function() {
     function _escAttr(s) { return ('' + s).replace(/'/g, "\\'"); }
 
     function _todayMD() {
-        // MM-DD,用于 overdue 判断;前端只比较字符串大小,所以 MM-DD < MM-DD 有效。
+        // MM-DD,用于看板/日历卡片的 overdue 颜色判断(向后兼容旧 demo 数据)
         var d = new Date();
-        var m = ('0' + (d.getMonth() + 1)).slice(-2);
-        var dd = ('0' + d.getDate()).slice(-2);
-        return m + '-' + dd;
+        return ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+    }
+    // T-098:用 YYYY-MM-DD 比较 due。'MM-DD' 简写自动补当前年。
+    function _todayYMD() {
+        var d = new Date();
+        return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+    }
+    function _normalizeDueLocal(due) {
+        if (!due) return '';
+        if (due.length === 10 && due.charAt(4) === '-' && due.charAt(7) === '-') return due;
+        if (due.length === 5 && due.charAt(2) === '-') return (new Date()).getFullYear() + '-' + due;
+        return due;
+    }
+    function _daysOverdue(dueY, todayY) {
+        var d = new Date(dueY + 'T00:00:00');
+        var t = new Date(todayY + 'T00:00:00');
+        return Math.max(1, Math.floor((t - d) / 86400000));
     }
 
     // ============ 行渲染 ============
+    // T-100:行加 data-id;# 列点击打开详情抽屉,其它单元格仍走原内联编辑。
+    // T-103 B.2:每行加 .wt-entering 类 + stagger 入场 animation-delay(JS 渲染时算)
     function _rowHTML(t, num) {
-        var tds = '<td class="wt-num">' + num + '</td>';
+        var tds = '<td class="wt-num" onclick="WorkTable._openDetail(' + t.id + ')" title="点开打开详情">' + num + '</td>';
         var cols = Work.columns();
         for (var i = 0; i < cols.length; i++) tds += _cell(t, cols[i]);
-        return '<tr>' + tds + '</tr>';
+        // stagger delay 35ms × row index;超过 20 行后封顶,避免最后一行等太久
+        var delay = Math.min(num - 1, 20) * 35;
+        return '<tr data-id="' + t.id + '" class="wt-entering" style="animation-delay:' + delay + 'ms">' + tds + '</tr>';
+    }
+
+    // T-100:由 # 列调用打开详情抽屉,把当前可见行 id 顺序传过去支持上下翻
+    function _openDetail(id) {
+        if (typeof WorkDetail === 'undefined') return;
+        var ids = _visibleRows().map(function(r) { return r.id; });
+        WorkDetail.openDetail(id, ids);
     }
 
     // ============ 主渲染 ============
@@ -255,25 +288,52 @@ var WorkTable = (function() {
             + colgroup + thead + '<tbody>' + body + '</tbody></table></div>';
     }
 
-    // ============ 单元格编辑函数 ============
+    // ============ 单元格编辑函数(T-095:全部走居中 modal,禁用原生 prompt)============
     function editText(id, field) {
         var t = Work.rowById(id); if (!t) return;
         var c = Work.colByKey(field);
         var cur = (field === 'due') ? (t.due || '') : (t[field] != null ? t[field] : (t.customFields && t.customFields[field]) || '');
-        var v = prompt('修改「' + (c ? c.name : field) + '」:', cur);
-        if (v === null) return;
-        _saveField(id, c, field, v.trim());
+        openTextInputDialog({
+            label: '修改「' + (c ? c.name : field) + '」',
+            initial: cur,
+            type: 'text',
+            onConfirm: function(v) { _saveField(id, c, field, ('' + v).trim()); },
+        });
+    }
+
+    // T-104:date 单元格 → 弹 datepicker(复用 todo 同款 popover,callback 模式)
+    // 注意:WorkDetail 抽屉里的截止日字段也走这里(同一 editText / editDate 通道)。
+    function editDate(ev, id, field) {
+        if (ev && ev.stopPropagation) ev.stopPropagation();
+        var t = Work.rowById(id); if (!t) return;
+        var c = Work.colByKey(field);
+        var cur = c && c.builtin ? (t[field] || '') : ((t.customFields && t.customFields[field]) || '');
+        // anchor = 被点的单元格本身(<td>);未给 event 时用 body 中心(降级)
+        var anchor = (ev && ev.currentTarget) || (ev && ev.target) || document.body;
+        if (typeof window.toggleDatePicker !== 'function') {
+            // 极端降级:如果 datepicker.js 没加载,回退到 text input
+            console.warn('[WorkTable] datepicker not available, fallback to text input');
+            return editText(id, field);
+        }
+        window.toggleDatePicker({
+            anchor: anchor,
+            initial: cur,
+            onSelect: function(ymd) {
+                _saveField(id, c, field, ymd);
+            },
+        });
     }
 
     function editNumber(id, field) {
         var t = Work.rowById(id); if (!t) return;
         var c = Work.colByKey(field);
         var cur = t[field] != null ? t[field] : (t.customFields && t.customFields[field]);
-        var v = prompt('修改「' + (c ? c.name : field) + '」(数字):', cur == null ? '' : cur);
-        if (v === null) return;
-        var n = parseFloat(v);
-        if (isNaN(n)) n = 0;
-        _saveField(id, c, field, n);
+        openTextInputDialog({
+            label: '修改「' + (c ? c.name : field) + '」',
+            initial: cur == null ? '' : String(cur),
+            type: 'number',
+            onConfirm: function(n) { _saveField(id, c, field, isNaN(n) ? 0 : n); },
+        });
     }
 
     function toggleCheck(id, field) {
@@ -281,6 +341,82 @@ var WorkTable = (function() {
         var c = Work.colByKey(field);
         var cur = c && c.builtin ? t[field] : (t.customFields && t.customFields[field]);
         _saveField(id, c, field, !cur);
+    }
+
+    // T-095 § 7.1 问题 4:进度列复用 todo 的 .progress-ring 同款 slider 弹窗。
+    // 与 todo 不同之处:work-table 这里 100% 二次确认后 status 也设为 'done'。
+    // T-103 B.3:二次确认通过 → 彩纸 + 行温柔淡出(冻结 render 1100ms 避免被打断)
+    function editProgress(id, field) {
+        var t = Work.rowById(id); if (!t) return;
+        var c = Work.colByKey(field);
+        var cur;
+        if (c && c.builtin) cur = +t[field] || 0;
+        else cur = +(t.customFields && t.customFields[field]) || 0;
+        openProgressDialog({
+            label: t.title || '(无标题)',
+            currentProgress: cur,
+            onConfirm: function(p) { _saveField(id, c, field, p); },
+            onComplete: function() {
+                // 100% 时二次确认:同时把状态切到 done(work-table 业务规则)。
+                window.AppUtils.showConfirm(
+                    '确定要将此任务标记为已完成吗？\n完成后状态变为已完成（done）。',
+                    function() {
+                        _doCompletionWithCelebration(id, c, field);
+                    },
+                    { confirmText: '确定完成' }
+                );
+            },
+        });
+    }
+
+    // T-103 B.3:完成动画 — 彩纸 + 行淡出;期间冻结 render 避免被打断
+    function _doCompletionWithCelebration(id, c, field) {
+        // 1) 立刻发 PATCH(乐观更新);但冻结 render 1100ms,让动画跑完再重渲
+        if (Work.freezeRender) Work.freezeRender(1100);
+
+        if (field === 'progress') {
+            Work.updateRow(id, { progress: 100, status: 'done' });
+        } else if (c && c.builtin) {
+            var patch = { status: 'done' };
+            patch[field] = 100;
+            Work.updateRow(id, patch);
+        } else {
+            var cf = {}; cf[field] = 100;
+            Work.updateRow(id, { customFields: cf, status: 'done' });
+        }
+
+        // 2) 找到当前行 + 彩纸锚点(进度单元格;退而求其次取行)
+        var row = document.querySelector('#wt-table-view tr[data-id="' + id + '"]');
+        var anchor = row ? (row.querySelector('.wt-progress') || row.querySelector('.wt-num') || row) : document.body;
+        _confettiBurst(anchor);
+
+        // 3) 700ms 后给行加 .wt-removing,触发 translateX -30 opacity 0 缓动
+        setTimeout(function() {
+            if (row && row.parentNode) row.classList.add('wt-removing');
+        }, 700);
+        // 4) Work.freezeRender 期满会自动调 render(),replace DOM,自然结束动画
+    }
+
+    // T-103 B.3:14 片彩纸喷射 1.4s
+    var _CONFETTI_COLORS = ['#7C4DFF', '#14B8A6', '#E0A23B', '#3B82F6', '#E11D48', '#10B981'];
+    function _confettiBurst(anchor) {
+        if (!anchor || !anchor.getBoundingClientRect) return;
+        var rect = anchor.getBoundingClientRect();
+        var cx = rect.left + rect.width / 2;
+        var cy = rect.top + rect.height / 2;
+        for (var i = 0; i < 14; i++) {
+            var c = document.createElement('div');
+            c.className = 'wt-confetti';
+            c.style.left = cx + 'px';
+            c.style.top  = cy + 'px';
+            c.style.background = _CONFETTI_COLORS[i % _CONFETTI_COLORS.length];
+            c.style.setProperty('--r', (Math.random() * 720 - 360) + 'deg');
+            c.style.setProperty('--x', (Math.random() * 200 - 100) + 'px');
+            c.style.setProperty('--initR', (Math.random() * 360) + 'deg');
+            document.body.appendChild(c);
+            // 1.5s 后清理(动画 1.4s + 缓冲)
+            (function(el) { setTimeout(function() { el.remove(); }, 1500); })(c);
+        }
     }
 
     function _saveField(id, c, field, value) {
@@ -378,18 +514,25 @@ var WorkTable = (function() {
         Work.updateRow(id, patch);
     }
 
-    // ============ 加行 ============
+    // ============ 加行(T-095:走居中 modal,不再用原生 prompt)============
     function addRow() {
-        var name = prompt('新任务标题:');
-        if (!name || !name.trim()) return;
-        Work.createRow({
-            title: name.trim(),
-            assignee: '我',
-            level: '个人',
-            freq: '一次性',
-            status: 'todo',
-            priority: 'mid',
-            progress: 0,
+        openTextInputDialog({
+            label: '新任务标题',
+            initial: '',
+            type: 'text',
+            placeholder: '输入任务名',
+            onConfirm: function(name) {
+                if (!name || !('' + name).trim()) return;
+                Work.createRow({
+                    title: ('' + name).trim(),
+                    assignee: '我',
+                    level: '个人',
+                    freq: '一次性',
+                    status: 'todo',
+                    priority: 'mid',
+                    progress: 0,
+                });
+            },
         });
     }
 
@@ -456,7 +599,9 @@ var WorkTable = (function() {
         render: render,
         addRow: addRow,
         editText: editText,
+        editDate: editDate,   // T-104
         editNumber: editNumber,
+        editProgress: editProgress,
         toggleCheck: toggleCheck,
         openPick: openPick,
         openText: openText,
@@ -472,5 +617,7 @@ var WorkTable = (function() {
         _PRIORITY: PRIORITY,
         _esc: _esc,
         _todayMD: _todayMD,
+        _openDetail: _openDetail,
+        _visibleRows: _visibleRows,
     };
 })();

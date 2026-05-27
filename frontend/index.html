@@ -8,16 +8,16 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Next">
     <title>Next - Focus on the Right Thing</title>
-    <link rel="stylesheet" href="assets/css/base.css?v=20260525b">
-    <link rel="stylesheet" href="assets/css/style.css?v=20260525b">
-    <link rel="stylesheet" href="assets/css/components.css?v=20260525b">
-    <link rel="stylesheet" href="assets/css/mobile.css?v=20260525b">
-    <link rel="stylesheet" href="assets/css/abao.css?v=20260525b">
-    <link rel="stylesheet" href="assets/css/english.css?v=20260525b">
-    <link rel="stylesheet" href="assets/css/health.css?v=20260525b">
-    <link rel="stylesheet" href="assets/css/patrol.css?v=20260525b">
-    <link rel="stylesheet" href="assets/css/admin-panel.css?v=20260525b">
-    <link rel="stylesheet" href="assets/css/work.css?v=20260525b">
+    <link rel="stylesheet" href="assets/css/base.css?v=20260527e">
+    <link rel="stylesheet" href="assets/css/style.css?v=20260527e">
+    <link rel="stylesheet" href="assets/css/components.css?v=20260527e">
+    <link rel="stylesheet" href="assets/css/mobile.css?v=20260527e">
+    <link rel="stylesheet" href="assets/css/abao.css?v=20260527e">
+    <link rel="stylesheet" href="assets/css/english.css?v=20260527e">
+    <link rel="stylesheet" href="assets/css/health.css?v=20260527e">
+    <link rel="stylesheet" href="assets/css/patrol.css?v=20260527e">
+    <link rel="stylesheet" href="assets/css/admin-panel.css?v=20260527e">
+    <link rel="stylesheet" href="assets/css/work.css?v=20260527e">
     <link rel="manifest" href="assets/manifest.json">
     <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
     <script>
@@ -1162,13 +1162,39 @@
         <!-- 任务表子视图(三视图共用此容器，由 Work.setView 切换) -->
         <div id="work-table-view" style="display:none;">
             <button class="wt-back-btn" onclick="Work.showHub()">&larr; 工作</button>
+            <!-- T-103 B.1:30 天负载心电图;JS 在 Work.render 时填充 -->
+            <div class="wt-heart-strip" id="wt-heart-strip"></div>
+            <!-- T-098: 时间镜头 Tab(全部 / 今日 / 本周 / 本月);日历视图下自动隐藏
+                 T-103 B.2:加 .wt-tab-indicator spring 滑块,JS 在 setTimeTab 时移动 -->
+            <div class="wt-time-tabs" id="wt-time-tabs">
+                <button class="wt-time-tab active" data-tab="all" onclick="Work.setTimeTab('all')">
+                    全部 <span class="wt-time-tab-count" id="wt-tab-count-all">0</span>
+                </button>
+                <button class="wt-time-tab" data-tab="today" onclick="Work.setTimeTab('today')">
+                    今日 <span class="wt-time-tab-count" id="wt-tab-count-today">0</span><span class="wt-time-tab-warn" id="wt-tab-warn" style="display:none" title="">⚠</span>
+                </button>
+                <button class="wt-time-tab" data-tab="week" onclick="Work.setTimeTab('week')">
+                    本周 <span class="wt-time-tab-count" id="wt-tab-count-week">0</span>
+                </button>
+                <button class="wt-time-tab" data-tab="month" onclick="Work.setTimeTab('month')">
+                    本月 <span class="wt-time-tab-count" id="wt-tab-count-month">0</span>
+                </button>
+                <div class="wt-tab-indicator" id="wt-tab-indicator"></div>
+            </div>
             <div class="wt-toolbar">
                 <h2>任务表</h2>
                 <span class="wt-total" id="wt-total">共 0 项</span>
+                <!-- T-103 B.1:点心电图柱后显示的日期过滤 chip -->
+                <span class="wt-date-filter-chip" id="wt-date-filter-chip" style="display:none">
+                    <span>📅 <span id="wt-dfc-date"></span></span>
+                    <span class="wt-dfc-x" onclick="Work.clearDateFilter()" title="清除日期过滤">✕</span>
+                </span>
                 <div class="wt-seg">
                     <button id="wt-seg-table" class="active" onclick="Work.setView('table')">▦ 表格</button>
                     <button id="wt-seg-board" onclick="Work.setView('board')">▤ 看板</button>
                     <button id="wt-seg-cal"   onclick="Work.setView('cal')">▥ 日历</button>
+                    <!-- T-099 -->
+                    <button id="wt-seg-person" onclick="Work.setView('person')">✦ 人员</button>
                 </div>
                 <select class="wt-select" id="wt-filter" onchange="Work.render()">
                     <option value="">全部责任人</option>
@@ -1186,6 +1212,8 @@
             <div id="wt-table-view" class="wt-table-wrap"></div>
             <div id="wt-board-view" class="wt-board wt-hidden"></div>
             <div id="wt-cal-view" class="wt-hidden"></div>
+            <!-- T-099:人员视图(气泡总览 + 卡片墙) -->
+            <div id="wt-person-view" class="wt-hidden"></div>
         </div>
     </div>
 
@@ -1217,6 +1245,104 @@
     <!-- 工作:单选/多选弹候选 -->
     <div class="wt-pick-bd" id="wt-pick-bd" onclick="WorkPick.close()"></div>
     <div class="wt-pick" id="wt-pick"></div>
+
+    <!-- 工作:任务详情侧拉抽屉 (T-100 / SPEC § 7.6) -->
+    <div class="wt-detail-scrim" id="wt-detail-scrim" onclick="WorkDetail.closeDetail()"></div>
+    <aside class="wt-detail-drawer" id="wt-detail-drawer" aria-hidden="true">
+      <div class="wt-d-head">
+        <div class="wt-d-head-top">
+          <button class="wt-d-icon-btn" id="wt-d-close" onclick="WorkDetail.closeDetail()" title="关闭 (Esc)">✕</button>
+          <div class="wt-d-nav">
+            <button class="wt-d-icon-btn wt-d-nav-btn" id="wt-d-prev" onclick="WorkDetail.navigate(-1)" title="上一条 (↑)">↑</button>
+            <span class="wt-d-nav-pos"><span id="wt-d-nav-pos">1</span> / <span id="wt-d-nav-total">1</span></span>
+            <button class="wt-d-icon-btn wt-d-nav-btn" id="wt-d-next" onclick="WorkDetail.navigate(1)" title="下一条 (↓)">↓</button>
+          </div>
+          <button class="wt-d-icon-btn" title="复制链接(暂未实现)" onclick="showToast && showToast('复制链接将在后续版本支持','info')">🔗</button>
+          <button class="wt-d-icon-btn" title="更多(暂未实现)" onclick="showToast && showToast('更多操作将在后续版本支持','info')">⋯</button>
+        </div>
+        <div class="wt-d-title-row">
+          <textarea class="wt-d-title" id="wt-d-title" rows="1" placeholder="任务标题(失焦自动保存)"></textarea>
+        </div>
+        <div class="wt-d-quickrow">
+          <span class="wt-pill" id="wt-d-status-pill">●待办</span>
+          <span class="wt-pill" id="wt-d-prio-pill">中</span>
+          <span class="wt-pill" id="wt-d-due-pill" style="display:none"></span>
+        </div>
+      </div>
+
+      <div class="wt-d-body">
+        <!-- 字段网格 -->
+        <div class="wt-d-section">
+          <div class="wt-d-grid">
+            <div class="wt-d-k">👤 责任人</div>
+            <div class="wt-d-v">
+              <div class="wt-d-field" id="wt-d-field-assignee">
+                <span class="wt-avatar" id="wt-d-avatar">?</span>
+                <span id="wt-d-assignee">未指派</span>
+                <span class="wt-d-caret">▾</span>
+              </div>
+            </div>
+
+            <div class="wt-d-k">🏛 层级</div>
+            <div class="wt-d-v">
+              <div class="wt-d-field" id="wt-d-field-level">
+                <span id="wt-d-level">—</span>
+                <span class="wt-d-caret">▾</span>
+              </div>
+            </div>
+
+            <div class="wt-d-k">🔁 频率</div>
+            <div class="wt-d-v">
+              <div class="wt-d-field" id="wt-d-field-freq">
+                <span id="wt-d-freq">—</span>
+                <span class="wt-d-caret">▾</span>
+              </div>
+            </div>
+
+            <div class="wt-d-k">⚡ 优先级</div>
+            <div class="wt-d-v">
+              <div class="wt-d-field" id="wt-d-field-priority">
+                <span id="wt-d-priority-field">—</span>
+                <span class="wt-d-caret">▾</span>
+              </div>
+            </div>
+
+            <div class="wt-d-k">📅 截止日</div>
+            <div class="wt-d-v">
+              <div class="wt-d-field" id="wt-d-field-due">
+                <span id="wt-d-due">—</span>
+                <span class="wt-d-caret">📅</span>
+              </div>
+            </div>
+
+            <div class="wt-d-k">📊 进度</div>
+            <div class="wt-d-v">
+              <div class="wt-d-progress" id="wt-d-progress" title="点击修改进度">
+                <div class="wt-d-bar"><div class="wt-d-fill" id="wt-d-progress-fill" style="width:0%"></div></div>
+                <span class="wt-d-pct" id="wt-d-progress-pct">0%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 简介 -->
+        <div class="wt-d-section">
+          <div class="wt-d-label">简介</div>
+          <textarea class="wt-d-desc" id="wt-d-desc" placeholder="点击添加简介……(Cmd/Ctrl+Enter 保存)"></textarea>
+        </div>
+
+        <!-- 活动时间线 -->
+        <div class="wt-d-section">
+          <div class="wt-d-label">活动</div>
+          <div class="wt-d-timeline" id="wt-d-timeline"></div>
+        </div>
+      </div>
+
+      <div class="wt-d-foot">
+        <span class="wt-d-meta">创建 <span id="wt-d-created">—</span></span>
+        <span class="wt-d-meta wt-d-meta-sep">修改 <span id="wt-d-updated">—</span></span>
+      </div>
+    </aside>
 
     <!-- 差旅弹窗 -->
     <div class="trip-modal-overlay" id="trip-modal-overlay" style="display:none;"></div>
@@ -1577,46 +1703,51 @@
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
 
     <!-- JS Modules -->
-    <script src="assets/js/observability.js?v=20260525b"></script>
-    <script src="assets/js/api.js?v=20260525b"></script>
-    <script src="assets/js/utils.js?v=20260525b"></script>
-    <script src="assets/js/jelly-indicator.js?v=20260525b"></script>
-    <script src="assets/js/app.js?v=20260525b"></script>
-    <script src="assets/js/tasks.js?v=20260525b"></script>
-    <script src="assets/js/modal.js?v=20260525b"></script>
-    <script src="assets/js/datepicker.js?v=20260525b"></script>
-    <script src="assets/js/drag.js?v=20260525b"></script>
-    <script src="assets/js/actionsheet.js?v=20260525b"></script>
-    <script src="assets/js/share-modal.js?v=20260525b"></script>
-    <script src="assets/js/review.js?v=20260525b"></script>
-    <script src="assets/js/routines.js?v=20260525b"></script>
-    <script src="assets/js/features.js?v=20260525b"></script>
-    <script src="assets/js/particles.js?v=20260525b"></script>
-    <script src="assets/js/living-line.js?v=20260525b"></script>
-    <script src="assets/js/abao.js?v=20260525b"></script>
-    <script src="assets/js/english.js?v=20260525b"></script>
-    <script src="assets/js/life.js?v=20260525b"></script>
-    <script src="assets/js/expense.js?v=20260525b"></script>
-    <script src="assets/js/expense-analytics.js?v=20260525b"></script>
-    <script src="assets/js/trip.js?v=20260525b"></script>
-    <script src="assets/js/health-data.js?v=20260525b"></script>
-    <script src="assets/js/health-renderer.js?v=20260525b"></script>
-    <script src="assets/js/health.js?v=20260525b"></script>
-    <script src="assets/js/friends.js?v=20260525b"></script>
-    <script src="assets/js/notifications.js?v=20260525b"></script>
-    <script src="assets/js/settings.js?v=20260525b"></script>
-    <script src="assets/js/admin-panel.js?v=20260525b"></script>
+    <script src="assets/js/observability.js?v=20260527e"></script>
+    <script src="assets/js/api.js?v=20260527e"></script>
+    <script src="assets/js/utils.js?v=20260527e"></script>
+    <!-- T-095: 通用弹窗组件 (openProgressDialog / openTextInputDialog),tasks.js 和 work-table.js 都依赖 -->
+    <script src="assets/js/dialogs.js?v=20260527e"></script>
+    <script src="assets/js/jelly-indicator.js?v=20260527e"></script>
+    <script src="assets/js/app.js?v=20260527e"></script>
+    <script src="assets/js/tasks.js?v=20260527e"></script>
+    <script src="assets/js/modal.js?v=20260527e"></script>
+    <script src="assets/js/datepicker.js?v=20260527e"></script>
+    <script src="assets/js/drag.js?v=20260527e"></script>
+    <script src="assets/js/actionsheet.js?v=20260527e"></script>
+    <script src="assets/js/share-modal.js?v=20260527e"></script>
+    <script src="assets/js/review.js?v=20260527e"></script>
+    <script src="assets/js/routines.js?v=20260527e"></script>
+    <script src="assets/js/features.js?v=20260527e"></script>
+    <script src="assets/js/particles.js?v=20260527e"></script>
+    <script src="assets/js/living-line.js?v=20260527e"></script>
+    <script src="assets/js/abao.js?v=20260527e"></script>
+    <script src="assets/js/english.js?v=20260527e"></script>
+    <script src="assets/js/life.js?v=20260527e"></script>
+    <script src="assets/js/expense.js?v=20260527e"></script>
+    <script src="assets/js/expense-analytics.js?v=20260527e"></script>
+    <script src="assets/js/trip.js?v=20260527e"></script>
+    <script src="assets/js/health-data.js?v=20260527e"></script>
+    <script src="assets/js/health-renderer.js?v=20260527e"></script>
+    <script src="assets/js/health.js?v=20260527e"></script>
+    <script src="assets/js/friends.js?v=20260527e"></script>
+    <script src="assets/js/notifications.js?v=20260527e"></script>
+    <script src="assets/js/settings.js?v=20260527e"></script>
+    <script src="assets/js/admin-panel.js?v=20260527e"></script>
     <!-- Work module (T-094 / SPEC work-task-table) -->
-    <script src="assets/js/work-pick.js?v=20260525b"></script>
-    <script src="assets/js/work-table.js?v=20260525b"></script>
-    <script src="assets/js/work-column-cfg.js?v=20260525b"></script>
-    <script src="assets/js/work-board.js?v=20260525b"></script>
-    <script src="assets/js/work-calendar.js?v=20260525b"></script>
-    <script src="assets/js/work.js?v=20260525b"></script>
-    <script src="assets/js/patrol-utils.js?v=20260525b"></script>
-    <script src="assets/js/patrol-terrain.js?v=20260525b"></script>
-    <script src="assets/js/patrol-debug.js?v=20260525b"></script>
-    <script src="assets/js/patrol.js?v=20260525b"></script>
+    <script src="assets/js/work-pick.js?v=20260527e"></script>
+    <script src="assets/js/work-table.js?v=20260527e"></script>
+    <script src="assets/js/work-column-cfg.js?v=20260527e"></script>
+    <script src="assets/js/work-board.js?v=20260527e"></script>
+    <script src="assets/js/work-calendar.js?v=20260527e"></script>
+    <!-- T-099 -->
+    <script src="assets/js/work-person.js?v=20260527e"></script>
+    <script src="assets/js/work-detail.js?v=20260527e"></script>
+    <script src="assets/js/work.js?v=20260527e"></script>
+    <script src="assets/js/patrol-utils.js?v=20260527e"></script>
+    <script src="assets/js/patrol-terrain.js?v=20260527e"></script>
+    <script src="assets/js/patrol-debug.js?v=20260527e"></script>
+    <script src="assets/js/patrol.js?v=20260527e"></script>
 
     <script>
     // Initialize

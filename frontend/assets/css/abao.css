@@ -190,6 +190,166 @@
     cursor: default;
 }
 
+/* ============================================================
+ * T-101:工作任务工具 inline 卡片(5 种)
+ * 视觉设计依据:frontend/work-tools-preview.html
+ * 类名 abao-wt- 前缀,避免与全局 .task-card / .list-card 撞名。
+ * ============================================================ */
+
+/* —— task-card:create_work_task / update_work_task 返回 —— */
+.abao-wt-task-card {
+    margin-top: 8px;
+    background: var(--bg-card, #fff);
+    border: 1px solid rgba(var(--primary-color-rgb, 124,77,255), 0.18);
+    border-radius: 10px;
+    padding: 10px 12px;
+    box-shadow: 0 1px 3px rgba(var(--primary-color-rgb, 124,77,255), 0.10);
+}
+.abao-wt-tc-head {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+}
+.abao-wt-tid {
+    background: rgba(var(--primary-color-rgb, 124,77,255), 0.10);
+    color: var(--primary-color, #7C4DFF);
+    padding: 1px 7px; border-radius: 10px; font-size: 11px;
+    font-family: ui-monospace, monospace; font-weight: 600;
+}
+.abao-wt-tt {
+    flex: 1; font-weight: 600; font-size: 13.5px;
+    color: var(--text-primary);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.abao-wt-tc-meta {
+    display: flex; gap: 8px; flex-wrap: wrap;
+    font-size: 11.5px; color: var(--text-muted);
+}
+.abao-wt-pill {
+    padding: 1px 7px; border-radius: 8px; font-size: 11px;
+    background: var(--bg-secondary, #F5F2FB);
+    color: var(--text-secondary);
+}
+.abao-wt-pill.abao-wt-due-soon  { background: rgba(245, 158, 11, 0.12); color: #8B5A00; }
+.abao-wt-pill.abao-wt-overdue   { background: rgba(225, 29, 72, 0.10); color: #E11D48; font-weight: 600; }
+.abao-wt-pill.abao-wt-p0        { background: rgba(245, 158, 11, 0.12); color: #8B5A00; font-weight: 600; }
+.abao-wt-av-mini {
+    width: 18px; height: 18px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: 600; font-size: 10px;
+}
+.abao-wt-tc-actions {
+    margin-top: 8px;
+    display: flex; gap: 6px;
+}
+.abao-wt-tc-actions a {
+    color: var(--primary-color, #7C4DFF); font-size: 12px; cursor: pointer;
+    padding: 2px 8px; border-radius: 6px;
+    background: rgba(var(--primary-color-rgb, 124,77,255), 0.10);
+    text-decoration: none;
+}
+.abao-wt-tc-actions a:hover { background: rgba(var(--primary-color-rgb, 124,77,255), 0.18); }
+
+/* —— list-card:query_work_tasks 返回 —— */
+.abao-wt-list-card {
+    margin-top: 8px;
+    background: var(--bg-card, #fff);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    overflow: hidden;
+}
+.abao-wt-lc-summary {
+    padding: 8px 12px;
+    background: var(--bg-secondary, #F5F2FB);
+    font-size: 12px;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border-color);
+    display: flex; gap: 12px; flex-wrap: wrap;
+}
+.abao-wt-lc-summary strong { color: var(--text-primary); }
+.abao-wt-lc-row {
+    padding: 8px 12px;
+    display: flex; align-items: center; gap: 8px;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 12.5px;
+    cursor: pointer;
+    transition: background .12s;
+}
+.abao-wt-lc-row:last-child { border-bottom: 0; }
+.abao-wt-lc-row:hover { background: var(--bg-secondary, #F5F2FB); }
+.abao-wt-lc-row .abao-wt-tid {
+    background: var(--bg-secondary, #F5F2FB);
+    color: var(--text-muted);
+    padding: 0 5px; border-radius: 6px; font-size: 10.5px;
+}
+.abao-wt-lc-row .abao-wt-tt {
+    flex: 1; font-weight: normal;
+}
+.abao-wt-lc-empty {
+    padding: 14px 12px; text-align: center;
+    color: var(--text-muted); font-size: 12px;
+}
+
+/* —— disambig-card:候选消歧(CSS 就绪,MVP 由 LLM 文本主动触发) —— */
+.abao-wt-disambig-card {
+    margin-top: 8px;
+    background: var(--bg-card, #fff);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 10px 12px;
+}
+.abao-wt-dc-q { font-weight: 600; margin-bottom: 6px; font-size: 12.5px; color: var(--text-primary); }
+.abao-wt-dc-opts { display: flex; gap: 6px; flex-wrap: wrap; }
+.abao-wt-dc-opt {
+    padding: 4px 10px;
+    background: var(--bg-secondary, #F5F2FB);
+    border-radius: 14px;
+    cursor: pointer;
+    font-size: 12px;
+    display: inline-flex; align-items: center; gap: 5px;
+}
+.abao-wt-dc-opt:hover {
+    background: rgba(var(--primary-color-rgb, 124,77,255), 0.10);
+    color: var(--primary-color);
+}
+
+/* —— confirm-card:批量操作前二次确认(CSS 就绪) —— */
+.abao-wt-confirm-card {
+    margin-top: 8px;
+    background: rgba(245, 158, 11, 0.12);
+    border: 1px solid #F59E0B;
+    border-radius: 10px;
+    padding: 10px 12px;
+    color: #8B5A00;
+}
+.abao-wt-cc-q { font-weight: 600; margin-bottom: 8px; }
+.abao-wt-cc-btns { display: flex; gap: 8px; }
+.abao-wt-cc-btns button {
+    padding: 4px 14px;
+    border-radius: 6px;
+    border: 1px solid;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+}
+.abao-wt-cc-ok {
+    background: var(--primary-color, #7C4DFF); color: white;
+    border-color: var(--primary-color);
+}
+.abao-wt-cc-no {
+    background: white; color: var(--text-muted);
+    border-color: var(--border-color);
+}
+
+/* —— error-card:工具调用失败 —— */
+.abao-wt-error-card {
+    margin-top: 8px;
+    background: rgba(225, 29, 72, 0.10);
+    border: 1px solid #E11D48;
+    border-radius: 10px;
+    padding: 10px 12px;
+    color: #E11D48;
+    font-size: 12.5px;
+}
+
 /* --- 推送引导卡片 --- */
 .abao-push-prompt {
     border-left: 3px solid #f0883e;

@@ -1,0 +1,47 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "boris -p \"C:\\Project\\ergouWeb\" merge-pack auto-end 2>/dev/null"
+          },
+          {
+            "type": "command",
+            "command": "boris -p \"C:\\Project\\ergouWeb\" check"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "boris -p \"C:\\Project\\ergouWeb\" merge-pack auto-begin 2>/dev/null"
+          },
+          {
+            "type": "command",
+            "command": "boris -p \"C:\\Project\\ergouWeb\" record file.modified -s claude-agent --pack $BORIS_PACK_ID -d '{\"tool\": \"$TOOL_NAME\"}'"
+          },
+          {
+            "type": "command",
+            "command": "boris -p \"C:\\Project\\ergouWeb\" check --tag essential"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "boris -p \"C:\\Project\\ergouWeb\" record agent.tool_call -s claude-agent --pack $BORIS_PACK_ID -d '{\"tool\": \"Bash\"}'"
+          }
+        ]
+      }
+    ]
+  }
+}

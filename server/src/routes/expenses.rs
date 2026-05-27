@@ -9,7 +9,7 @@ use chrono::Datelike;
 use serde::Serialize;
 use serde_json::json;
 
-use crate::auth::{check_guest_ai_quota, ActiveUserId, UserId};
+use crate::auth::{check_guest_ai_quota, extract_client_ip, ActiveUserId, UserId};
 use crate::models::expense::*;
 use crate::state::AppState;
 
@@ -821,6 +821,16 @@ pub async fn upload_photos(
             continue;
         }
 
+        // T-089 块1:扩展名白名单(防双扩展名攻击)
+        //   - `rsplit('.').next()` 取最后一个 '.' 之后的部分,所以 `evil.jpg.php` → 'php' → 不在白名单 → 拒绝
+        //   - 配合保留 mime 校验,双重防御
+        let ext = filename.rsplit('.').next().unwrap_or("").to_lowercase();
+        let allowed_exts = ["jpg", "jpeg", "png", "webp", "heic"];
+        if !allowed_exts.contains(&ext.as_str()) {
+            eprintln!("[expenses upload] rejected filename={:?} ext={:?} (extension not in whitelist)", filename, ext);
+            continue;
+        }
+
         let data = match field.bytes().await {
             Ok(d) => d,
             Err(_) => continue,
@@ -831,7 +841,6 @@ pub async fn upload_photos(
         }
 
         let photo_id = uuid::Uuid::new_v4().to_string();
-        let ext = filename.rsplit('.').next().unwrap_or("jpg").to_lowercase();
         let storage_name = format!("{}.{}", photo_id, ext);
         let storage_path = format!("{}/{}", upload_dir, storage_name);
 
@@ -995,10 +1004,12 @@ pub async fn serve_photo(
 pub async fn parse_receipts(
     State(state): State<AppState>,
     user_id: ActiveUserId,
+    headers: http::HeaderMap,
     Path(entry_id): Path<String>,
 ) -> (StatusCode, Json<serde_json::Value>) {
-    // Guest AI quota check
-    let guest_ai_remaining = match check_guest_ai_quota(&state, &user_id.0) {
+    // Guest AI quota check (T-089: IP aggregate)
+    let client_ip = extract_client_ip(&headers);
+    let guest_ai_remaining = match check_guest_ai_quota(&state, &user_id.0, &client_ip) {
         Ok(r) => r,
         Err(e) => return e,
     };
@@ -1156,10 +1167,12 @@ pub async fn parse_receipts(
 pub async fn parse_preview(
     State(state): State<AppState>,
     user_id: ActiveUserId,
+    headers: http::HeaderMap,
     Json(req): Json<ParsePreviewRequest>,
 ) -> (StatusCode, Json<ParsePreviewResponse>) {
-    // Guest AI quota check
-    let guest_ai_remaining = match check_guest_ai_quota(&state, &user_id.0) {
+    // Guest AI quota check (T-089: IP aggregate)
+    let client_ip = extract_client_ip(&headers);
+    let guest_ai_remaining = match check_guest_ai_quota(&state, &user_id.0, &client_ip) {
         Ok(r) => r,
         Err(_) => {
             return (

@@ -1,13 +1,19 @@
 use axum::{extract::State, response::IntoResponse, Json};
+use http::HeaderMap;
 use serde_json::json;
 
-use crate::auth::{check_guest_ai_quota, UserId};
+use crate::auth::{check_guest_ai_quota, extract_client_ip, UserId};
 use crate::services::{context, llm::LlmClient};
 use crate::state::AppState;
 
 /// GET /api/moment — get a pool of one-liners from 二狗 for the header
-pub async fn get_moment(State(state): State<AppState>, user_id: UserId) -> impl IntoResponse {
+pub async fn get_moment(
+    State(state): State<AppState>,
+    user_id: UserId,
+    headers: HeaderMap,
+) -> impl IntoResponse {
     let uid = user_id.0;
+    let client_ip = extract_client_ip(&headers);
 
     // Read user timezone
     let user_timezone = {
@@ -39,8 +45,8 @@ pub async fn get_moment(State(state): State<AppState>, user_id: UserId) -> impl 
         }
     }
 
-    // Guest AI quota check
-    let ai_remaining = match check_guest_ai_quota(&state, &uid) {
+    // Guest AI quota check (T-089: IP aggregate via 4th arg)
+    let ai_remaining = match check_guest_ai_quota(&state, &uid, &client_ip) {
         Ok(remaining) => Some(remaining),
         Err(_) => {
             // Quota exhausted — use fallback pool

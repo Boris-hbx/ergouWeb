@@ -880,7 +880,26 @@ var Abao = (function() {
         if (!messagesContainer || !toolCalls || toolCalls.length === 0) return;
         for (var i = 0; i < toolCalls.length; i++) {
             var tc = toolCalls[i];
+
+            // T-101:工具失败 → error-card(任何 work_task 工具都走这一路)
+            if (tc.tool && tc.tool.indexOf('work_task') >= 0 && tc.result && tc.result.error) {
+                _appendWtErrorCard(tc.result.error);
+                continue;
+            }
+
             if (!tc.result || !tc.result.success) continue;
+
+            // T-101:create_work_task / update_work_task → task-card
+            if (tc.tool === 'create_work_task' || tc.tool === 'update_work_task') {
+                _appendWtTaskCard(tc.result);
+                continue;
+            }
+            // T-101:query_work_tasks → list-card
+            if (tc.tool === 'query_work_tasks') {
+                _appendWtListCard(tc.result);
+                continue;
+            }
+
             // Show task card for create_todo
             if (tc.tool === 'create_todo' && tc.result.text) {
                 var card = document.createElement('div');
@@ -917,6 +936,147 @@ var Abao = (function() {
                 maybePromptPush();
             }
         }
+    }
+
+    // ============================================================
+    // T-101:工作任务工具 inline 卡片渲染
+    // 视觉设计依据:frontend/work-tools-preview.html
+    // 卡片点击 → 复用 T-100 侧拉抽屉(WorkDetail.openDetail)
+    // ============================================================
+
+    function _wtEsc(s) {
+        return ('' + (s == null ? '' : s))
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function _wtColorOf(name) {
+        if (typeof Work !== 'undefined' && Work.colorOf) return Work.colorOf(name || '?');
+        var pal = ['#7C4DFF', '#14B8A6', '#E0A23B', '#3B82F6'];
+        var h = 0;
+        var s = '' + (name || '');
+        for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+        return pal[h % 4];
+    }
+
+    function _wtTodayYmd() {
+        var d = new Date();
+        return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+    }
+
+    // due 显示:逾期 / 今天 / 明天 / 本周 / 原日期
+    function _wtDueLabel(t) {
+        if (!t.due) return { text: '', cls: '' };
+        var due = ('' + t.due);
+        var today = _wtTodayYmd();
+        if (t.status !== 'done' && due < today) {
+            return { text: '⏰ 逾期', cls: 'abao-wt-overdue' };
+        }
+        if (due === today) return { text: '今天', cls: 'abao-wt-due-soon' };
+        return { text: due, cls: '' };
+    }
+
+    // 打开侧拉抽屉(必须在工作模块视图打开时才可见;否则给提示)
+    function _wtOpenDetail(id) {
+        if (typeof WorkDetail !== 'undefined' && WorkDetail.openDetail) {
+            // 切到 work 页(如果不在)
+            if (typeof switchPage === 'function' && document.body && !document.querySelector('#work-view') ||
+                (document.getElementById('work-view') && document.getElementById('work-view').style.display === 'none')) {
+                if (typeof switchPage === 'function') switchPage('work');
+                if (typeof Work !== 'undefined' && Work.openFeature) Work.openFeature('table');
+                // 等一下数据加载完(reload 异步)再打开抽屉
+                setTimeout(function() { WorkDetail.openDetail(id); }, 350);
+                return;
+            }
+            WorkDetail.openDetail(id);
+        }
+    }
+
+    function _appendWtTaskCard(t) {
+        if (!t || !t.id) return;
+        var card = document.createElement('div');
+        card.className = 'abao-wt-task-card';
+        var assignee = t.assignee || '未指派';
+        var initial = (t.assignee || '?').charAt(0);
+        var due = _wtDueLabel(t);
+        var isP0 = (t.priority === 'high');
+
+        var headHtml = '<div class="abao-wt-tc-head">'
+            + '<span class="abao-wt-tid">T-' + t.id + '</span>'
+            + '<span class="abao-wt-tt">' + _wtEsc(t.title || '(无标题)') + '</span>'
+            + '</div>';
+
+        var metaParts = [];
+        metaParts.push('<span><span class="abao-wt-av-mini" style="background:' + _wtColorOf(assignee) + '">'
+            + _wtEsc(initial) + '</span> ' + _wtEsc(assignee) + '</span>');
+        if (t.level)  metaParts.push('<span class="abao-wt-pill">' + _wtEsc(t.level) + '</span>');
+        if (t.freq)   metaParts.push('<span class="abao-wt-pill">' + _wtEsc(t.freq) + '</span>');
+        if (due.text) metaParts.push('<span class="abao-wt-pill ' + due.cls + '">' + _wtEsc(due.text) + '</span>');
+        if (isP0)     metaParts.push('<span class="abao-wt-pill abao-wt-p0">P0</span>');
+
+        card.innerHTML = headHtml
+            + '<div class="abao-wt-tc-meta">' + metaParts.join('') + '</div>'
+            + '<div class="abao-wt-tc-actions">'
+            + '<a class="abao-wt-open-detail">查看详情</a>'
+            + '</div>';
+        card.querySelector('.abao-wt-open-detail').addEventListener('click', function(e) {
+            e.preventDefault();
+            _wtOpenDetail(t.id);
+        });
+        messagesContainer.appendChild(card);
+        if (autoScroll) scrollToBottom();
+    }
+
+    function _appendWtListCard(result) {
+        var tasks = (result && result.tasks) || [];
+        var summary = (result && result.summary) || {};
+        var card = document.createElement('div');
+        card.className = 'abao-wt-list-card';
+
+        var sumParts = [];
+        sumParts.push('共 <strong>' + (result.count || tasks.length) + '</strong> 条');
+        if (summary.overdue) {
+            sumParts.push('<span style="color:#E11D48">⏰ <strong>' + summary.overdue + '</strong> 逾期</span>');
+        }
+        if (summary.p0) {
+            sumParts.push('<span style="color:#8B5A00">⚡ <strong>' + summary.p0 + '</strong> P0</span>');
+        }
+
+        var rowsHtml = '';
+        if (!tasks.length) {
+            rowsHtml = '<div class="abao-wt-lc-empty">没找到匹配的任务</div>';
+        } else {
+            tasks.forEach(function(t) {
+                var due = _wtDueLabel(t);
+                rowsHtml += '<div class="abao-wt-lc-row" data-id="' + t.id + '">'
+                    + '<span class="abao-wt-tid">T-' + t.id + '</span>'
+                    + '<span class="abao-wt-tt">' + _wtEsc(t.title || '(无标题)') + '</span>'
+                    + (t.assignee ? '<span class="abao-wt-pill">' + _wtEsc(t.assignee) + '</span>' : '')
+                    + (t.priority === 'high' ? '<span class="abao-wt-pill abao-wt-p0">P0</span>' : '')
+                    + (due.text ? '<span class="abao-wt-pill ' + due.cls + '">' + _wtEsc(due.text) + '</span>' : '')
+                    + '</div>';
+            });
+        }
+
+        card.innerHTML =
+            '<div class="abao-wt-lc-summary">' + sumParts.join(' ') + '</div>'
+            + rowsHtml;
+        // 行点击 → 打开抽屉
+        card.querySelectorAll('.abao-wt-lc-row').forEach(function(row) {
+            row.addEventListener('click', function() {
+                var id = parseInt(row.dataset.id, 10);
+                if (id) _wtOpenDetail(id);
+            });
+        });
+        messagesContainer.appendChild(card);
+        if (autoScroll) scrollToBottom();
+    }
+
+    function _appendWtErrorCard(errMsg) {
+        var card = document.createElement('div');
+        card.className = 'abao-wt-error-card';
+        card.innerHTML = '<strong>失败:</strong> ' + _wtEsc(errMsg);
+        messagesContainer.appendChild(card);
+        if (autoScroll) scrollToBottom();
     }
 
     function maybePromptPush() {
@@ -1334,6 +1494,11 @@ var Abao = (function() {
             if (!refreshed.trip && tool.indexOf('trip') >= 0) {
                 refreshed.trip = true;
                 if (typeof Trip !== 'undefined' && Trip.init) Trip.init();
+            }
+            // T-101:work_task — 工作模块若已加载,reload 以反映新建/更新
+            if (!refreshed.work_task && tool.indexOf('work_task') >= 0) {
+                refreshed.work_task = true;
+                if (typeof Work !== 'undefined' && Work.reload) Work.reload();
             }
         }
     }

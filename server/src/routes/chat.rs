@@ -10,10 +10,11 @@ use axum::{
     Json,
 };
 use futures::stream::Stream;
+use http::HeaderMap;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use crate::auth::{check_guest_ai_quota, ActiveUserId};
+use crate::auth::{check_guest_ai_quota, extract_client_ip, ActiveUserId};
 use crate::services::{
     context,
     llm::{LlmClient, SseEvent},
@@ -63,6 +64,7 @@ pub struct ChatResponse {
 pub async fn chat_handler(
     State(state): State<AppState>,
     user_id: ActiveUserId,
+    headers: HeaderMap,
     Json(req): Json<ChatRequest>,
 ) -> impl IntoResponse {
     // Input validation
@@ -135,8 +137,9 @@ pub async fn chat_handler(
         }
     }
 
-    // Guest AI quota check
-    let guest_ai_remaining = match check_guest_ai_quota(&state, &user_id.0) {
+    // Guest AI quota check (T-089: also enforces per-IP aggregate)
+    let _client_ip = extract_client_ip(&headers);
+    let guest_ai_remaining = match check_guest_ai_quota(&state, &user_id.0, &_client_ip) {
         Ok(remaining) => Some(remaining),
         Err(err_resp) => return err_resp.into_response(),
     };
@@ -453,6 +456,7 @@ pub async fn chat_handler(
 pub async fn chat_stream_handler(
     State(state): State<AppState>,
     user_id: ActiveUserId,
+    headers: HeaderMap,
     Json(req): Json<ChatRequest>,
 ) -> impl IntoResponse {
     // Input validation
@@ -486,8 +490,9 @@ pub async fn chat_stream_handler(
         }
     }
 
-    // Guest AI quota check
-    let _guest_ai_remaining = match check_guest_ai_quota(&state, &user_id.0) {
+    // Guest AI quota check (T-089: also enforces per-IP aggregate)
+    let _stream_client_ip = extract_client_ip(&headers);
+    let _guest_ai_remaining = match check_guest_ai_quota(&state, &user_id.0, &_stream_client_ip) {
         Ok(remaining) => Some(remaining),
         Err(_) => {
             return Sse::new(futures::stream::once(async {
