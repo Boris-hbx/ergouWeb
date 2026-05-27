@@ -1,0 +1,240 @@
+/* ========== 洞察公开分享页样式 /r/:token (T-106 P1) ==========
+ * 独立的桌面公开页样式;无任何登录态依赖。
+ */
+
+:root {
+  --share-bg:           #FAF9FC;
+  --share-bg-card:      #FFFFFF;
+  --share-text:         #1F2937;
+  --share-text-mute:    #6B7280;
+  --share-text-faint:   #9CA3AF;
+  --share-border:       #E5E3EE;
+  --share-primary:      #7C4DFF;
+  --share-primary-soft: rgba(124, 77, 255, 0.10);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  background: var(--share-bg);
+  color: var(--share-text);
+  font: 15px/1.7 -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Helvetica Neue", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+#share-app {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 40px 28px 80px;
+}
+
+.share-loading,
+.share-error {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--share-text-mute);
+  font-size: 14px;
+}
+
+.share-revoked {
+  text-align: center;
+  padding: 12vh 24px;
+  color: var(--share-text-mute);
+  max-width: 480px;
+  margin: 0 auto;
+}
+.share-revoked-icon { font-size: 48px; margin-bottom: 16px; }
+.share-revoked h1 { font-size: 22px; margin-bottom: 12px; color: var(--share-text); }
+.share-revoked p { line-height: 1.6; }
+
+.share-article {
+  background: var(--share-bg-card);
+  border: 1px solid var(--share-border);
+  border-radius: 12px;
+  padding: 36px 40px 32px;
+  box-shadow: 0 1px 2px rgba(15, 15, 30, 0.04), 0 4px 12px rgba(15, 15, 30, 0.06);
+}
+
+.share-header {
+  padding-bottom: 18px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--share-border);
+}
+.share-header h1 {
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--share-text);
+  margin-bottom: 10px;
+}
+.share-meta {
+  font-size: 13px;
+  color: var(--share-text-mute);
+}
+.share-version {
+  background: var(--share-primary);
+  color: #fff;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.share-topic {
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: var(--share-primary-soft);
+  border-left: 3px solid var(--share-primary);
+  border-radius: 0 6px 6px 0;
+  color: var(--share-text-mute);
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+/* Markdown 主体 */
+.share-md {
+  font-size: 15px;
+  line-height: 1.78;
+  color: var(--share-text);
+}
+.share-md h1, .share-md h2, .share-md h3, .share-md h4 {
+  margin: 26px 0 12px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.share-md h1 { font-size: 24px; padding-bottom: 6px; border-bottom: 2px solid var(--share-border); }
+.share-md h2 { font-size: 20px; color: var(--share-primary); padding-bottom: 4px; border-bottom: 1px solid var(--share-border); }
+.share-md h3 { font-size: 17px; }
+.share-md h4 { font-size: 15px; color: var(--share-text-mute); }
+.share-md p { margin: 0 0 12px; }
+.share-md ul, .share-md ol { margin: 0 0 12px; padding-left: 26px; }
+.share-md li { margin: 3px 0; }
+.share-md blockquote {
+  border-left: 3px solid var(--share-primary);
+  background: var(--share-primary-soft);
+  padding: 8px 14px;
+  margin: 0 0 14px;
+  color: var(--share-text-mute);
+  border-radius: 0 6px 6px 0;
+}
+.share-md code {
+  background: #F5F2FB;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-family: ui-monospace, "SF Mono", Consolas, monospace;
+  font-size: 0.9em;
+  color: var(--share-primary);
+}
+.share-md pre {
+  background: #1F2937;
+  color: #F9FAFB;
+  padding: 14px 16px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 0 0 14px;
+  line-height: 1.5;
+}
+.share-md pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  font-size: 13px;
+}
+.share-md table {
+  border-collapse: collapse;
+  margin: 0 0 14px;
+  font-size: 14px;
+  width: 100%;
+}
+.share-md th, .share-md td {
+  border: 1px solid var(--share-border);
+  padding: 7px 11px;
+  text-align: left;
+}
+.share-md th { background: #F5F2FB; font-weight: 600; }
+.share-md a {
+  color: var(--share-primary);
+  text-decoration: underline;
+  text-decoration-color: rgba(124, 77, 255, 0.3);
+  text-underline-offset: 2px;
+}
+.share-md a:hover {
+  text-decoration-color: var(--share-primary);
+}
+.share-md hr {
+  border: 0;
+  border-top: 1px dashed var(--share-border);
+  margin: 22px 0;
+}
+.share-md img {
+  max-width: 100%;
+  border-radius: 6px;
+  margin: 8px 0;
+}
+.share-md sup {
+  font-size: 0.8em;
+  vertical-align: super;
+  line-height: 0;
+}
+
+/* footnote 默认渲染(marked GFM) */
+.share-md .footnote { color: var(--share-text-faint); font-size: 13px; }
+
+/* Sources 列表 */
+.share-sources {
+  margin-top: 32px;
+  padding: 18px 22px;
+  background: #F5F2FB;
+  border-radius: 10px;
+  border-left: 4px solid var(--share-primary);
+}
+.share-sources h2 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--share-text-mute);
+  margin-bottom: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+.share-sources ol {
+  margin: 0;
+  padding-left: 22px;
+  font-size: 13.5px;
+}
+.share-sources li {
+  margin: 6px 0;
+  color: var(--share-text-mute);
+  line-height: 1.6;
+}
+.share-sources a {
+  color: var(--share-primary);
+  text-decoration: none;
+}
+.share-sources a:hover { text-decoration: underline; }
+.share-author { color: var(--share-text-faint); }
+.share-src-note {
+  margin-top: 4px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 4px;
+  font-size: 12.5px;
+  color: var(--share-text);
+  border-left: 2px solid var(--share-text-faint);
+}
+
+/* 页脚 */
+.share-footer {
+  margin-top: 32px;
+  padding-top: 16px;
+  border-top: 1px solid var(--share-border);
+  text-align: center;
+  color: var(--share-text-faint);
+  font-size: 12px;
+}
+
+@media (max-width: 720px) {
+  #share-app { padding: 20px 16px 50px; }
+  .share-article { padding: 24px 18px 22px; }
+  .share-header h1 { font-size: 22px; }
+}

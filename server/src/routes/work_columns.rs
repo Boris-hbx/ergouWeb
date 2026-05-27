@@ -67,7 +67,7 @@ fn row_to_col(row: &rusqlite::Row) -> rusqlite::Result<WorkColumn> {
 
 const SELECT_COLS: &str = "key, name, type, options, width, min_width, position, builtin, sys";
 
-/// Seed the 9 built-in columns for a user that has none yet.
+/// Seed the built-in columns for a user that has none yet.
 fn seed_builtin(db: &Connection, user_id: &str) -> rusqlite::Result<()> {
     let seed = builtin_seed();
     let mut stmt = db.prepare(
@@ -93,9 +93,23 @@ fn seed_builtin(db: &Connection, user_id: &str) -> rusqlite::Result<()> {
     Ok(())
 }
 
+/// T-108: 对已有 work_columns 行的老用户,补齐 builtin_seed 中新增的内置列。
+/// 用 INSERT OR IGNORE 实现幂等:已存在的 key 跳过,缺失的按种子定义插入。
+/// 新增内置列时(如 T-108 的「标签」),老用户首次访问 list_columns 时自动补行。
+/// 老用户可能已有自定义列占用了 seed 的 position(如 c1 在 position 9),
+/// 新内置列(tags 也想要 position 9)会与之共存;fetch_all 用 (position, key)
+/// 双键排序,顺序确定;用户可在「列设置」面板拖动调整。
+fn ensure_builtin_present(db: &Connection, user_id: &str) -> rusqlite::Result<()> {
+    // 与 seed_builtin 共享 INSERT OR IGNORE 语义,只是不再检查 count==0。
+    seed_builtin(db, user_id)
+}
+
 fn fetch_all(db: &Connection, user_id: &str) -> rusqlite::Result<Vec<WorkColumn>> {
+    // T-108: 加 key 做兜底排序,避免同 position 时(老用户的自定义列与新内置列
+    // 可能共享 position)顺序不稳定。
     let sql = format!(
-        "SELECT {SELECT_COLS} FROM work_columns WHERE user_id = ?1 ORDER BY position ASC"
+        "SELECT {SELECT_COLS} FROM work_columns WHERE user_id = ?1
+         ORDER BY position ASC, key ASC"
     );
     let mut stmt = db.prepare(&sql)?;
     let rows = stmt.query_map(params![user_id], row_to_col)?;
@@ -110,7 +124,8 @@ pub async fn list_columns(
 ) -> (StatusCode, Json<JsonValue>) {
     let db = state.db.lock();
 
-    // Seed if empty
+    // Seed if empty (new user); otherwise ensure any newly-added builtin column
+    // (e.g. T-108 「标签」) is present for existing users — INSERT OR IGNORE is idempotent.
     let count: i64 = db
         .query_row(
             "SELECT COUNT(*) FROM work_columns WHERE user_id = ?1",
@@ -122,6 +137,9 @@ pub async fn list_columns(
         if let Err(e) = seed_builtin(&db, &user_id.0) {
             return db_error("seed_builtin", e);
         }
+    } else if let Err(e) = ensure_builtin_present(&db, &user_id.0) {
+        // Non-fatal: log and continue with whatever columns are present.
+        warn!(target: "work_columns", "ensure_builtin_present err: {}", e);
     }
 
     match fetch_all(&db, &user_id.0) {
@@ -377,7 +395,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn list_seeds_9_builtin_cols_on_first_access() {
+    async fn list_seeds_10_builtin_cols_on_first_access() {
         let state = test_state();
         let (_uid, token) = create_test_user(&state, "alice", "Pa55word1");
         let cookie = auth_cookie(&token);
@@ -395,7 +413,7 @@ mod tests {
             .unwrap();
         let j = body_json(resp).await;
         let items = j["items"].as_array().unwrap();
-        assert_eq!(items.len(), 9);
+        assert_eq!(items.len(), 10);
         // First seeded col is "title" by position
         assert_eq!(items[0]["key"], "title");
         assert_eq!(items[0]["name"], "任务");
@@ -403,6 +421,89 @@ mod tests {
         // status + priority are sys
         let status_col = items.iter().find(|c| c["key"] == "status").unwrap();
         assert_eq!(status_col["sys"], true);
+        // T-108: tags column is seeded (multi type, empty options)
+        let tags_col = items.iter().find(|c| c["key"] == "tags").unwrap();
+        assert_eq!(tags_col["name"], "标签");
+        assert_eq!(tags_col["type"], "multi");
+        assert_eq!(tags_col["builtin"], true);
+        assert_eq!(tags_col["sys"], false);
+        let opts = tags_col["options"].as_array().unwrap();
+        assert!(opts.is_empty(), "tags options should start empty");
+    }
+
+    /// T-108: 模拟"老用户"场景 — 数据库里已经有 9 个旧版内置列,
+    /// 不该重复 seed,但应该自动把缺失的 tags 列补上。
+    #[tokio::test]
+    async fn list_backfills_tags_for_existing_users_idempotently() {
+        let state = test_state();
+        let (uid, token) = create_test_user(&state, "old_user", "Pa55word1");
+        let cookie = auth_cookie(&token);
+
+        // 手工插入 9 个旧版内置列(模拟 T-094 时代的老用户数据)
+        {
+            let db = state.db.lock();
+            let legacy_seed: Vec<(&str, &str, &str, i32)> = vec![
+                ("title", "任务", "text", 0),
+                ("desc", "简介", "longtext", 1),
+                ("assignee", "责任人", "text", 2),
+                ("level", "层级", "select", 3),
+                ("freq", "频率", "select", 4),
+                ("status", "状态", "status", 5),
+                ("priority", "优先级", "select", 6),
+                ("due", "截止日", "date", 7),
+                ("progress", "进度", "percent", 8),
+            ];
+            for (key, name, typ, pos) in legacy_seed {
+                let sys = if key == "status" || key == "priority" {
+                    1
+                } else {
+                    0
+                };
+                db.execute(
+                    "INSERT INTO work_columns(user_id, key, name, type, options,
+                       width, min_width, position, builtin, sys)
+                     VALUES (?1, ?2, ?3, ?4, '[]', 140, 80, ?5, 1, ?6)",
+                    params![&uid, key, name, typ, pos, sys],
+                )
+                .unwrap();
+            }
+        }
+
+        let app = crate::build_app(state);
+
+        // 第一次访问:tags 应该被补进去
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/api/work/columns")
+                    .header("Cookie", &cookie)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let j = body_json(resp).await;
+        let items = j["items"].as_array().unwrap();
+        assert_eq!(items.len(), 10, "tags should be backfilled");
+        let tags = items.iter().find(|c| c["key"] == "tags").unwrap();
+        assert_eq!(tags["type"], "multi");
+        assert_eq!(tags["builtin"], true);
+
+        // 第二次访问:幂等,仍是 10 列(不重复插入)
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/work/columns")
+                    .header("Cookie", &cookie)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let j = body_json(resp).await;
+        let items = j["items"].as_array().unwrap();
+        assert_eq!(items.len(), 10, "second access should be idempotent");
     }
 
     #[tokio::test]
@@ -442,7 +543,8 @@ mod tests {
         assert_eq!(j["success"], true);
         assert_eq!(j["createdKey"], "c1");
         let items = j["items"].as_array().unwrap();
-        assert_eq!(items.len(), 10);
+        // 10 builtin (incl. T-108 tags) + 1 custom = 11
+        assert_eq!(items.len(), 11);
         let new_col = items.iter().find(|c| c["key"] == "c1").unwrap();
         assert_eq!(new_col["name"], "涉及部门");
         assert_eq!(new_col["type"], "multi");

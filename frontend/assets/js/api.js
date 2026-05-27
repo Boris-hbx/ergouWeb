@@ -620,5 +620,53 @@ var API = (function() {
         workSaveColumns:  async function(patches)  { return await request('PUT',    '/work/columns', { columns: patches }); },
         workAddColumn:    async function(data)     { return await request('POST',   '/work/columns', data); },
         workDeleteColumn: async function(key)      { return await request('DELETE', '/work/columns/' + encodeURIComponent(key)); },
+
+        // ===== Insight (T-105 / T-107 后端;T-106 前端) =====
+        // Insight CRUD
+        insightList:       async function(params)            {
+            var q = '';
+            if (params && params.status) q += (q ? '&' : '?') + 'status=' + encodeURIComponent(params.status);
+            if (params && params.limit)  q += (q ? '&' : '?') + 'limit='  + encodeURIComponent(params.limit);
+            return await request('GET',    '/insights' + q);
+        },
+        insightCreate:     async function(data)               { return await request('POST',   '/insights', data); },
+        insightGet:        async function(id, includeSources) {
+            var q = includeSources ? '?include=sources' : '';
+            return await request('GET',    '/insights/' + id + q);
+        },
+        insightUpdate:     async function(id, patch)          { return await request('PATCH',  '/insights/' + id, patch); },
+        insightDelete:     async function(id)                 { return await request('DELETE', '/insights/' + id); },
+        // Report / generation
+        insightRegenerate: async function(id, data)           { return await request('POST',   '/insights/' + id + '/regenerate', data || {}); },
+        insightListReports:   async function(id)              { return await request('GET',    '/insights/' + id + '/reports'); },
+        insightLatestReport:  async function(id)              { return await request('GET',    '/insights/' + id + '/reports/latest'); },
+        insightGetReport:     async function(id, version)     { return await request('GET',    '/insights/' + id + '/reports/' + version); },
+        insightPatchReport:   async function(id, version, patch) { return await request('PATCH', '/insights/' + id + '/reports/' + version, patch); },
+        // Publish / retract
+        insightPublish:    async function(id, data)           { return await request('POST',   '/insights/' + id + '/publish', data || {}); },
+        insightRetract:    async function(id)                 { return await request('POST',   '/insights/' + id + '/retract', {}); },
+        insightGetShare:   async function(id)                 { return await request('GET',    '/insights/' + id + '/share'); },
+        // Annotations (T-107 / spec § 8.5;P2 才用)
+        insightListAnnotations: async function(id, params)    {
+            var q = '';
+            if (params && params.reportId) q += (q ? '&' : '?') + 'report_id=' + encodeURIComponent(params.reportId);
+            if (params && params.status)   q += (q ? '&' : '?') + 'status='    + encodeURIComponent(params.status);
+            return await request('GET', '/insights/' + id + '/annotations' + q);
+        },
+        insightCreateAnnotation: async function(id, data)     { return await request('POST',   '/insights/' + id + '/annotations', data); },
+        annotationUpdate:        async function(aid, patch)   { return await request('PATCH',  '/annotations/' + aid, patch); },
+        annotationDelete:        async function(aid)          { return await request('DELETE', '/annotations/' + aid); },
+
+        // ===== Sources (T-105 / spec § 8.2) =====
+        sourceList:   async function(params) {
+            var q = '';
+            if (params && params.insightId)  q += (q ? '&' : '?') + 'insight_id=' + encodeURIComponent(params.insightId);
+            if (params && params.unassigned) q += (q ? '&' : '?') + 'unassigned=1';
+            return await request('GET', '/sources' + q);
+        },
+        sourceCreate:  async function(data)        { return await request('POST',   '/sources', data); },
+        sourceUpdate:  async function(id, patch)   { return await request('PATCH',  '/sources/' + id, patch); },
+        sourceDelete:  async function(id)          { return await request('DELETE', '/sources/' + id); },
+        sourceRefetch: async function(id)          { return await request('POST',   '/sources/' + id + '/refetch', {}); },
     };
 })();

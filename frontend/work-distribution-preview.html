@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>工作任务表 · 分布视图 设计稿</title>
+<style>
+  :root {
+    --bg: #FAF9FC;
+    --bg-card: #FFFFFF;
+    --bg-elev: #F5F2FB;
+    --bg-elev-2: #EFEAF7;
+    --border: #E5E3EE;
+    --border-strong: #D4D0E0;
+    --text: #1F2937;
+    --text-mute: #6B7280;
+    --text-faint: #9CA3AF;
+    --primary: #7C4DFF;
+    --primary-soft: rgba(124, 77, 255, 0.10);
+    --primary-strong: rgba(124, 77, 255, 0.18);
+    --danger: #E11D48;
+    --danger-soft: rgba(225, 29, 72, 0.10);
+    --warn: #F59E0B;
+    --warn-soft: rgba(245, 158, 11, 0.12);
+    --ok: #10B981;
+    --shadow: 0 1px 2px rgba(15, 15, 30, 0.04), 0 4px 12px rgba(15, 15, 30, 0.06);
+    --ease-spring: cubic-bezier(0.68, -0.4, 0.265, 1.35);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: var(--bg); color: var(--text);
+    font: 13px/1.55 -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+  }
+
+  /* 顶栏 */
+  .topbar {
+    padding: 14px 28px;
+    display: flex; align-items: center; gap: 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-card);
+  }
+  .topbar h1 { font-size: 17px; font-weight: 600; }
+  .seg {
+    display: inline-flex; background: var(--bg-elev); border-radius: 8px; padding: 3px;
+    border: 1px solid var(--border);
+  }
+  .seg button {
+    border: 0; background: transparent; padding: 5px 12px; font-size: 12.5px;
+    color: var(--text-mute); border-radius: 6px; cursor: pointer;
+  }
+  .seg button.active { background: var(--bg-card); color: var(--primary); font-weight: 600; }
+  .topbar .spacer { flex: 1; }
+
+  /* 时间 Tab */
+  .time-tabs {
+    padding: 12px 28px 0;
+    display: flex; gap: 4px;
+    border-bottom: 1px solid var(--border);
+  }
+  .time-tab {
+    border: 0; background: transparent;
+    padding: 8px 16px 10px;
+    font-size: 13px; color: var(--text-mute); cursor: pointer;
+    border-bottom: 2px solid transparent; margin-bottom: -1px;
+  }
+  .time-tab.active {
+    color: var(--primary); font-weight: 600;
+    border-bottom-color: var(--primary);
+  }
+  .time-tab .count {
+    font-size: 11px; color: var(--text-faint);
+    background: var(--bg-elev);
+    padding: 1px 6px; border-radius: 10px;
+    margin-left: 4px;
+  }
+  .time-tab.active .count { background: var(--primary-soft); color: var(--primary); }
+
+  .container { padding: 18px 28px 50px; max-width: 1400px; margin: 0 auto; }
+
+  /* 维度选择器（这视图独有） */
+  .dim-bar {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 18px;
+    box-shadow: var(--shadow);
+    margin-bottom: 18px;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .dim-bar .lbl {
+    font-size: 12.5px; color: var(--text-mute);
+  }
+  .dim-bar .dim-seg {
+    display: inline-flex; background: var(--bg-elev); border-radius: 8px; padding: 3px;
+    border: 1px solid var(--border);
+  }
+  .dim-bar .dim-seg button {
+    border: 0; background: transparent; padding: 5px 14px; font-size: 12.5px;
+    color: var(--text-mute); border-radius: 6px; cursor: pointer;
+    transition: all .15s;
+  }
+  .dim-bar .dim-seg button.active {
+    background: var(--primary); color: white; font-weight: 600;
+    box-shadow: 0 1px 4px rgba(124, 77, 255, 0.3);
+  }
+  .dim-bar .dim-seg button .typ {
+    font-size: 10px; opacity: 0.6; margin-left: 4px;
+    background: rgba(0,0,0,0.06); padding: 0 4px; border-radius: 4px;
+    font-family: ui-monospace, monospace;
+  }
+  .dim-bar .dim-seg button.active .typ { background: rgba(255,255,255,0.18); opacity: 0.9; }
+  .dim-bar .spacer { flex: 1; }
+  .dim-bar .stats {
+    font-size: 11.5px; color: var(--text-mute);
+  }
+  .dim-bar .stats strong { color: var(--text); }
+
+  .section-label {
+    margin: 18px 0 10px;
+    font-size: 11.5px; color: var(--text-faint);
+    letter-spacing: 0.06em; text-transform: uppercase; font-weight: 600;
+  }
+  .section-label:first-child { margin-top: 0; }
+  .section-label .right {
+    float: right;
+    text-transform: none; letter-spacing: 0;
+    font-weight: 400; color: var(--text-mute); font-size: 11px;
+  }
+
+  /* 气泡总览 */
+  .bubble-wrap {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px 22px;
+    box-shadow: var(--shadow);
+  }
+  .bubble-row {
+    display: flex; flex-wrap: wrap; gap: 14px;
+    align-items: center;
+  }
+  .bubble {
+    position: relative;
+    border-radius: 50%;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    cursor: pointer;
+    transition: transform .18s, box-shadow .18s;
+    font-weight: 600;
+    text-align: center;
+    user-select: none;
+    border: 2px solid transparent;
+    padding: 4px;
+  }
+  .bubble:hover {
+    transform: translateY(-2px) scale(1.04);
+    box-shadow: 0 8px 24px rgba(15, 15, 30, 0.12);
+  }
+  .bubble .b-name {
+    font-size: 12px; line-height: 1.15;
+    max-width: 90%; overflow: hidden; text-overflow: ellipsis;
+  }
+  .bubble .b-count {
+    font-size: 14px; margin-top: 2px; font-weight: 500;
+  }
+  .bubble.has-overdue {
+    background: var(--danger-soft);
+    border-color: var(--danger);
+    color: var(--danger);
+  }
+  .bubble.has-p0 {
+    background: var(--warn-soft);
+    border-color: var(--warn);
+    color: #8B5A00;
+  }
+  .bubble.normal {
+    background: var(--primary-soft);
+    border-color: var(--primary);
+    color: var(--primary);
+  }
+  .bubble.empty {
+    background: var(--bg-elev);
+    border-color: var(--border-strong);
+    color: var(--text-mute);
+    border-style: dashed;
+  }
+  .bubble .b-badge {
+    position: absolute; top: -6px; right: -4px;
+    background: var(--danger); color: white;
+    font-size: 10px; padding: 2px 6px; border-radius: 10px;
+    font-weight: 600;
+    border: 2px solid var(--bg-card);
+  }
+  .bubble-legend {
+    display: flex; gap: 18px; margin-top: 14px;
+    padding-top: 12px; border-top: 1px dashed var(--border);
+    font-size: 11.5px; color: var(--text-mute);
+  }
+  .bubble-legend .dot {
+    display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+    margin-right: 5px; vertical-align: middle;
+  }
+
+  /* 卡片墙 */
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 14px;
+  }
+  .tag-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 14px 6px;
+    box-shadow: var(--shadow);
+    transition: border-color .2s, box-shadow .2s;
+    min-height: 180px;
+    display: flex; flex-direction: column;
+  }
+  .tag-card.highlight {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-soft), var(--shadow);
+  }
+  .tag-head {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px dashed var(--border);
+  }
+  .tag-chip {
+    display: inline-flex; align-items: center;
+    background: var(--primary-soft); color: var(--primary);
+    padding: 3px 10px; border-radius: 12px;
+    font-weight: 600; font-size: 13px;
+  }
+  .tag-chip.danger { background: var(--danger-soft); color: var(--danger); }
+  .tag-chip.warn { background: var(--warn-soft); color: #8B5A00; }
+  .tag-chip.empty { background: var(--bg-elev); color: var(--text-mute); border: 1px dashed var(--border-strong); }
+  .tag-stats {
+    font-size: 11px; color: var(--text-mute);
+    display: flex; gap: 6px; align-items: center;
+    margin-left: auto;
+  }
+  .tag-stats .total { color: var(--text); font-weight: 500; }
+  .tag-stats .overdue {
+    color: var(--danger); background: var(--danger-soft);
+    padding: 1px 6px; border-radius: 8px; font-weight: 600;
+  }
+  .tag-stats .p0 {
+    color: #8B5A00; background: var(--warn-soft);
+    padding: 1px 6px; border-radius: 8px; font-weight: 600;
+  }
+
+  .task-list {
+    flex: 1;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .task-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 6px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background .12s;
+  }
+  .task-item:hover { background: var(--bg-elev); }
+  .task-item.done .task-title { text-decoration: line-through; color: var(--text-faint); }
+  .task-checkbox {
+    width: 14px; height: 14px;
+    border: 1.5px solid var(--border-strong); border-radius: 4px;
+    flex-shrink: 0; background: white;
+  }
+  .task-title {
+    flex: 1; font-size: 12.5px; color: var(--text);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .task-meta {
+    font-size: 10.5px; color: var(--text-faint);
+    flex-shrink: 0;
+    display: flex; gap: 4px; align-items: center;
+  }
+  .task-meta .pill {
+    padding: 1px 6px; border-radius: 8px;
+    background: var(--bg-elev);
+  }
+  .task-meta .pill.overdue {
+    background: var(--danger-soft); color: var(--danger); font-weight: 600;
+  }
+  .task-meta .pill.p0 {
+    background: var(--warn-soft); color: #8B5A00; font-weight: 600;
+  }
+  .task-meta .av-mini {
+    width: 16px; height: 16px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: white; font-weight: 600; font-size: 9px;
+  }
+  .task-meta .extra-tags {
+    color: var(--primary); font-size: 9.5px; opacity: 0.7;
+    background: var(--primary-soft); padding: 0 4px; border-radius: 6px;
+  }
+
+  .card-foot {
+    display: flex; justify-content: center;
+    padding: 4px; margin-top: 6px;
+    border-top: 1px dashed var(--border);
+    color: var(--text-faint); font-size: 11px;
+  }
+
+  .multi-note {
+    background: var(--primary-soft);
+    border-left: 3px solid var(--primary);
+    padding: 10px 14px;
+    margin: 18px 0;
+    border-radius: 0 6px 6px 0;
+    font-size: 12px;
+    color: var(--primary);
+  }
+  .multi-note strong { color: var(--text); }
+
+  /* 提示 */
+  .toast {
+    position: fixed; bottom: 24px; left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: rgba(31, 41, 55, 0.94); color: white;
+    padding: 9px 16px; border-radius: 8px;
+    font-size: 12.5px; opacity: 0;
+    transition: all .25s; pointer-events: none;
+    z-index: 100;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* 设计说明 */
+  .design-note {
+    margin-top: 28px;
+    padding: 18px 22px;
+    background: var(--bg-card);
+    border: 1px dashed var(--border-strong);
+    border-radius: 10px;
+    color: var(--text-mute);
+    font-size: 12.5px;
+    line-height: 1.65;
+  }
+  .design-note h3 { margin-bottom: 10px; color: var(--primary); font-size: 13px; }
+  .design-note h4 { margin: 12px 0 4px; color: var(--text); font-size: 12.5px; font-weight: 600; }
+  .design-note ul { margin-left: 22px; }
+  .design-note li { margin: 3px 0; }
+  .design-note code {
+    background: var(--bg-elev); padding: 1px 5px; border-radius: 3px;
+    font-family: ui-monospace, monospace; font-size: 11.5px; color: var(--primary);
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>任务表</h1>
+  <div class="seg">
+    <button>表格</button>
+    <button>看板</button>
+    <button>日历</button>
+    <button>人员</button>
+    <button class="active">分布 ✦</button>
+  </div>
+  <div class="spacer"></div>
+  <button style="padding:7px 14px;border:0;background:var(--primary);color:white;border-radius:8px;font-size:12.5px;cursor:pointer;font-weight:500">+ 新建任务</button>
+</div>
+
+<!-- 时间 Tab(全局共用) -->
+<div class="time-tabs">
+  <button class="time-tab">全部 <span class="count">28</span></button>
+  <button class="time-tab active">今日 <span class="count">7</span></button>
+  <button class="time-tab">本周 <span class="count">15</span></button>
+  <button class="time-tab">本月 <span class="count">24</span></button>
+</div>
+
+<div class="container">
+
+  <!-- 维度选择器 -->
+  <div class="dim-bar">
+    <span class="lbl">按以下维度看分布：</span>
+    <div class="dim-seg" id="dimSeg">
+      <button class="active" data-dim="tag">标签 <span class="typ">multi</span></button>
+      <button data-dim="dept">涉及部门 <span class="typ">multi</span></button>
+      <button data-dim="level">层级 <span class="typ">select</span></button>
+      <button data-dim="status">状态 <span class="typ">status</span></button>
+      <button data-dim="priority">优先级 <span class="typ">select</span></button>
+    </div>
+    <span class="spacer"></span>
+    <span class="stats">共 <strong>28</strong> 任务 · 跨 <strong>9</strong> 个标签 · <strong>3</strong> 条未标记</span>
+  </div>
+
+  <!-- 气泡总览 -->
+  <div class="section-label">
+    分布概览
+    <span class="right">气泡大小 = 任务数；红=含逾期 / 橙=含 P0 / 紫=正常 / 灰=未标记</span>
+  </div>
+  <div class="bubble-wrap">
+    <div class="bubble-row" id="bubbleRow"></div>
+    <div class="bubble-legend">
+      <span><span class="dot" style="background:var(--danger)"></span>含逾期</span>
+      <span><span class="dot" style="background:var(--warn)"></span>含 P0</span>
+      <span><span class="dot" style="background:var(--primary)"></span>正常</span>
+      <span><span class="dot" style="background:var(--border-strong)"></span>未标记 / 仅低优</span>
+      <span style="margin-left:auto;">点气泡跳到对应卡片</span>
+    </div>
+  </div>
+
+  <!-- 多选注释 -->
+  <div class="multi-note">
+    💡 <strong>multi 字段的特性</strong>：一个任务可有多个标签，会在每个对应卡片里都出现一次。看右上角的"+N 标签"提示能看到该任务的其它标签。
+  </div>
+
+  <!-- 卡片墙 -->
+  <div class="section-label">
+    各标签详情
+    <span class="right">默认按任务数降序；未标记永远置最末</span>
+  </div>
+  <div class="card-grid" id="cardGrid"></div>
+
+  <!-- 设计说明 -->
+  <div class="design-note">
+    <h3>设计要点（PM 草稿）</h3>
+
+    <h4>1. 第 5 个视图叫「分布」（不叫"标签"）</h4>
+    <ul>
+      <li>视图 seg：表格 / 看板 / 日历 / 人员 / <strong>分布</strong>，5 视图</li>
+      <li>取名"分布"是因为它本质是<strong>动态选维度看分布</strong>，不仅服务"标签"</li>
+      <li>解决问题：哪个维度下哪个值任务多 / 谁有逾期 / 哪个值是空</li>
+    </ul>
+
+    <h4>2. 维度选择器（顶部）</h4>
+    <ul>
+      <li>横排 seg：列出所有可分组的列 —— <strong>所有 multi 列</strong> + <strong>所有 select / status 列</strong></li>
+      <li>列名后面带类型标签（multi / select / status）—— 帮助理解</li>
+      <li>默认选第 1 个 multi 列（"标签"）</li>
+      <li>新增 multi 列后该选择器自动出现新选项（"列由配置驱动"原则）</li>
+    </ul>
+
+    <h4>3. 气泡 + 卡片墙（复用人员视图形态）</h4>
+    <ul>
+      <li>上半气泡：每个值一个气泡，大小=任务数（对数缩放 60-110px），颜色=逾期/P0/正常/灰</li>
+      <li>下半卡片墙：每个值一张卡，列出该值下的任务（点 → 打开 T-100 抽屉）</li>
+      <li>点气泡 → 滚到对应卡片 + 高亮</li>
+    </ul>
+
+    <h4>4. multi 字段的特殊处理</h4>
+    <ul>
+      <li>multi 一个任务可有多个标签 → 该任务在<strong>每个标签的卡片里都出现一次</strong>（合理的，否则任务"归属"会模糊）</li>
+      <li>每个出现处右侧显示「+N 标签」灰色提示，表明这任务还有其它标签</li>
+      <li>顶部"统计"行：共 N 任务 · 跨 M 个标签 · <strong>K 条未标记</strong>（即该 multi 字段为空的任务数）</li>
+    </ul>
+
+    <h4>5. 「未标记」永远是最后一个气泡 / 卡片</h4>
+    <ul>
+      <li>灰底 + 虚线描边，区别于真实标签</li>
+      <li>提醒用户"有些任务还没贴标签，要不要补"</li>
+    </ul>
+
+    <h4>6. 不做的事</h4>
+    <ul>
+      <li>❌ <strong>不做"拖动转移标签"</strong>：multi 字段一个任务多个标签，拖动语义模糊（是改还是加？）；改标签走 T-100 抽屉</li>
+      <li>❌ <strong>不做关系网络图</strong>（标签共现网络）：过度设计；除非未来有明确需求</li>
+      <li>❌ 不做手机端（按 memory 规则）</li>
+    </ul>
+
+    <h4>7. 内置「标签」列（默认种入）</h4>
+    <ul>
+      <li>在 work_columns 表的内置种子里加第 10 行：<code>{name:'标签', type:'multi', options:[], builtin:true, position:10}</code></li>
+      <li>每个 task 默认空，用户自由打标签；分布视图开箱即用</li>
+      <li><strong>需后端迁移</strong>：现有用户的 work_columns 表也要补上这行（IDEMPOTENT INSERT，只对没该行的用户加）</li>
+    </ul>
+
+    <h4>8. 实施成本</h4>
+    <ul>
+      <li>1 个新文件 <code>frontend/assets/js/work-distribution.js</code>（复用 work-person 的 80% 代码）</li>
+      <li><code>work.css</code> 加 ~30 行（维度选择器 + chip 样式）</li>
+      <li>后端 1 行迁移加内置「标签」列种子；其它逻辑全前端</li>
+      <li>预估 1 天</li>
+    </ul>
+
+    <h4>9. 时间 Tab 叠加</h4>
+    <ul>
+      <li>遵循全局时间 Tab：今日 + 分布 = 只统计今日任务的标签分布</li>
+      <li>切到分布视图时 Tab 保留（与其它视图行为一致）</li>
+    </ul>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── 假数据（按"标签"维度） ──
+const TAGS = [
+  { name: '基金',   count: 8, hasOverdue: false, hasP0: true,  tasks: [
+    { id:1, title:'国基金中期总结', assignee:'自己', priority:'P0', due:'今天', overdue:false, extra:1 },
+    { id:2, title:'青年基金申报',   assignee:'陈大民', priority:'mid', due:'下周', overdue:false, extra:0 },
+    { id:3, title:'基金结题报告',   assignee:'王主任', priority:'P0', due:'本月',  overdue:false, extra:2 },
+    { id:4, title:'横向项目预算',   assignee:'王主任', priority:'mid', due:'下周', overdue:false, extra:1 },
+    { id:5, title:'科研经费报表',   assignee:'陈大民', priority:'mid', due:'本月',  overdue:false, extra:0 },
+  ]},
+  { name: '论文', count: 6, hasOverdue: true, hasP0: false, tasks: [
+    { id:6, title:'数据分析(项目甲)', assignee:'赵研究员', priority:'P0', due:'逾期 5 天', overdue:true, extra:1 },
+    { id:7, title:'论文校对(Nature)', assignee:'赵研究员', priority:'mid', due:'下周', overdue:false, extra:1 },
+    { id:8, title:'回应审稿意见',     assignee:'自己', priority:'mid', due:'本周', overdue:false, extra:0 },
+    { id:9, title:'参考文献整理',     assignee:'赵研究员', priority:'low', due:'本月', overdue:false, extra:1 },
+  ]},
+  { name: '行政', count: 5, hasOverdue: false, hasP0: true, tasks: [
+    { id:10, title:'院评委会准备',  assignee:'陈大民', priority:'P0',  due:'今天',  overdue:false, extra:1 },
+    { id:11, title:'所务会材料',    assignee:'王主任', priority:'P0',  due:'明天',  overdue:false, extra:0 },
+    { id:12, title:'人事档案归档',  assignee:'王主任', priority:'low', due:'下周',  overdue:false, extra:0 },
+  ]},
+  { name: '教学', count: 4, hasOverdue: false, hasP0: false, tasks: [
+    { id:13, title:'开题答辩准备',    assignee:'陈大民', priority:'mid', due:'下下周', overdue:false, extra:1 },
+    { id:14, title:'硕士论文意见',    assignee:'自己',   priority:'mid', due:'本月',   overdue:false, extra:0 },
+    { id:15, title:'本科生答疑安排',  assignee:'李秘书', priority:'low', due:'本周',   overdue:false, extra:0 },
+  ]},
+  { name: '设备', count: 3, hasOverdue: false, hasP0: false, tasks: [
+    { id:16, title:'服务器迁移',  assignee:'刘工', priority:'mid', due:'本周', overdue:false, extra:0 },
+    { id:17, title:'实验仪器报修', assignee:'刘工', priority:'low', due:'本月', overdue:false, extra:0 },
+  ]},
+  { name: '会议', count: 3, hasOverdue: false, hasP0: false, tasks: [
+    { id:18, title:'周例会',  assignee:'自己', priority:'mid', due:'明天', overdue:false, extra:1 },
+    { id:19, title:'年会议程草案', assignee:'李秘书', priority:'low', due:'下周', overdue:false, extra:0 },
+  ]},
+  { name: '差旅', count: 2, hasOverdue: false, hasP0: false, tasks: [
+    { id:20, title:'北京出差报销', assignee:'自己', priority:'low', due:'本月', overdue:false, extra:1 },
+  ]},
+  { name: '阅读', count: 2, hasOverdue: false, hasP0: false, tasks: [
+    { id:21, title:'阅读 X 论文', assignee:'自己', priority:'low', due:'本月', overdue:false, extra:0 },
+  ]},
+  { name: '其他', count: 1, hasOverdue: false, hasP0: false, tasks: [
+    { id:22, title:'未分类杂事', assignee:'自己', priority:'low', due:'本月', overdue:false, extra:0 },
+  ]},
+  { name: '未标记', count: 3, hasOverdue: true, hasP0: false, tasks: [
+    { id:23, title:'未填标签的任务 1', assignee:'刘工', priority:'mid', due:'逾期 1 天', overdue:true, extra:0 },
+    { id:24, title:'未填标签的任务 2', assignee:'自己', priority:'mid', due:'下周',     overdue:false, extra:0 },
+    { id:25, title:'未填标签的任务 3', assignee:'李秘书', priority:'low', due:'本月',   overdue:false, extra:0 },
+  ], isEmpty: true },
+];
+
+// ── 工具 ──
+const AVATAR_COLORS = ['#7C4DFF','#14B8A6','#E0A23B','#3B82F6'];
+function colorOf(name) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return AVATAR_COLORS[h % 4];
+}
+
+// 对数缩放 60-110px
+function bubbleSize(n) {
+  const min = 60, max = 110;
+  if (n === 0) return min - 4;
+  const t = Math.min(1, Math.log2(n + 1) / 4);
+  return min + (max - min) * t;
+}
+
+function bubbleClass(t) {
+  if (t.isEmpty || t.count === 0) return 'empty';
+  if (t.hasOverdue) return 'has-overdue';
+  if (t.hasP0) return 'has-p0';
+  return 'normal';
+}
+
+// 渲染气泡
+function renderBubbles() {
+  const row = document.getElementById('bubbleRow');
+  row.innerHTML = '';
+  TAGS.forEach(t => {
+    const overdueCount = t.tasks.filter(x => x.overdue).length;
+    const size = bubbleSize(t.count);
+    const b = document.createElement('div');
+    b.className = 'bubble ' + bubbleClass(t);
+    b.style.width = b.style.height = size + 'px';
+    b.innerHTML = `
+      <div class="b-name">${t.name}</div>
+      <div class="b-count">${t.count}</div>
+      ${overdueCount ? `<div class="b-badge">⏰ ${overdueCount}</div>` : ''}
+    `;
+    b.onclick = () => scrollToCard(t.name);
+    row.appendChild(b);
+  });
+}
+
+// 渲染卡片
+function renderCards() {
+  const grid = document.getElementById('cardGrid');
+  grid.innerHTML = '';
+  TAGS.forEach(tag => {
+    const overdueCount = tag.tasks.filter(x => x.overdue).length;
+    const p0Count = tag.tasks.filter(x => x.priority === 'P0').length;
+
+    const card = document.createElement('div');
+    card.className = 'tag-card';
+    card.dataset.tag = tag.name;
+
+    const chipCls = tag.isEmpty ? 'empty' : overdueCount ? 'danger' : (p0Count ? 'warn' : '');
+    const head = `
+      <div class="tag-head">
+        <span class="tag-chip ${chipCls}">${tag.isEmpty ? '🏷 ' : '#'}${tag.name}</span>
+        <div class="tag-stats">
+          <span class="total">${tag.count} 任务</span>
+          ${overdueCount ? `<span class="overdue">⏰ ${overdueCount}</span>` : ''}
+          ${p0Count ? `<span class="p0">⚡ ${p0Count}</span>` : ''}
+        </div>
+      </div>
+    `;
+
+    const taskListHtml = tag.tasks.map(t => {
+      const dueClass = t.overdue ? 'overdue' : '';
+      const p0Pill = t.priority === 'P0' ? '<span class="pill p0">P0</span>' : '';
+      const extraTags = t.extra > 0 ? `<span class="extra-tags">+${t.extra}</span>` : '';
+      return `
+        <div class="task-item" onclick="toast('打开 T-${t.id} 抽屉')">
+          <div class="task-checkbox"></div>
+          <div class="task-title">${t.title}</div>
+          <div class="task-meta">
+            <span class="av-mini" style="background:${colorOf(t.assignee)}">${t.assignee.slice(0,1)}</span>
+            ${p0Pill}
+            <span class="pill ${dueClass}">${t.due}</span>
+            ${extraTags}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    card.innerHTML = head + `<div class="task-list">${taskListHtml}</div>
+      <div class="card-foot">点任务打开详情抽屉</div>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+function scrollToCard(name) {
+  const card = document.querySelector(`.tag-card[data-tag="${name}"]`);
+  if (!card) return;
+  card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  card.classList.add('highlight');
+  setTimeout(() => card.classList.remove('highlight'), 1400);
+}
+
+// 维度切换（mock）
+document.getElementById('dimSeg').addEventListener('click', e => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  document.querySelectorAll('#dimSeg button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  toast(`已切到维度「${btn.firstChild.textContent.trim()}」（设计稿仅模拟，标签数据不变）`);
+});
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+renderBubbles();
+renderCards();
+</script>
+
+</body>
+</html>

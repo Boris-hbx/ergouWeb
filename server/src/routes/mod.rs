@@ -21,3 +21,10 @@ pub mod todos;
 pub mod trips;
 pub mod work_columns;
 pub mod work_tasks;
+// T-105 SPEC insight
+pub mod insights;
+pub mod reports;
+pub mod share_links;
+pub mod sources;
+// T-107 SPEC insight v0.2
+pub mod annotations;

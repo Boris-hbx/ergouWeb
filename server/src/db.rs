@@ -268,6 +268,62 @@ fn run_migrations(conn: &Connection) {
            WHERE builtin = 1 AND key = 'progress' AND width = 130;",
     )
     .ok();
+
+    // T-107 v0.2:Insight 表 + Report 表新增字段
+    // 用 "SELECT ... FROM ... LIMIT 1" 探测字段是否已存在,幂等。
+    let has_pending_revision: bool = conn
+        .prepare("SELECT pending_revision_note FROM insights LIMIT 1")
+        .is_ok();
+    if !has_pending_revision {
+        conn.execute_batch(
+            "ALTER TABLE insights ADD COLUMN pending_revision_note TEXT NOT NULL DEFAULT '';",
+        )
+        .ok();
+    }
+    let has_published_at: bool = conn.prepare("SELECT published_at FROM reports LIMIT 1").is_ok();
+    if !has_published_at {
+        conn.execute_batch("ALTER TABLE reports ADD COLUMN published_at TEXT;")
+            .ok();
+    }
+    let has_retracted_at: bool = conn.prepare("SELECT retracted_at FROM reports LIMIT 1").is_ok();
+    if !has_retracted_at {
+        conn.execute_batch("ALTER TABLE reports ADD COLUMN retracted_at TEXT;")
+            .ok();
+    }
+    let has_revision_note: bool = conn.prepare("SELECT revision_note FROM reports LIMIT 1").is_ok();
+    if !has_revision_note {
+        conn.execute_batch(
+            "ALTER TABLE reports ADD COLUMN revision_note TEXT NOT NULL DEFAULT '';",
+        )
+        .ok();
+    }
+    let has_parent_report: bool = conn
+        .prepare("SELECT parent_report_id FROM reports LIMIT 1")
+        .is_ok();
+    if !has_parent_report {
+        conn.execute_batch("ALTER TABLE reports ADD COLUMN parent_report_id INTEGER;")
+            .ok();
+    }
+
+    // T-106 P3 / spec v0.2.1: reports.citations 字段(CC 输出的引用条目,前端 popover 用)
+    let has_citations: bool = conn.prepare("SELECT citations FROM reports LIMIT 1").is_ok();
+    if !has_citations {
+        conn.execute_batch(
+            "ALTER TABLE reports ADD COLUMN citations TEXT NOT NULL DEFAULT '[]';",
+        )
+        .ok();
+    }
+
+    // T-107 v0.2:status enum 迁移 'drafting' → 'collecting'(无报告) / 'editing'(有报告)。
+    // 幂等:跑过后 drafting 已被替换,WHERE 不再命中。
+    // 注:SQLite 不强制 enum,这里只是把字符串值改对。
+    conn.execute_batch(
+        "UPDATE insights SET status = 'editing'
+           WHERE status = 'drafting' AND current_report_id IS NOT NULL;
+         UPDATE insights SET status = 'collecting'
+           WHERE status = 'drafting';",
+    )
+    .ok();
 }
 
 fn create_tables(conn: &Connection) {
@@ -827,6 +883,102 @@ fn create_tables(conn: &Connection) {
             PRIMARY KEY (user_id, key)
         );
         CREATE INDEX IF NOT EXISTS idx_work_columns_user_pos ON work_columns(user_id, position);
+
+        -- ============ Insight (T-105 / SPEC insight) ============
+        -- Boris 把多源素材整理成可分享研究报告。架构 = Hybrid:
+        --   Web 后端 = 收件箱 + 抓取 + 存储(本表);
+        --   Claude Code(Boris 本机)= 调 LLM 生成报告,POST /api/insights/:id/reports;
+        --   同事/领导 = 公开 /r/{token} 访问只读分享页。
+        -- 详见 specs/insight/spec.md。
+        CREATE TABLE IF NOT EXISTS insights (
+            id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id            TEXT    NOT NULL REFERENCES users(id),
+            title              TEXT    NOT NULL DEFAULT '',
+            topic              TEXT    NOT NULL DEFAULT '',
+            template           TEXT    NOT NULL DEFAULT 'survey',
+            status             TEXT    NOT NULL DEFAULT 'drafting',
+            current_report_id  INTEGER,
+            created_at         TEXT    NOT NULL,
+            updated_at         TEXT    NOT NULL,
+            deleted            INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE INDEX IF NOT EXISTS idx_insights_user ON insights(user_id, deleted);
+
+        -- Sources:每条素材一行。
+        -- insight_id NULL = 未归属候选(刷推时的素材库);
+        -- 非 NULL = 已挂到某个 Insight。
+        -- content 是抓取后的正文/字幕,**一次抓 + 冻结**(spec 原则 2),
+        -- 重抓走 POST /api/sources/:id/refetch 单独触发。
+        CREATE TABLE IF NOT EXISTS sources (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id       TEXT    NOT NULL REFERENCES users(id),
+            insight_id    INTEGER REFERENCES insights(id),
+            kind          TEXT    NOT NULL,
+            url           TEXT,
+            title         TEXT    NOT NULL DEFAULT '',
+            author        TEXT    NOT NULL DEFAULT '',
+            content       TEXT    NOT NULL DEFAULT '',
+            note          TEXT    NOT NULL DEFAULT '',
+            starred       INTEGER NOT NULL DEFAULT 0,
+            fetch_status  TEXT    NOT NULL DEFAULT 'pending',
+            fetch_error   TEXT,
+            fetched_at    TEXT,
+            created_at    TEXT    NOT NULL,
+            updated_at    TEXT    NOT NULL,
+            deleted       INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE INDEX IF NOT EXISTS idx_sources_user_insight ON sources(user_id, insight_id, deleted);
+        CREATE INDEX IF NOT EXISTS idx_sources_user_unassigned ON sources(user_id, deleted) WHERE insight_id IS NULL;
+
+        -- Reports:版本化报告(spec 原则 3);分享链接绑定到具体 version,不变。
+        -- v0.2.1 citations 字段:CC 生成报告时输出的 [{ref, sourceId, quote}] JSON 数组,
+        --   让前端在 `[^N]` 上挂可交互 popover 显示原文片段。旧 report / CC 未输出时为 '[]'。
+        CREATE TABLE IF NOT EXISTS reports (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            insight_id    INTEGER NOT NULL REFERENCES insights(id),
+            version       INTEGER NOT NULL,
+            template      TEXT    NOT NULL,
+            content_md    TEXT    NOT NULL DEFAULT '',
+            source_ids    TEXT    NOT NULL DEFAULT '[]',
+            citations     TEXT    NOT NULL DEFAULT '[]',
+            generated_by  TEXT    NOT NULL DEFAULT '',
+            model_used    TEXT    NOT NULL DEFAULT '',
+            created_at    TEXT    NOT NULL,
+            updated_at    TEXT    NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_reports_insight ON reports(insight_id, version DESC);
+
+        -- Share links:公开分享(无需登录)。token 32 字节 URL-safe 随机;
+        -- 撤销 → revoked_at 非 NULL → GET /r/{token} 返回 410 Gone(非 404)。
+        CREATE TABLE IF NOT EXISTS share_links (
+            token       TEXT    PRIMARY KEY,
+            insight_id  INTEGER NOT NULL REFERENCES insights(id),
+            report_id   INTEGER NOT NULL REFERENCES reports(id),
+            show_notes  INTEGER NOT NULL DEFAULT 0,
+            created_at  TEXT    NOT NULL,
+            revoked_at  TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_share_insight ON share_links(insight_id);
+
+        -- T-107 v0.2:Annotations 表 — 锚定到具体 report 版本的备注。
+        -- Boris 在 editing 状态下加注,CC 修订时读取 open 项作为修订输入。
+        -- 锚点 (anchor) 是 JSON,kind/MVP:paragraph(段索引)/ heading(slug);range 留 Phase 2。
+        -- 软删保留历史;resolved 状态对 CC 不可见(只看 open)。
+        CREATE TABLE IF NOT EXISTS annotations (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id     TEXT    NOT NULL REFERENCES users(id),
+            insight_id  INTEGER NOT NULL REFERENCES insights(id),
+            report_id   INTEGER NOT NULL REFERENCES reports(id),
+            anchor      TEXT    NOT NULL,
+            body        TEXT    NOT NULL,
+            kind        TEXT    NOT NULL DEFAULT 'other',
+            status      TEXT    NOT NULL DEFAULT 'open',
+            created_at  TEXT    NOT NULL,
+            updated_at  TEXT    NOT NULL,
+            deleted     INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE INDEX IF NOT EXISTS idx_annotations_report ON annotations(report_id, status, deleted);
+        CREATE INDEX IF NOT EXISTS idx_annotations_user_insight ON annotations(user_id, insight_id, deleted);
         ",
     )
     .expect("Failed to create tables");
