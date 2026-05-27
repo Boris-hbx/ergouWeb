@@ -8,17 +8,17 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Next">
     <title>Next - Focus on the Right Thing</title>
-    <link rel="stylesheet" href="assets/css/base.css?v=20260527k">
-    <link rel="stylesheet" href="assets/css/style.css?v=20260527k">
-    <link rel="stylesheet" href="assets/css/components.css?v=20260527k">
-    <link rel="stylesheet" href="assets/css/mobile.css?v=20260527k">
-    <link rel="stylesheet" href="assets/css/abao.css?v=20260527k">
-    <link rel="stylesheet" href="assets/css/english.css?v=20260527k">
-    <link rel="stylesheet" href="assets/css/health.css?v=20260527k">
-    <link rel="stylesheet" href="assets/css/patrol.css?v=20260527k">
-    <link rel="stylesheet" href="assets/css/admin-panel.css?v=20260527k">
-    <link rel="stylesheet" href="assets/css/work.css?v=20260527k">
-    <link rel="stylesheet" href="assets/css/insight.css?v=20260527k">
+    <link rel="stylesheet" href="assets/css/base.css?v=20260527l">
+    <link rel="stylesheet" href="assets/css/style.css?v=20260527l">
+    <link rel="stylesheet" href="assets/css/components.css?v=20260527l">
+    <link rel="stylesheet" href="assets/css/mobile.css?v=20260527l">
+    <link rel="stylesheet" href="assets/css/abao.css?v=20260527l">
+    <link rel="stylesheet" href="assets/css/english.css?v=20260527l">
+    <link rel="stylesheet" href="assets/css/health.css?v=20260527l">
+    <link rel="stylesheet" href="assets/css/patrol.css?v=20260527l">
+    <link rel="stylesheet" href="assets/css/admin-panel.css?v=20260527l">
+    <link rel="stylesheet" href="assets/css/work.css?v=20260527l">
+    <link rel="stylesheet" href="assets/css/insight.css?v=20260527l">
     <link rel="manifest" href="assets/manifest.json">
     <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
     <script>
@@ -1158,6 +1158,12 @@
                     <div class="life-hub-card-title">洞察</div>
                     <div class="life-hub-card-desc">多源素材整理成可分享报告</div>
                 </div>
+                <!-- T-111 -->
+                <div class="life-hub-card" onclick="WorkDone.openFeature()">
+                    <div class="life-hub-card-icon">📦</div>
+                    <div class="life-hub-card-title">已完成档案</div>
+                    <div class="life-hub-card-desc">按月分组复盘 · 周月报数据源</div>
+                </div>
                 <div class="life-hub-card life-hub-card-disabled">
                     <div class="life-hub-card-icon">📊</div>
                     <div class="life-hub-card-title">周报</div>
@@ -1233,6 +1239,9 @@
             <div id="insight-list-view"></div>
             <div id="insight-detail-view" class="ins-hidden"></div>
         </div>
+
+        <!-- T-111:已完成档案(按月分组的复盘归档区,只读;由 WorkDone 模块自主渲染) -->
+        <div id="work-done-view" style="display:none;"></div>
     </div>
 
     <!-- 工作:长文本弹层(简介编辑) -->
@@ -1721,63 +1730,65 @@
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
 
     <!-- JS Modules -->
-    <script src="assets/js/observability.js?v=20260527k"></script>
-    <script src="assets/js/api.js?v=20260527k"></script>
-    <script src="assets/js/utils.js?v=20260527k"></script>
+    <script src="assets/js/observability.js?v=20260527l"></script>
+    <script src="assets/js/api.js?v=20260527l"></script>
+    <script src="assets/js/utils.js?v=20260527l"></script>
     <!-- T-095: 通用弹窗组件 (openProgressDialog / openTextInputDialog),tasks.js 和 work-table.js 都依赖 -->
-    <script src="assets/js/dialogs.js?v=20260527k"></script>
-    <script src="assets/js/jelly-indicator.js?v=20260527k"></script>
-    <script src="assets/js/app.js?v=20260527k"></script>
-    <script src="assets/js/tasks.js?v=20260527k"></script>
-    <script src="assets/js/modal.js?v=20260527k"></script>
-    <script src="assets/js/datepicker.js?v=20260527k"></script>
-    <script src="assets/js/drag.js?v=20260527k"></script>
-    <script src="assets/js/actionsheet.js?v=20260527k"></script>
-    <script src="assets/js/share-modal.js?v=20260527k"></script>
-    <script src="assets/js/review.js?v=20260527k"></script>
-    <script src="assets/js/routines.js?v=20260527k"></script>
-    <script src="assets/js/features.js?v=20260527k"></script>
-    <script src="assets/js/particles.js?v=20260527k"></script>
-    <script src="assets/js/living-line.js?v=20260527k"></script>
-    <script src="assets/js/abao.js?v=20260527k"></script>
-    <script src="assets/js/english.js?v=20260527k"></script>
-    <script src="assets/js/life.js?v=20260527k"></script>
-    <script src="assets/js/expense.js?v=20260527k"></script>
-    <script src="assets/js/expense-analytics.js?v=20260527k"></script>
-    <script src="assets/js/trip.js?v=20260527k"></script>
-    <script src="assets/js/health-data.js?v=20260527k"></script>
-    <script src="assets/js/health-renderer.js?v=20260527k"></script>
-    <script src="assets/js/health.js?v=20260527k"></script>
-    <script src="assets/js/friends.js?v=20260527k"></script>
-    <script src="assets/js/notifications.js?v=20260527k"></script>
-    <script src="assets/js/settings.js?v=20260527k"></script>
-    <script src="assets/js/admin-panel.js?v=20260527k"></script>
+    <script src="assets/js/dialogs.js?v=20260527l"></script>
+    <script src="assets/js/jelly-indicator.js?v=20260527l"></script>
+    <script src="assets/js/app.js?v=20260527l"></script>
+    <script src="assets/js/tasks.js?v=20260527l"></script>
+    <script src="assets/js/modal.js?v=20260527l"></script>
+    <script src="assets/js/datepicker.js?v=20260527l"></script>
+    <script src="assets/js/drag.js?v=20260527l"></script>
+    <script src="assets/js/actionsheet.js?v=20260527l"></script>
+    <script src="assets/js/share-modal.js?v=20260527l"></script>
+    <script src="assets/js/review.js?v=20260527l"></script>
+    <script src="assets/js/routines.js?v=20260527l"></script>
+    <script src="assets/js/features.js?v=20260527l"></script>
+    <script src="assets/js/particles.js?v=20260527l"></script>
+    <script src="assets/js/living-line.js?v=20260527l"></script>
+    <script src="assets/js/abao.js?v=20260527l"></script>
+    <script src="assets/js/english.js?v=20260527l"></script>
+    <script src="assets/js/life.js?v=20260527l"></script>
+    <script src="assets/js/expense.js?v=20260527l"></script>
+    <script src="assets/js/expense-analytics.js?v=20260527l"></script>
+    <script src="assets/js/trip.js?v=20260527l"></script>
+    <script src="assets/js/health-data.js?v=20260527l"></script>
+    <script src="assets/js/health-renderer.js?v=20260527l"></script>
+    <script src="assets/js/health.js?v=20260527l"></script>
+    <script src="assets/js/friends.js?v=20260527l"></script>
+    <script src="assets/js/notifications.js?v=20260527l"></script>
+    <script src="assets/js/settings.js?v=20260527l"></script>
+    <script src="assets/js/admin-panel.js?v=20260527l"></script>
     <!-- Work module (T-094 / SPEC work-task-table) -->
-    <script src="assets/js/work-pick.js?v=20260527k"></script>
-    <script src="assets/js/work-table.js?v=20260527k"></script>
-    <script src="assets/js/work-column-cfg.js?v=20260527k"></script>
-    <script src="assets/js/work-board.js?v=20260527k"></script>
-    <script src="assets/js/work-calendar.js?v=20260527k"></script>
+    <script src="assets/js/work-pick.js?v=20260527l"></script>
+    <script src="assets/js/work-table.js?v=20260527l"></script>
+    <script src="assets/js/work-column-cfg.js?v=20260527l"></script>
+    <script src="assets/js/work-board.js?v=20260527l"></script>
+    <script src="assets/js/work-calendar.js?v=20260527l"></script>
     <!-- T-099 -->
-    <script src="assets/js/work-person.js?v=20260527k"></script>
+    <script src="assets/js/work-person.js?v=20260527l"></script>
     <!-- T-108 -->
-    <script src="assets/js/work-distribution.js?v=20260527k"></script>
-    <script src="assets/js/work-detail.js?v=20260527k"></script>
-    <script src="assets/js/work.js?v=20260527k"></script>
+    <script src="assets/js/work-distribution.js?v=20260527l"></script>
+    <script src="assets/js/work-detail.js?v=20260527l"></script>
+    <script src="assets/js/work.js?v=20260527l"></script>
+    <!-- T-111:已完成档案(按月分组归档区) -->
+    <script src="assets/js/work-done.js?v=20260527l"></script>
     <!-- T-106 Insight (P1: list + 4-form detail + capture sidebar + markdown + share) -->
-    <script src="assets/js/insight-markdown.js?v=20260527k"></script>
-    <script src="assets/js/insight-capture.js?v=20260527k"></script>
+    <script src="assets/js/insight-markdown.js?v=20260527l"></script>
+    <script src="assets/js/insight-capture.js?v=20260527l"></script>
     <!-- T-106 P2: dialog 集合(revise / publish / retract / fork-confirm) + annotation gutter -->
-    <script src="assets/js/insight-revise.js?v=20260527k"></script>
-    <script src="assets/js/insight-annotations.js?v=20260527k"></script>
+    <script src="assets/js/insight-revise.js?v=20260527l"></script>
+    <script src="assets/js/insight-annotations.js?v=20260527l"></script>
     <!-- T-106 P3: citation popover([^N] hover 看原文片段),4 处共用 -->
-    <script src="assets/js/insight-citation.js?v=20260527k"></script>
-    <script src="assets/js/insight-detail.js?v=20260527k"></script>
-    <script src="assets/js/insight.js?v=20260527k"></script>
-    <script src="assets/js/patrol-utils.js?v=20260527k"></script>
-    <script src="assets/js/patrol-terrain.js?v=20260527k"></script>
-    <script src="assets/js/patrol-debug.js?v=20260527k"></script>
-    <script src="assets/js/patrol.js?v=20260527k"></script>
+    <script src="assets/js/insight-citation.js?v=20260527l"></script>
+    <script src="assets/js/insight-detail.js?v=20260527l"></script>
+    <script src="assets/js/insight.js?v=20260527l"></script>
+    <script src="assets/js/patrol-utils.js?v=20260527l"></script>
+    <script src="assets/js/patrol-terrain.js?v=20260527l"></script>
+    <script src="assets/js/patrol-debug.js?v=20260527l"></script>
+    <script src="assets/js/patrol.js?v=20260527l"></script>
 
     <script>
     // Initialize

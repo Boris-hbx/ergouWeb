@@ -1216,3 +1216,151 @@ table.wt-table {
   color: #fff; font-weight: 600; font-size: 9px;
   flex-shrink: 0;
 }
+
+/* =========================================================================
+   T-111 已完成档案 (work-done.js)
+   独立路由 /work/done;按月分组复盘归档区;只读语义,点条进 T-100 抽屉。
+   spec § C.1 + § B.-1 动效铁律:大动作(切窗口/折叠展开)允许 stagger,小动作(下拉)静默
+   ========================================================================= */
+
+#work-done-view { padding: 18px 28px 50px; max-width: 1100px; }
+
+.wd-header {
+  display: flex; align-items: center; gap: 12px;
+  margin: 14px 0 14px;
+}
+.wd-header h2 { font-size: 19px; font-weight: 600; margin: 0; }
+.wd-total {
+  font-size: 12px; color: var(--text-color-mute, #6B7280);
+  background: rgba(124, 77, 255, 0.08);
+  padding: 2px 9px; border-radius: 10px;
+}
+.wd-total strong { color: var(--primary-color, #7C4DFF); }
+.wd-spacer { flex: 1; }
+.wd-hint { font-size: 11.5px; color: #9CA3AF; }
+
+.wd-filters {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 14px;
+  background: #FAF9FC;
+  border: 1px solid #E5E3EE;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+.wd-window-seg {
+  display: inline-flex; background: #fff; border-radius: 6px; padding: 2px;
+  border: 1px solid #E5E3EE;
+}
+.wd-win-btn {
+  border: 0; background: transparent;
+  padding: 4px 12px; font-size: 12px;
+  color: #6B7280; border-radius: 4px;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.wd-win-btn:hover { background: rgba(124, 77, 255, 0.06); color: #1F2937; }
+.wd-win-btn.active {
+  background: var(--primary-color, #7C4DFF);
+  color: #fff; font-weight: 500;
+}
+.wd-fil-spacer { flex: 1; }
+.wd-select {
+  padding: 5px 10px; font-size: 12px;
+  border: 1px solid #E5E3EE; border-radius: 5px;
+  background: #fff; color: #1F2937;
+  cursor: pointer;
+  min-width: 120px;
+}
+.wd-select:hover { border-color: #D4D0E0; }
+.wd-select:focus { outline: none; border-color: var(--primary-color, #7C4DFF); }
+
+.wd-month {
+  background: #fff;
+  border: 1px solid #E5E3EE;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+.wd-month-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px;
+  background: #F5F2FB;
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid transparent;
+  transition: background .15s, border-color .15s;
+}
+.wd-month-head:hover { background: rgba(124, 77, 255, 0.10); }
+.wd-month.collapsed .wd-month-head { border-bottom-color: transparent; }
+.wd-month:not(.collapsed) .wd-month-head { border-bottom-color: #E5E3EE; }
+.wd-month-caret {
+  font-size: 10px; color: #9CA3AF;
+  transition: transform .25s cubic-bezier(0.68, -0.4, 0.265, 1.35);
+  width: 12px; display: inline-block; text-align: center;
+}
+.wd-month-label { font-weight: 600; color: #1F2937; font-size: 13.5px; }
+.wd-month-dot { color: #D4D0E0; }
+.wd-month-count { font-size: 12px; color: #6B7280; }
+
+.wd-task-list {
+  display: flex; flex-direction: column;
+}
+.wd-task {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 14px 9px 36px;
+  border-bottom: 1px solid #F5F2FB;
+  cursor: pointer;
+  transition: background .12s;
+}
+.wd-task:hover { background: rgba(124, 77, 255, 0.04); }
+.wd-task:last-child { border-bottom: 0; }
+.wd-task-title {
+  flex: 1; font-size: 13px; color: #1F2937;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.wd-task-meta {
+  display: flex; align-items: center; gap: 6px;
+  flex-shrink: 0;
+}
+.wd-avatar {
+  width: 18px; height: 18px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: #fff; font-weight: 600; font-size: 10px;
+}
+.wd-avatar-empty { background: #E5E7EB; color: #9CA3AF; }
+.wd-pill {
+  padding: 1px 7px; border-radius: 9px;
+  font-size: 10.5px; font-weight: 500;
+}
+.wd-p-p0  { background: rgba(245, 158, 11, 0.16); color: #8B5A00; }
+.wd-p-mid { background: #E5E7EB; color: #4B5563; }
+.wd-p-low { background: #F3F4F6; color: #9CA3AF; }
+.wd-tags-mini {
+  font-size: 10.5px; color: var(--primary-color, #7C4DFF);
+  background: rgba(124, 77, 255, 0.08);
+  padding: 1px 6px; border-radius: 6px;
+  max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.wd-date { font-size: 11px; color: #9CA3AF; min-width: 70px; text-align: right; }
+
+/* Stagger 入场(进入页面 / 切窗口 / 折叠展开 = 大动作) */
+.wd-task-entering {
+  animation: wd-task-enter .42s var(--ease-spring, cubic-bezier(0.68, -0.4, 0.265, 1.35)) both;
+}
+@keyframes wd-task-enter {
+  from { transform: translateY(-6px) scale(0.98); opacity: 0; }
+  to   { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+/* 空状态 */
+.wd-empty {
+  background: #fff;
+  border: 1px dashed #D4D0E0;
+  border-radius: 10px;
+  padding: 48px 24px;
+  text-align: center;
+  color: #6B7280;
+}
+.wd-empty-icon { font-size: 40px; margin-bottom: 12px; }
+.wd-empty-title { font-size: 15px; color: #1F2937; font-weight: 500; margin-bottom: 6px; }
+.wd-empty-sub { font-size: 12.5px; color: #9CA3AF; }
