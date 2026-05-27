@@ -289,6 +289,8 @@ pub fn build_app(state: state::AppState) -> Router {
                 .route("/conversations/users", get(routes::admin::conversation_user_summary))
                 .route("/conversations", get(routes::admin::list_conversations))
                 .route("/conversations/{id}/messages", get(routes::admin::get_conversation_messages))
+                // T-115:一次性回补 todo.content → work_task.desc
+                .route("/migrate-todo-content", post(routes::admin::migrate_todo_content))
                 // T-089 块2:30 req/min/user 限流(必须双写 main.rs + lib.rs)
                 .route_layer(axum::middleware::from_fn_with_state(
                     state.clone(),

@@ -1346,3 +1346,394 @@ pub async fn delete_person(
         }
     }
 }
+
+// ============ T-115: 一次性回补 todo.content → work_task.desc ============
+//
+// 背景:T-101 实施时 spec 字段映射漏了 `todo.content → work_task.desc`,导致 Boris 之前
+//      用旧规则同步过的 work_task,desc 都是空的。T-114 已修未来同步规则;本端点回补历史。
+//
+// 流程:扫 admin 调用方自己的 work_tasks,按 title === todos.text 反查 todo;
+//      条件满足时把 todo.content 写到 work_task.desc。
+//
+// 安全约束:
+// - 只动调用方自己的 user_id(不跨用户)
+// - 已有 desc 的不覆盖(保护手动写的简介)
+// - 多匹配(同名 todo > 1)跳过 + warn(不知道哪个对应)
+// - 幂等(第二次跑 already_has_desc 拦截)
+// - 详细统计 + audit log
+
+#[derive(Debug, serde::Deserialize, Default)]
+pub struct MigrateTodoContentParams {
+    /// dry_run=1 → 只统计不写入,用于预演;默认 false 实际写入。
+    #[serde(default)]
+    pub dry_run: Option<i32>,
+}
+
+pub async fn migrate_todo_content(
+    State(state): State<AppState>,
+    admin: AdminUserId,
+    axum::extract::Query(p): axum::extract::Query<MigrateTodoContentParams>,
+) -> impl IntoResponse {
+    let dry_run = p.dry_run.unwrap_or(0) != 0;
+    let db = state.db.lock();
+    let user_id = admin.0.clone();
+
+    // 1) 扫所有未删 work_tasks(自己 user_id 下)
+    #[derive(Debug)]
+    struct WorkTaskRow {
+        id: i64,
+        title: String,
+        desc: String,
+    }
+    let mut rows_vec: Vec<WorkTaskRow> = Vec::new();
+    {
+        let mut stmt = match db.prepare(
+            "SELECT id, title, desc FROM work_tasks WHERE user_id = ?1 AND deleted = 0",
+        ) {
+            Ok(s) => s,
+            Err(e) => {
+                tracing::error!("[migrate-todo-content] prepare wt: {}", e);
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({"success": false, "error": "内部错误"})),
+                );
+            }
+        };
+        let mapped = stmt.query_map(rusqlite::params![&user_id], |r| {
+            Ok(WorkTaskRow {
+                id: r.get(0)?,
+                title: r.get(1)?,
+                desc: r.get(2)?,
+            })
+        });
+        if let Ok(iter) = mapped {
+            for r in iter.flatten() {
+                rows_vec.push(r);
+            }
+        }
+    }
+
+    let scanned = rows_vec.len();
+    let mut backfilled: usize = 0;
+    let mut skipped_already_has_desc: usize = 0;
+    let mut skipped_multi_match: usize = 0;
+    let mut skipped_no_todo: usize = 0;
+    let mut skipped_empty_content: usize = 0;
+
+    let now = chrono::Utc::now().to_rfc3339();
+
+    for row in &rows_vec {
+        // 已有 desc → 不覆盖
+        if !row.desc.trim().is_empty() {
+            skipped_already_has_desc += 1;
+            continue;
+        }
+        // 反查同 user_id + text 匹配的 todos.content;COALESCE 兜 NULL
+        let todos_content: Vec<String> = {
+            let mut q = match db.prepare(
+                "SELECT COALESCE(content, '') FROM todos \
+                 WHERE user_id = ?1 AND text = ?2 AND deleted = 0",
+            ) {
+                Ok(s) => s,
+                Err(e) => {
+                    tracing::warn!("[migrate-todo-content] prepare todo: {}", e);
+                    continue;
+                }
+            };
+            let mapped = q.query_map(rusqlite::params![&user_id, &row.title], |r| {
+                r.get::<_, String>(0)
+            });
+            match mapped {
+                Ok(iter) => iter.flatten().collect(),
+                Err(_) => Vec::new(),
+            }
+        };
+
+        if todos_content.is_empty() {
+            skipped_no_todo += 1;
+            tracing::info!(
+                "[migrate-todo-content] skip wt_id={} title={:?}: no matching todo",
+                row.id, row.title
+            );
+            continue;
+        }
+        if todos_content.len() > 1 {
+            skipped_multi_match += 1;
+            tracing::warn!(
+                "[migrate-todo-content] skip wt_id={} title={:?}: {} todos match (ambiguous)",
+                row.id, row.title, todos_content.len()
+            );
+            continue;
+        }
+        let content = &todos_content[0];
+        if content.trim().is_empty() {
+            skipped_empty_content += 1;
+            tracing::info!(
+                "[migrate-todo-content] skip wt_id={} title={:?}: todo.content empty",
+                row.id, row.title
+            );
+            continue;
+        }
+        // 回补!(dry_run 时只计数不写入)
+        if dry_run {
+            backfilled += 1;
+            tracing::info!(
+                "[migrate-todo-content] [DRY-RUN] would backfill wt_id={} title={:?} ({} chars)",
+                row.id, row.title, content.chars().count()
+            );
+            continue;
+        }
+        match db.execute(
+            "UPDATE work_tasks SET desc = ?1, updated_at = ?2 \
+             WHERE id = ?3 AND user_id = ?4 AND deleted = 0",
+            rusqlite::params![content, &now, row.id, &user_id],
+        ) {
+            Ok(_) => {
+                backfilled += 1;
+                tracing::info!(
+                    "[migrate-todo-content] backfilled wt_id={} title={:?} ({} chars)",
+                    row.id, row.title, content.chars().count()
+                );
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "[migrate-todo-content] update failed wt_id={}: {}",
+                    row.id, e
+                );
+            }
+        }
+    }
+
+    // 写 audit log 留痕(dry_run 也记,便于追溯演练)
+    let summary = format!(
+        "{}scanned={} backfilled={} already_has_desc={} multi_match={} no_todo={} empty_content={}",
+        if dry_run { "[DRY-RUN] " } else { "" },
+        scanned, backfilled, skipped_already_has_desc,
+        skipped_multi_match, skipped_no_todo, skipped_empty_content
+    );
+    insert_audit_log(
+        &db,
+        &user_id,
+        if dry_run { "migrate_todo_content_dry_run" } else { "migrate_todo_content" },
+        None,
+        Some("work_tasks"),
+        Some(&summary),
+    );
+
+    tracing::info!("[migrate-todo-content] done: {}", summary);
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "success": true,
+            "dry_run": dry_run,
+            "stats": {
+                "scanned": scanned,
+                "backfilled": backfilled,
+                "skipped_already_has_desc": skipped_already_has_desc,
+                "skipped_multi_match": skipped_multi_match,
+                "skipped_no_todo": skipped_no_todo,
+                "skipped_empty_content": skipped_empty_content,
+            }
+        })),
+    )
+}
+
+#[cfg(test)]
+mod migrate_tests {
+    use crate::test_helpers::{auth_cookie, create_test_user, test_state};
+    use axum::body::{to_bytes, Body};
+    use axum::http::Request;
+    use serde_json::Value as JsonValue;
+    use tower::ServiceExt;
+
+    async fn body_json(resp: axum::response::Response) -> JsonValue {
+        let body = to_bytes(resp.into_body(), 1_000_000).await.unwrap();
+        serde_json::from_slice(&body).unwrap()
+    }
+
+    async fn admin_setup() -> (crate::state::AppState, String, String) {
+        // 第一个注册用户被 migration 自动设为 owner (db.rs run_migrations) → AdminUserId 通过
+        let state = test_state();
+        let (uid, token) = create_test_user(&state, "boris_test", "Pa55word1");
+        // 显式确保 role=owner
+        {
+            let db = state.db.lock();
+            db.execute("UPDATE users SET role = 'owner' WHERE id = ?1", rusqlite::params![&uid])
+                .unwrap();
+        }
+        let cookie = auth_cookie(&token);
+        (state, uid, cookie)
+    }
+
+    async fn create_todo(state: &crate::state::AppState, user_id: &str, text: &str, content: &str) {
+        let db = state.db.lock();
+        let id = uuid::Uuid::new_v4().to_string();
+        let now = chrono::Utc::now().to_rfc3339();
+        db.execute(
+            "INSERT INTO todos (id, user_id, text, content, created_at, updated_at) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?5)",
+            rusqlite::params![id, user_id, text, content, now],
+        )
+        .unwrap();
+    }
+
+    async fn create_work_task(
+        state: &crate::state::AppState,
+        user_id: &str,
+        title: &str,
+        desc: &str,
+    ) -> i64 {
+        let db = state.db.lock();
+        let now = chrono::Utc::now().to_rfc3339();
+        db.execute(
+            "INSERT INTO work_tasks (user_id, title, desc, created_at, updated_at) \
+             VALUES (?1, ?2, ?3, ?4, ?4)",
+            rusqlite::params![user_id, title, desc, now],
+        )
+        .unwrap();
+        db.last_insert_rowid()
+    }
+
+    async fn run_migrate(app: &axum::Router, cookie: &str) -> JsonValue {
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/admin/migrate-todo-content")
+                    .header("Cookie", cookie)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        body_json(resp).await
+    }
+
+    #[tokio::test]
+    async fn backfills_single_match_with_content() {
+        let (state, uid, cookie) = admin_setup().await;
+        create_todo(&state, &uid, "院评委会准备", "PPT 大纲 + 三处数据").await;
+        let wt_id = create_work_task(&state, &uid, "院评委会准备", "").await;
+        let app = crate::build_app(state.clone());
+
+        let j = run_migrate(&app, &cookie).await;
+        assert_eq!(j["success"], true);
+        assert_eq!(j["stats"]["scanned"], 1);
+        assert_eq!(j["stats"]["backfilled"], 1);
+
+        // 验证 desc 被写入
+        let db = state.db.lock();
+        let desc: String = db
+            .query_row(
+                "SELECT desc FROM work_tasks WHERE id = ?1",
+                rusqlite::params![wt_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(desc, "PPT 大纲 + 三处数据");
+    }
+
+    #[tokio::test]
+    async fn skips_when_work_task_already_has_desc() {
+        let (state, uid, cookie) = admin_setup().await;
+        create_todo(&state, &uid, "X", "todo content").await;
+        let wt_id = create_work_task(&state, &uid, "X", "已有简介").await;
+        let app = crate::build_app(state.clone());
+
+        let j = run_migrate(&app, &cookie).await;
+        assert_eq!(j["stats"]["skipped_already_has_desc"], 1);
+        assert_eq!(j["stats"]["backfilled"], 0);
+
+        let db = state.db.lock();
+        let desc: String = db
+            .query_row(
+                "SELECT desc FROM work_tasks WHERE id = ?1",
+                rusqlite::params![wt_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(desc, "已有简介"); // 未被覆盖
+    }
+
+    #[tokio::test]
+    async fn skips_multi_match_with_warning() {
+        let (state, uid, cookie) = admin_setup().await;
+        create_todo(&state, &uid, "同名", "content A").await;
+        create_todo(&state, &uid, "同名", "content B").await;
+        create_work_task(&state, &uid, "同名", "").await;
+        let app = crate::build_app(state);
+
+        let j = run_migrate(&app, &cookie).await;
+        assert_eq!(j["stats"]["skipped_multi_match"], 1);
+        assert_eq!(j["stats"]["backfilled"], 0);
+    }
+
+    #[tokio::test]
+    async fn skips_when_no_matching_todo() {
+        let (state, uid, cookie) = admin_setup().await;
+        create_work_task(&state, &uid, "孤儿任务", "").await;
+        let app = crate::build_app(state);
+
+        let j = run_migrate(&app, &cookie).await;
+        assert_eq!(j["stats"]["skipped_no_todo"], 1);
+        assert_eq!(j["stats"]["backfilled"], 0);
+    }
+
+    #[tokio::test]
+    async fn skips_when_todo_content_empty() {
+        let (state, uid, cookie) = admin_setup().await;
+        create_todo(&state, &uid, "空内容 todo", "").await;
+        create_work_task(&state, &uid, "空内容 todo", "").await;
+        let app = crate::build_app(state);
+
+        let j = run_migrate(&app, &cookie).await;
+        assert_eq!(j["stats"]["skipped_empty_content"], 1);
+        assert_eq!(j["stats"]["backfilled"], 0);
+    }
+
+    #[tokio::test]
+    async fn idempotent_second_run_does_nothing() {
+        let (state, uid, cookie) = admin_setup().await;
+        create_todo(&state, &uid, "幂等测试", "回补一次").await;
+        create_work_task(&state, &uid, "幂等测试", "").await;
+        let app = crate::build_app(state);
+
+        let j1 = run_migrate(&app, &cookie).await;
+        assert_eq!(j1["stats"]["backfilled"], 1);
+
+        // 第二次:work_task.desc 已有内容 → 走 already_has_desc 跳过
+        let j2 = run_migrate(&app, &cookie).await;
+        assert_eq!(j2["stats"]["backfilled"], 0);
+        assert_eq!(j2["stats"]["skipped_already_has_desc"], 1);
+    }
+
+    #[tokio::test]
+    async fn user_isolation_does_not_touch_other_users() {
+        let (state, uid_admin, cookie) = admin_setup().await;
+        // 另一个用户的 todo + work_task,不应被 admin migrate 触碰
+        let (uid_other, _) = create_test_user(&state, "other_user", "Pa55word1");
+        create_todo(&state, &uid_other, "他人任务", "他人内容").await;
+        let wt_other = create_work_task(&state, &uid_other, "他人任务", "").await;
+        // admin 自己也有一条匹配
+        create_todo(&state, &uid_admin, "我的任务", "我的内容").await;
+        create_work_task(&state, &uid_admin, "我的任务", "").await;
+        let app = crate::build_app(state.clone());
+
+        let j = run_migrate(&app, &cookie).await;
+        assert_eq!(j["stats"]["scanned"], 1, "只扫 admin 自己的 work_tasks");
+        assert_eq!(j["stats"]["backfilled"], 1);
+
+        // 他人的 work_task.desc 没动
+        let db = state.db.lock();
+        let desc: String = db
+            .query_row(
+                "SELECT desc FROM work_tasks WHERE id = ?1",
+                rusqlite::params![wt_other],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(desc, "", "他人 work_task 不应被触碰");
+    }
+}

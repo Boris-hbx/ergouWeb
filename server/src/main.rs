@@ -460,6 +460,8 @@ pub fn build_app(state: AppState) -> Router {
                 // People (人物档案)
                 .route("/people", get(routes::admin::list_people).post(routes::admin::create_person))
                 .route("/people/{id}", put(routes::admin::update_person).delete(routes::admin::delete_person))
+                // T-115:一次性回补 todo.content → work_task.desc
+                .route("/migrate-todo-content", post(routes::admin::migrate_todo_content))
                 // T-089 块2:30 req/min/user 限流 —— 防暴力枚举 / DoS。
                 // route_layer 比 layer 更紧凑;仅作用于 admin 路由子树。
                 .route_layer(axum::middleware::from_fn_with_state(
