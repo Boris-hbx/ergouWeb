@@ -89,7 +89,8 @@ var Work = (function() {
         // T-098:日历视图下时间镜头 Tab 自动隐藏(日历本身按 due_date 排,叠加筛选语义重复)
         var tabBar = document.getElementById('wt-time-tabs');
         if (tabBar) tabBar.style.display = (v === 'cal') ? 'none' : '';
-        render();
+        // T-109:切视图属于"允许 stagger"路径
+        render({ stagger: true });
     }
 
     // T-098:切换时间镜头 Tab(all / today / week / month)
@@ -102,7 +103,8 @@ var Work = (function() {
         });
         _updateTabIndicator();
         _updateDateFilterChip();
-        render();
+        // T-109:切 Tab 属于"允许 stagger"路径
+        render({ stagger: true });
     }
     function timeTab() { return _timeTab; }
 
@@ -119,16 +121,18 @@ var Work = (function() {
             _updateTabIndicator();
         }
         // 自动切到表格视图(spec 说"跳到表格视图 + 自动筛选")
+        // T-109:setView 自带 stagger;直接 render 时也用 stagger(行集大变,跟切 Tab 同质)
         if (_view !== 'table') {
             setView('table');
         } else {
-            render();
+            render({ stagger: true });
         }
     }
     function clearDateFilter() {
         _dateFilter = null;
         _updateDateFilterChip();
-        render();
+        // T-109:清掉单日过滤,行集回到全量,允许 stagger
+        render({ stagger: true });
     }
     function dateFilter() { return _dateFilter; }
 
@@ -243,11 +247,14 @@ var Work = (function() {
 
     // 当前激活视图重渲;给子模块用(列设置改完、单元格改完 → 调一次)
     // T-103 B.3:完成动画期间 _renderFrozen=true 跳过重渲(避免动画被 redraw 打断)
-    function render() {
+    // T-109:opts.stagger 透传到表格视图(仅切 Tab / 切视图 / 首次加载触发动效;
+    //        编辑 / 拖拽 / 工具创建后的高频重渲不触发)
+    function render(opts) {
         if (_renderFrozen) return;
+        opts = opts || {};
         _updateTabCounts();   // T-098:每次重渲都刷 Tab 计数(任务新增/编辑/删除自动联动)
         _renderHeartStrip();  // T-103 B.1:心电图也跟着数据刷
-        if (_view === 'table') WorkTable.render();
+        if (_view === 'table') WorkTable.render(opts);
         else if (_view === 'board') WorkBoard.render();
         else if (_view === 'cal') WorkCalendar.render();
         else if (_view === 'person') WorkPerson.render();   // T-099

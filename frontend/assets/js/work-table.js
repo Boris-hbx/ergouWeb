@@ -206,14 +206,18 @@ var WorkTable = (function() {
 
     // ============ 行渲染 ============
     // T-100:行加 data-id;# 列点击打开详情抽屉,其它单元格仍走原内联编辑。
-    // T-103 B.2:每行加 .wt-entering 类 + stagger 入场 animation-delay(JS 渲染时算)
-    function _rowHTML(t, num) {
+    // T-103 B.2 + T-109 修正:stagger 仅在"加载/Tab/视图切换"时触发,不在编辑后触发。
+    //   withStagger 由调用方(render(opts)→ block → _rowHTML)透传。
+    function _rowHTML(t, num, withStagger) {
         var tds = '<td class="wt-num" onclick="WorkTable._openDetail(' + t.id + ')" title="点开打开详情">' + num + '</td>';
         var cols = Work.columns();
         for (var i = 0; i < cols.length; i++) tds += _cell(t, cols[i]);
-        // stagger delay 35ms × row index;超过 20 行后封顶,避免最后一行等太久
-        var delay = Math.min(num - 1, 20) * 35;
-        return '<tr data-id="' + t.id + '" class="wt-entering" style="animation-delay:' + delay + 'ms">' + tds + '</tr>';
+        if (withStagger) {
+            // stagger delay 35ms × row index;超过 20 行后封顶,避免最后一行等太久
+            var delay = Math.min(num - 1, 20) * 35;
+            return '<tr data-id="' + t.id + '" class="wt-entering" style="animation-delay:' + delay + 'ms">' + tds + '</tr>';
+        }
+        return '<tr data-id="' + t.id + '">' + tds + '</tr>';
     }
 
     // T-100:由 # 列调用打开详情抽屉,把当前可见行 id 顺序传过去支持上下翻
@@ -224,7 +228,12 @@ var WorkTable = (function() {
     }
 
     // ============ 主渲染 ============
-    function render() {
+    // T-109:opts.stagger 控制行入场动效;
+    //   true  → 行带 .wt-entering(用于首次加载 / 切 Tab / 切视图);
+    //   false → 静默更新(单元格编辑 / 拖拽 / 阿宝工具创建 / 列设置变更等高频路径,避免动效骚扰)
+    function render(opts) {
+        opts = opts || {};
+        var withStagger = !!opts.stagger;
         var cols = Work.columns();
         if (!cols || !cols.length) return;
         _refillFilter();
@@ -263,7 +272,7 @@ var WorkTable = (function() {
         var span = cols.length + 1;
         var group = _groupValue();
         var n = 0, body = '';
-        function block(list) { return list.map(function(t) { n++; return _rowHTML(t, n); }).join(''); }
+        function block(list) { return list.map(function(t) { n++; return _rowHTML(t, n, withStagger); }).join(''); }
 
         if (!group) {
             body = block(rows);
