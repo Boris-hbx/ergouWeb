@@ -274,10 +274,24 @@ var WorkDone = (function() {
         var styleAttr = withStagger
             ? ' style="animation-delay:' + (Math.min(idx, 20) * 28) + 'ms"'
             : '';
+        // T-119:协作者头像组(<=2,超出 +N)
+        var collabs = Array.isArray(t.collaborators) ? t.collaborators : [];
+        var collabHtml = '';
+        if (collabs.length > 0 && typeof Work !== 'undefined' && Work.colorOf) {
+            var shown = collabs.slice(0, 2);
+            var extra = collabs.length - shown.length;
+            collabHtml = '<span class="wt-collab-stack" title="协作者:' + _esc(collabs.join('、')) + '">'
+                + shown.map(function(c) {
+                    return '<span class="wt-avatar wt-avatar-xs" style="background:' + Work.colorOf(c) + '">' + _esc(('' + c).slice(0, 1)) + '</span>';
+                  }).join('')
+                + (extra > 0 ? '<span class="wt-collab-more">+' + extra + '</span>' : '')
+                + '</span>';
+        }
         return '<div class="wd-task' + entering + '"' + styleAttr + ' onclick="WorkDone.openDetail(' + t.id + ')">'
           +   '<span class="wd-task-title">' + _esc(t.title || '(无标题)') + '</span>'
           +   '<span class="wd-task-meta">'
           +     assigneeAvatar
+          +     collabHtml
           +     '<span class="wd-pill ' + prioCls + '">' + prioLabel + '</span>'
           +     (Array.isArray(t.tags) && t.tags.length
               ? '<span class="wd-tags-mini">' + t.tags.slice(0, 2).map(function(tg) { return '#' + _esc(tg); }).join(' ') + (t.tags.length > 2 ? ' +' + (t.tags.length - 2) : '') + '</span>'

@@ -55,6 +55,14 @@ var WorkCalendar = (function() {
             rows.filter(function(t) { return _matchesDay(t.due, mm, dd); })
                 .forEach(function(t) {
                     var s = WorkTable._statusBy(t.status);
+                    // T-119:主首字 + 协作者数(如 "陈+2" 表示主"陈" + 2 个协作者)
+                    var collabs = Array.isArray(t.collaborators) ? t.collaborators : [];
+                    var aPrefix = t.assignee ? WorkTable._esc(t.assignee.charAt(0)) : '';
+                    var collabSuffix = collabs.length > 0 ? '<span style="opacity:0.65">+' + collabs.length + '</span>' : '';
+                    var nameTag = (aPrefix || collabs.length > 0)
+                        ? '<span style="color:var(--primary-color);font-weight:600;margin-right:3px">' + aPrefix + collabSuffix + '</span>'
+                        : '';
+                    var titleAttr = t.title + (collabs.length ? ' (主:' + (t.assignee || '?') + ' + ' + collabs.join('、') + ')' : '');
                     // T-100:日历项单击打开详情抽屉
                     // T-102:加 draggable + dragstart/dragend(同一元素同时支持点和拖,HTML5 不冲突)
                     html += '<div class="wt-cal-task" data-id="' + t.id + '" '
@@ -62,8 +70,8 @@ var WorkCalendar = (function() {
                          +    'ondragstart="WorkCalendar._onDragStart(event,' + t.id + ')" '
                          +    'ondragend="WorkCalendar._onDragEnd(event)" '
                          +    'onclick="WorkCalendar._openDetail(' + t.id + ')" '
-                         +    'title="' + WorkTable._esc(t.title) + '">'
-                         +    WorkTable._esc(s.label.charAt(0)) + ' ' + WorkTable._esc(t.title)
+                         +    'title="' + WorkTable._esc(titleAttr) + '">'
+                         +    WorkTable._esc(s.label.charAt(0)) + ' ' + nameTag + WorkTable._esc(t.title)
                          +  '</div>';
                 });
             html += '</div>';

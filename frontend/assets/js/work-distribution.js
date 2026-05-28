@@ -68,11 +68,15 @@ var WorkDistribution = (function() {
         return { text: due.slice(5), cls: '' };
     }
 
-    // ── 维度:取 multi / select / status 列 ──
+    // ── 维度:取 multi / select / status 列 + T-119 注入虚拟「协作者」维度(multi) ──
     function _getDimensions() {
-        return Work.columns().filter(function(c) {
+        var dims = Work.columns().filter(function(c) {
             return c.type === 'multi' || c.type === 'select' || c.type === 'status';
         });
+        // T-119:协作者不在 work_columns 配置里,作为虚拟列注入
+        //   key 用 __collaborators 避免与用户自定义列名冲突
+        dims.push({ key: '__collaborators', name: '协作者', type: 'multi' });
+        return dims;
     }
 
     // ── 取一个任务在维度列下的值(返回数组,空数组 = 未标记) ──
@@ -80,6 +84,12 @@ var WorkDistribution = (function() {
     //   select/status:返回单元素数组
     function _getValues(task, col) {
         var key = col.key;
+        // T-119:虚拟「协作者」维度直读 task.collaborators
+        if (key === '__collaborators') {
+            return Array.isArray(task.collaborators)
+                ? task.collaborators.filter(function(v) { return v != null && ('' + v).trim() !== ''; })
+                : [];
+        }
         // 内置列读 task[key];自定义列读 task.customFields[key]
         var raw;
         if (key === 'status' || key === 'priority' || key === 'level' || key === 'freq' || key === 'assignee') {

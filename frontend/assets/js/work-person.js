@@ -25,13 +25,25 @@ var WorkPerson = (function() {
             .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
-    // ── 数据:按 assignee 分组,未指派永远末尾 ────
+    // ── 数据:按 assignee + collaborators 分组(T-119),未指派永远末尾 ────
+    //   主责任人卡:含该人 assignee 的所有任务(isCollab=false)
+    //   协作者卡:含 collaborators 中含该人的所有任务(isCollab=true,显示「协作」灰标)
+    //   同一任务可能同时出现在主卡和协作者卡,这是期望行为
     function _groupRows(rows) {
         var map = Object.create(null);
+        function _push(name, task, isCollab) {
+            if (!map[name]) map[name] = [];
+            map[name].push({ task: task, isCollab: !!isCollab });
+        }
         rows.forEach(function(t) {
             var name = (t.assignee && ('' + t.assignee).trim()) ? t.assignee : UNASSIGNED;
-            if (!map[name]) map[name] = [];
-            map[name].push(t);
+            _push(name, t, false);
+            // T-119:协作者也按各自姓名 push,标记 isCollab=true
+            if (Array.isArray(t.collaborators)) {
+                t.collaborators.forEach(function(c) {
+                    if (c && c !== name) _push(c, t, true);
+                });
+            }
         });
         // 维持入场顺序;未指派单独放末尾
         var names = Object.keys(map).filter(function(n) { return n !== UNASSIGNED; });
@@ -89,17 +101,23 @@ var WorkPerson = (function() {
         return Math.max(1, Math.floor((b - a) / 86400000));
     }
 
-    // ── 气泡颜色分类(spec § 6.4 优先级:逾期 > P0 > 正常 > 仅低优) ──
+    // ── 气泡颜色分类(spec § 6.4 优先级:逾期 > P0 > 正常 > 仅低优)
+    //   T-119:tasks 现在是 [{task, isCollab}];颜色**只看主责任人那部分**(isCollab=false),
+    //         避免协作者卡因为别人那条逾期任务而显红
     function _bubbleClass(group) {
         if (group.name === UNASSIGNED) return 'wt-bubble-low';
-        var hasOverdue = group.tasks.some(function(t) {
+        var primary = group.tasks.filter(function(it) { return !it.isCollab; });
+        // 协作者卡 primary 为空时,降级看协作任务的颜色
+        var pool = primary.length > 0 ? primary : group.tasks;
+        var hasOverdue = pool.some(function(it) {
+            var t = it.task;
             var due = _normalizeDue(t.due);
             return t.status !== 'done' && due && due < _todayYMD();
         });
         if (hasOverdue) return 'wt-bubble-overdue';
-        var hasP0 = group.tasks.some(function(t) { return t.priority === 'high'; });
+        var hasP0 = pool.some(function(it) { return it.task.priority === 'high'; });
         if (hasP0) return 'wt-bubble-p0';
-        var onlyLow = group.tasks.every(function(t) { return t.priority === 'low'; });
+        var onlyLow = pool.every(function(it) { return it.task.priority === 'low'; });
         if (onlyLow) return 'wt-bubble-low';
         return 'wt-bubble-normal';
     }
@@ -111,16 +129,22 @@ var WorkPerson = (function() {
         return Math.round(min + (max - min) * t);
     }
 
-    function _overdueCount(tasks) {
+    function _overdueCount(items) {
         var today = _todayYMD();
-        return tasks.filter(function(t) {
+        return items.filter(function(it) {
+            var t = it.task;
             var due = _normalizeDue(t.due);
             return t.status !== 'done' && due && due < today;
         }).length;
     }
 
-    function _p0Count(tasks) {
-        return tasks.filter(function(t) { return t.priority === 'high'; }).length;
+    function _p0Count(items) {
+        return items.filter(function(it) { return it.task.priority === 'high'; }).length;
+    }
+
+    // T-119:协作任务数(用于统计行"协作 N 件")
+    function _collabCount(items) {
+        return items.filter(function(it) { return it.isCollab; }).length;
     }
 
     // ============ 主渲染 ============
@@ -185,22 +209,30 @@ var WorkPerson = (function() {
         card.dataset.person = g.name;
         var overdue = _overdueCount(g.tasks);
         var p0 = _p0Count(g.tasks);
+        var collabN = _collabCount(g.tasks);   // T-119:协作任务数
         var statsHtml =
             '<span class="wt-person-stats-total">' + g.tasks.length + ' 任务</span>'
           + (overdue ? '<span class="wt-person-stats-overdue">⏰ ' + overdue + ' 逾期</span>' : '')
-          + (p0      ? '<span class="wt-person-stats-p0">⚡ ' + p0 + ' P0</span>' : '');
+          + (p0      ? '<span class="wt-person-stats-p0">⚡ ' + p0 + ' P0</span>' : '')
+          + (collabN ? '<span class="wt-person-stats-collab">🤝 ' + collabN + ' 协作</span>' : '');
         var avatarBg = Work.colorOf(g.name);
         var initial = _initialOf(g.name);
 
-        var taskListHtml = g.tasks.map(function(t) {
+        // T-119:tasks 现在是 [{task, isCollab}];协作任务行右上加灰「协作」标
+        var taskListHtml = g.tasks.map(function(it) {
+            var t = it.task;
             var due = _dueLabel(t);
             var p0Pill = (t.priority === 'high') ? '<span class="wt-person-pill wt-person-pill-p0">P0</span>' : '';
+            var collabPill = it.isCollab ? '<span class="wt-person-pill wt-person-pill-collab" title="协作者">协作</span>' : '';
             var doneCls = (t.status === 'done') ? ' wt-person-task-done' : '';
-            return '<div class="wt-person-task' + doneCls + '" '
-                +    'draggable="true" data-tid="' + t.id + '" data-from="' + _esc(g.name) + '">'
+            var collabCls = it.isCollab ? ' wt-person-task-collab' : '';
+            return '<div class="wt-person-task' + doneCls + collabCls + '" '
+                +    (it.isCollab ? '' : 'draggable="true" ')   // T-119:协作任务不允许从此卡拖走(转交语义只走主责任人卡)
+                +    'data-tid="' + t.id + '" data-from="' + _esc(g.name) + '">'
                 +    '<div class="wt-person-check" data-tid="' + t.id + '"></div>'
                 +    '<div class="wt-person-task-title" data-tid="' + t.id + '">' + _esc(t.title || '(无标题)') + '</div>'
                 +    '<div class="wt-person-task-meta">'
+                +      collabPill
                 +      p0Pill
                 +      '<span class="wt-person-pill ' + due.cls + '">' + _esc(due.text) + '</span>'
                 +    '</div>'

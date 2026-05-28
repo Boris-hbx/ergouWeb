@@ -89,6 +89,19 @@ var WorkBoard = (function() {
               + 'onclick="event.stopPropagation();WorkTable.openText(' + t.id + ',\'desc\')" '
               + 'title="查看简介">📄</span>'
             : '';
+        // T-119:协作者头像组(<=3,超出 +N)
+        var collabs = Array.isArray(t.collaborators) ? t.collaborators : [];
+        var collabHtml = '';
+        if (collabs.length > 0) {
+            var shown = collabs.slice(0, 3);
+            var extra = collabs.length - shown.length;
+            collabHtml = '<span class="wt-collab-stack" title="协作者:' + esc(collabs.join('、')) + '">'
+                + shown.map(function(c) {
+                    return '<span class="wt-avatar wt-avatar-xs" style="background:' + Work.colorOf(c) + '">' + esc(('' + c).slice(0, 1)) + '</span>';
+                  }).join('')
+                + (extra > 0 ? '<span class="wt-collab-more">+' + extra + '</span>' : '')
+                + '</span>';
+        }
         // T-100:卡片点击(空白处)打开详情;内部 desc 图标依然 stopPropagation 走原弹层。
         return '<div class="wt-card" draggable="true" data-id="' + t.id + '" '
             +    'onclick="WorkBoard._openFromCard(event,' + t.id + ')">'
@@ -96,6 +109,7 @@ var WorkBoard = (function() {
             +   '<div class="wt-card-meta">'
             +     WorkTable._avatar(t.assignee || '?')
             +     '<span style="font-size:.8rem;color:var(--text-secondary)">' + esc(t.assignee || '—') + '</span>'
+            +     collabHtml
             +     (t.level ? '<span class="wt-pill wt-lv">' + esc(t.level) + '</span>' : '')
             +     (t.freq  ? '<span class="wt-pill wt-fq">' + esc(t.freq)  + '</span>' : '')
             +     descIcon

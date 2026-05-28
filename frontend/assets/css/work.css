@@ -224,6 +224,60 @@ table.wt-table {
   display: flex; align-items: center; justify-content: center;
   font-size: 0.66rem; font-weight: 700; color: #fff;
 }
+
+/* T-119:协作者头像组(stacked,小一号)+ +N 标签 */
+.wt-avatar-xs {
+  width: 16px; height: 16px; flex: 0 0 16px;
+  font-size: 0.58rem;
+  border: 1.5px solid #fff;
+}
+.wt-avatar-sm {
+  width: 18px; height: 18px; flex: 0 0 18px;
+  font-size: 0.6rem;
+  border: 1.5px solid #fff;
+}
+.wt-collab-stack {
+  display: inline-flex; align-items: center;
+  margin-left: 2px;
+}
+.wt-collab-stack .wt-avatar-xs,
+.wt-collab-stack .wt-avatar-sm {
+  margin-left: -5px;   /* 头像 stack 重叠 */
+}
+.wt-collab-stack .wt-avatar-xs:first-child,
+.wt-collab-stack .wt-avatar-sm:first-child {
+  margin-left: 0;
+}
+.wt-collab-more {
+  font-size: 10.5px; color: var(--text-muted, #6B7280);
+  background: #F5F2FB;
+  padding: 1px 6px; border-radius: 8px;
+  margin-left: 4px;
+  font-weight: 500;
+}
+.wt-d-collab-text {
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+/* T-119 人员视图:协作任务的灰色「协作」pill + 任务行底色 */
+.wt-person-pill-collab {
+  background: #F3F4F6;
+  color: #6B7280;
+  font-weight: 500;
+}
+.wt-person-task-collab {
+  background: rgba(124, 77, 255, 0.03);
+  border-left: 2px solid rgba(124, 77, 255, 0.30);
+  padding-left: 5px;
+}
+.wt-person-stats-collab {
+  color: var(--primary-color, #7C4DFF);
+  background: rgba(124, 77, 255, 0.08);
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-weight: 600;
+}
 .wt-due { font-variant-numeric: tabular-nums; }
 .wt-due.overdue { color: var(--danger-color); font-weight: 600; }
 /* T-098: 逾期徽章(在截止日单元格内,任务 due < today && status != done 时显示) */

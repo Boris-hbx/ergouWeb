@@ -328,6 +328,17 @@ fn run_migrations(conn: &Connection) {
         .ok();
     }
 
+    // T-119:work_tasks.collaborators 字段(Linear 风格"主+协")
+    let has_collaborators: bool = conn
+        .prepare("SELECT collaborators FROM work_tasks LIMIT 1")
+        .is_ok();
+    if !has_collaborators {
+        conn.execute_batch(
+            "ALTER TABLE work_tasks ADD COLUMN collaborators TEXT NOT NULL DEFAULT '[]';",
+        )
+        .ok();
+    }
+
     // T-107 v0.2:status enum 迁移 'drafting' → 'collecting'(无报告) / 'editing'(有报告)。
     // 幂等:跑过后 drafting 已被替换,WHERE 不再命中。
     // 注:SQLite 不强制 enum,这里只是把字符串值改对。
@@ -889,6 +900,7 @@ fn create_tables(conn: &Connection) {
             due_date      TEXT,
             progress      INTEGER NOT NULL DEFAULT 0,
             tags          TEXT    NOT NULL DEFAULT '[]',
+            collaborators TEXT    NOT NULL DEFAULT '[]',
             custom_fields TEXT    NOT NULL DEFAULT '{}',
             sort_order    REAL    NOT NULL DEFAULT 0,
             created_at    TEXT    NOT NULL,

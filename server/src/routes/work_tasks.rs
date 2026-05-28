@@ -40,6 +40,8 @@ pub struct QueryFilters {
     pub due_after: Option<String>,
     /// `true` = due_date < today AND status ≠ done
     pub has_overdue: Option<bool>,
+    /// T-119:按协作者筛选(模糊 JSON LIKE);精确单值
+    pub collaborator: Option<String>,
     /// 默认 None → 不限制(返回全部,与 GET /api/work/tasks 原始行为兼容);
     /// LLM 工具默认填 10;上限 50。
     pub limit: Option<i64>,
@@ -96,6 +98,8 @@ fn row_to_task(row: &rusqlite::Row) -> rusqlite::Result<WorkTask> {
     let custom_raw: String = row.get(11)?;
     let tags_raw: String = row.get(14)?;
     let tags: Vec<String> = serde_json::from_str(&tags_raw).unwrap_or_default();
+    let collab_raw: String = row.get(15)?;
+    let collaborators: Vec<String> = serde_json::from_str(&collab_raw).unwrap_or_default();
     Ok(WorkTask {
         id: row.get(0)?,
         title: row.get(1)?,
@@ -112,12 +116,13 @@ fn row_to_task(row: &rusqlite::Row) -> rusqlite::Result<WorkTask> {
         created_at: row.get(12)?,
         updated_at: row.get(13)?,
         tags,
+        collaborators,
     })
 }
 
-// T-110:SELECT_COLS 末尾追加 tags(放最后避免重排其它列索引)
+// T-110:SELECT_COLS 末尾追加 tags;T-119:再追加 collaborators(末尾保持向前兼容)
 const SELECT_COLS: &str =
-    "id, title, desc, assignee, level, freq, status, priority, due_date, progress, sort_order, custom_fields, created_at, updated_at, tags";
+    "id, title, desc, assignee, level, freq, status, priority, due_date, progress, sort_order, custom_fields, created_at, updated_at, tags, collaborators";
 
 // ============ impl 函数(给 HTTP + 工具复用) ============
 
@@ -179,6 +184,13 @@ pub fn query_tasks_impl(
             "due_date IS NOT NULL AND due_date < ?{idx} AND status != 'done'"
         ));
         params_v.push(Box::new(today));
+        idx += 1;
+    }
+    // T-119:按协作者筛选(JSON LIKE 模糊匹配,collaborators 存为 '["a","b"]' 形式)
+    if let Some(v) = f.collaborator.as_deref().filter(|s| !s.is_empty()) {
+        // JSON 数组里搜 "name" 字面(带引号定界,避免 substr 误匹配)
+        conditions.push(format!("collaborators LIKE ?{idx}"));
+        params_v.push(Box::new(format!("%\"{}\"%", v.replace('"', "\\\""))));
         // idx not used after this
     }
 
@@ -249,6 +261,14 @@ pub fn create_task_impl(
 
     // T-110:tags 也存为 JSON 字符串
     let tags_str = serde_json::to_string(&req.tags).unwrap_or_else(|_| "[]".to_string());
+    // T-119:协作者 + 去重(若与主责任人同名则剔除)
+    let collab_clean: Vec<String> = req
+        .collaborators
+        .iter()
+        .filter(|c| !c.is_empty() && c.as_str() != req.assignee.as_str())
+        .cloned()
+        .collect();
+    let collab_str = serde_json::to_string(&collab_clean).unwrap_or_else(|_| "[]".to_string());
 
     let next_sort: f64 = db
         .query_row(
@@ -263,8 +283,8 @@ pub fn create_task_impl(
     db.execute(
         "INSERT INTO work_tasks
            (user_id, title, desc, assignee, level, freq, status, priority,
-            due_date, progress, custom_fields, tags, sort_order, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?14)",
+            due_date, progress, custom_fields, tags, collaborators, sort_order, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?15)",
         params![
             user_id,
             &req.title,
@@ -278,6 +298,7 @@ pub fn create_task_impl(
             req.progress,
             &custom_str,
             &tags_str,
+            &collab_str,
             next_sort,
             &now,
         ],
@@ -324,6 +345,8 @@ pub fn update_task_impl(
             }
         };
     }
+    // T-119:在 push_str! 把 patch.assignee 移走前,先保留一份用于 collaborators 去重
+    let new_assignee = patch.assignee.clone();
     push_str!("title", patch.title);
     push_str!("desc", patch.desc);
     push_str!("assignee", patch.assignee);
@@ -381,6 +404,27 @@ pub fn update_task_impl(
     if let Some(patch_tags) = patch.tags {
         let s = serde_json::to_string(&patch_tags).unwrap_or_else(|_| "[]".into());
         sets.push("tags = ?");
+        vals.push(Box::new(s));
+    }
+    // T-119:collaborators 整体替换;若与新 assignee 同名,后端去重(防客户端漏过滤)
+    if let Some(patch_collab) = patch.collaborators {
+        let effective_assignee = new_assignee
+            .clone()
+            .or_else(|| {
+                db.query_row(
+                    "SELECT assignee FROM work_tasks WHERE id = ?1 AND user_id = ?2",
+                    params![id, user_id],
+                    |r| r.get::<_, String>(0),
+                )
+                .ok()
+            })
+            .unwrap_or_default();
+        let clean: Vec<String> = patch_collab
+            .into_iter()
+            .filter(|c| !c.is_empty() && c != &effective_assignee)
+            .collect();
+        let s = serde_json::to_string(&clean).unwrap_or_else(|_| "[]".into());
+        sets.push("collaborators = ?");
         vals.push(Box::new(s));
     }
 
@@ -921,6 +965,190 @@ mod tests {
             .unwrap();
         let j = body_json(resp).await;
         assert_eq!(j["item"]["tags"].as_array().unwrap().len(), 0);
+    }
+
+    // ============ T-119:collaborators 字段测试 ============
+
+    #[tokio::test]
+    async fn create_with_collaborators_persists() {
+        let state = test_state();
+        let (_uid, token) = create_test_user(&state, "t119a", "Pa55word1");
+        let cookie = auth_cookie(&token);
+        let app = crate::build_app(state);
+
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/work/tasks")
+                    .header("Cookie", &cookie)
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(r#"{"title":"所务会","assignee":"陈大民","collaborators":["王主任","李秘书"]}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let j = body_json(resp).await;
+        assert_eq!(j["success"], true);
+        let collab = j["item"]["collaborators"].as_array().unwrap();
+        assert_eq!(collab.len(), 2);
+        assert!(collab.contains(&json!("王主任")));
+        assert!(collab.contains(&json!("李秘书")));
+    }
+
+    #[tokio::test]
+    async fn patch_collaborators_replaces() {
+        let state = test_state();
+        let (_uid, token) = create_test_user(&state, "t119b", "Pa55word1");
+        let cookie = auth_cookie(&token);
+        let app = crate::build_app(state);
+
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/work/tasks")
+                    .header("Cookie", &cookie)
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(r#"{"title":"x","assignee":"陈","collaborators":["a","b","c"]}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let id = body_json(resp).await["item"]["id"].as_i64().unwrap();
+
+        // PATCH 替换为 ["d"]
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("PATCH")
+                    .uri(format!("/api/work/tasks/{id}"))
+                    .header("Cookie", &cookie)
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(r#"{"collaborators":["d"]}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let j = body_json(resp).await;
+        let collab = j["item"]["collaborators"].as_array().unwrap();
+        assert_eq!(collab.len(), 1);
+        assert_eq!(collab[0], "d");
+    }
+
+    #[tokio::test]
+    async fn collaborator_equal_to_assignee_is_deduped_on_create() {
+        // 创建时 collaborators 含主责任人 → 后端自动去重
+        let state = test_state();
+        let (_uid, token) = create_test_user(&state, "t119c", "Pa55word1");
+        let cookie = auth_cookie(&token);
+        let app = crate::build_app(state);
+
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/work/tasks")
+                    .header("Cookie", &cookie)
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(r#"{"title":"x","assignee":"陈","collaborators":["陈","王"]}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let j = body_json(resp).await;
+        let collab = j["item"]["collaborators"].as_array().unwrap();
+        assert_eq!(collab.len(), 1, "主责任人应自动从 collaborators 去重");
+        assert_eq!(collab[0], "王");
+    }
+
+    #[tokio::test]
+    async fn patch_assignee_dedupes_existing_collaborator() {
+        // PATCH 把 assignee 改成 "王",而 collaborators 已含 "王" → 去重
+        let state = test_state();
+        let (_uid, token) = create_test_user(&state, "t119d", "Pa55word1");
+        let cookie = auth_cookie(&token);
+        let app = crate::build_app(state);
+
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/work/tasks")
+                    .header("Cookie", &cookie)
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(r#"{"title":"x","assignee":"陈","collaborators":["王","李"]}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let id = body_json(resp).await["item"]["id"].as_i64().unwrap();
+
+        // PATCH:换主责任人为"王",同时显式更新 collaborators(含"王")
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("PATCH")
+                    .uri(format!("/api/work/tasks/{id}"))
+                    .header("Cookie", &cookie)
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(r#"{"assignee":"王","collaborators":["王","李","陈"]}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let j = body_json(resp).await;
+        let collab = j["item"]["collaborators"].as_array().unwrap();
+        // "王" 应被去重(因为是新 assignee);"李"、"陈"保留
+        assert!(!collab.iter().any(|v| v == "王"));
+        assert!(collab.iter().any(|v| v == "李"));
+        assert!(collab.iter().any(|v| v == "陈"));
+        assert_eq!(j["item"]["assignee"], "王");
+    }
+
+    #[tokio::test]
+    async fn query_filter_by_collaborator() {
+        let state = test_state();
+        let (_uid, token) = create_test_user(&state, "t119e", "Pa55word1");
+        let cookie = auth_cookie(&token);
+        let app = crate::build_app(state);
+
+        // 3 条:王主任协作 2 条,李秘书协作 1 条
+        for body in [
+            r#"{"title":"a","assignee":"陈","collaborators":["王主任","李秘书"]}"#,
+            r#"{"title":"b","assignee":"赵","collaborators":["王主任"]}"#,
+            r#"{"title":"c","assignee":"孙","collaborators":["李秘书"]}"#,
+        ] {
+            let _ = app.clone()
+                .oneshot(
+                    Request::builder()
+                        .method("POST")
+                        .uri("/api/work/tasks")
+                        .header("Cookie", &cookie)
+                        .header("Content-Type", "application/json")
+                        .body(Body::from(body))
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+        }
+
+        // 按 collaborator=王主任 筛选 → 2 条
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/work/tasks?collaborator=王主任")
+                    .header("Cookie", &cookie)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let j = body_json(resp).await;
+        let items = j["items"].as_array().unwrap();
+        assert_eq!(items.len(), 2);
     }
 
     // ============ T-101:query 过滤器测试 ============

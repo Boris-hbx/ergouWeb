@@ -1,4 +1,4 @@
-const CACHE_NAME = 'next-v43';
+const CACHE_NAME = 'next-v44';
 
 // Global error handlers
 self.addEventListener('error', event => {

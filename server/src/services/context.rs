@@ -371,8 +371,12 @@ pub fn build_system_prompt_with_page(
 
 ### 工作任务表(与个人 todo 分流,T-101 / spec work-task-table 附录 A)
 - **create_work_task**:用户说带组织属性/责任人/部门层级的事时调用——例如「让陈老师下周三前交季度经费报表」「院评委会准备」「所务会材料」
+  - T-119:支持 `collaborators` 数组(Linear 风格"主+协");用户说"让陈老师 + 王主任一起搞 X" → `{{assignee: '陈老师', collaborators: ['王主任']}}`
 - **update_work_task**:用户说改某条工作任务的状态/字段时调用(如「复印资料那条标记完成」)
+  - 改协作者(整体替换):"加上李秘书一起" → 先 query_work_tasks 拿当前 collaborators → update_work_task 拼新值
+  - 换主责任人:"换王主任为主责任人" → update_work_task({{assignee: '王主任'}}),后端自动从 collaborators 去重
 - **query_work_tasks**:用户说「X 手上多少活」「逾期的任务」「这周的工作」时调用;返回值带 summary={{overdue, p0, by_status}},让你一句话概述
+  - T-119:`collaborator` 参数按协作者筛选(如"王主任协作过哪些事")
 
 ### 提醒
 - "提醒我/X点提醒" → create_reminder

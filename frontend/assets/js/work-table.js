@@ -90,10 +90,26 @@ var WorkTable = (function() {
                 +    'onclick="WorkTable.editText(' + t.id + ',\'title\')">' + title + '</td>';
         }
         if (k === 'assignee') {
+            // T-119:主责任人头像 + 协作者头像组(<=3,超出 +N);点击仍走 editText 改主责任人
+            //   编辑协作者通过抽屉的「🤝 协作者」字段(走 WorkTable.editCollaborators)
             var name = v || '—';
+            var collabs = Array.isArray(t.collaborators) ? t.collaborators : [];
+            var collabHtml = '';
+            if (collabs.length > 0) {
+                var shown = collabs.slice(0, 3);
+                var extra = collabs.length - shown.length;
+                collabHtml = '<span class="wt-collab-stack" title="协作者:' + _esc(collabs.join('、')) + '">'
+                    + shown.map(function(c) {
+                        return '<span class="wt-avatar wt-avatar-xs" style="background:' + _avatarColor(c) + '">' + _esc(('' + c).slice(0, 1)) + '</span>';
+                      }).join('')
+                    + (extra > 0 ? '<span class="wt-collab-more">+' + extra + '</span>' : '')
+                    + '</span>';
+            }
             return '<td class="wt-editable" onclick="WorkTable.editText(' + t.id + ',\'assignee\')">'
                 +    '<span class="wt-assignee">' + _avatarHTML(v || '?')
-                +    '<span class="wt-aname">' + _esc(name) + '</span></span></td>';
+                +    '<span class="wt-aname">' + _esc(name) + '</span>'
+                +    collabHtml
+                +    '</span></td>';
         }
         if (k === 'priority') {
             var p = _prioBy(t.priority);
@@ -606,6 +622,43 @@ var WorkTable = (function() {
         _rs = null;
     }
 
+    // T-119:协作者多选编辑(候选来自所有现存 assignee+collaborators 去重,剔除当前主责任人)
+    function editCollaborators(id) {
+        var t = Work.rowById(id);
+        if (!t) return;
+        var names = {};
+        Work.rows().forEach(function(r) {
+            if (r.assignee) names[r.assignee] = 1;
+            if (Array.isArray(r.collaborators)) {
+                r.collaborators.forEach(function(c) { if (c) names[c] = 1; });
+            }
+        });
+        if (t.assignee) delete names[t.assignee];   // 不允许主责任人当协作者
+        var options = Object.keys(names).sort().map(function(n) { return { key: n, label: n }; });
+        if (options.length === 0) {
+            if (typeof showToast === 'function') {
+                showToast('还没有候选协作者 — 先去其它任务填责任人', 'info');
+            }
+            return;
+        }
+        var anchor = document.getElementById('wt-d-field-collaborators')
+                  || document.querySelector('#wt-table-view tr[data-id="' + id + '"] .wt-assignee')
+                  || document.body;
+        var current = Array.isArray(t.collaborators) ? t.collaborators.slice() : [];
+        WorkPick.open({
+            anchor: anchor,
+            options: options,
+            current: current,
+            isMulti: true,
+            onConfirm: function(chosen) {
+                var clean = (chosen || []).filter(function(n) {
+                    return n && n !== t.assignee;
+                });
+                Work.updateRow(id, { collaborators: clean });
+            }
+        });
+    }
+
     return {
         render: render,
         addRow: addRow,
@@ -613,6 +666,7 @@ var WorkTable = (function() {
         editDate: editDate,   // T-104
         editNumber: editNumber,
         editProgress: editProgress,
+        editCollaborators: editCollaborators,   // T-119
         toggleCheck: toggleCheck,
         openPick: openPick,
         openText: openText,

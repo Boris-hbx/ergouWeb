@@ -3271,6 +3271,11 @@ fn tool_create_work_task(db: &Connection, user_id: &str, input: &Value) -> Value
         due_date: opt_string(input, "due_date").filter(|s| !s.is_empty()),
         progress: input["progress"].as_i64().unwrap_or(0) as i32,
         tags: Vec::new(),  // T-110:LLM 工具暂不传 tags(P2 加,届时 schema 字段已就绪)
+        // T-119:支持 collaborators 数组(主+协 Linear 风格)
+        collaborators: input["collaborators"]
+            .as_array()
+            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+            .unwrap_or_default(),
         custom_fields: None,
     };
     match create_task_impl(db, user_id, &req) {
@@ -3301,6 +3306,11 @@ fn tool_update_work_task(db: &Connection, user_id: &str, input: &Value) -> Value
         due_date: opt_string(input, "due_date"), // 空字符串 = 清空(impl 已处理)
         progress: input["progress"].as_i64().map(|n| n as i32),
         tags: None,  // T-110:LLM 工具暂不改 tags(P2 加)
+        // T-119:支持 collaborators 整体替换(传 [] 清空,不传保持不变)
+        collaborators: input
+            .get("collaborators")
+            .and_then(|v| v.as_array())
+            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect()),
         custom_fields: None,
         sort_order: None,
     };
@@ -3328,6 +3338,8 @@ fn tool_query_work_tasks(db: &Connection, user_id: &str, input: &Value) -> Value
         due_before: opt_string(input, "due_before"),
         due_after: opt_string(input, "due_after"),
         has_overdue: input["has_overdue"].as_bool(),
+        // T-119:按协作者筛选
+        collaborator: opt_string(input, "collaborator"),
         // LLM 默认拿 10 条,避免回复过长(spec § A.1)
         limit: Some(input["limit"].as_i64().unwrap_or(10).clamp(1, 50)),
     };

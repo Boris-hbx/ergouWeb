@@ -46,6 +46,10 @@ pub struct WorkTask {
     /// (用户自定义的 multi 列仍走 custom_fields;只有内置「标签」走此独立字段。)
     #[serde(default)]
     pub tags: Vec<String>,
+    /// T-119:协作者(Linear 风格"主+协")。assignee 是主责任人(单值);
+    /// collaborators 是协作者数组,纯文本标识,不关联账号。
+    #[serde(default)]
+    pub collaborators: Vec<String>,
     /// Custom column values: { column_key: string_value }.
     /// For multi-select custom cols, the value is a JSON array of strings.
     #[serde(rename = "customFields", default)]
@@ -84,6 +88,9 @@ pub struct CreateWorkTaskRequest {
     /// T-110:内置「标签」列(builtin=true, multi 类型)对应的字段。
     #[serde(default)]
     pub tags: Vec<String>,
+    /// T-119:协作者数组(Linear 风格;assignee 是主责任人,collaborators 是参与方)
+    #[serde(default)]
+    pub collaborators: Vec<String>,
     #[serde(rename = "customFields", default)]
     pub custom_fields: Option<Map<String, JsonValue>>,
 }
@@ -104,6 +111,8 @@ pub struct UpdateWorkTaskRequest {
     pub progress: Option<i32>,
     /// T-110:内置「标签」列(builtin=true, multi 类型) — 整体替换,不 merge(语义同 status/level 等单选)。
     pub tags: Option<Vec<String>>,
+    /// T-119:协作者数组(整体替换,不 merge)
+    pub collaborators: Option<Vec<String>>,
     #[serde(rename = "customFields")]
     pub custom_fields: Option<Map<String, JsonValue>>,
     pub sort_order: Option<f64>,
@@ -143,6 +152,7 @@ mod tests {
             due_date: Some("05-25".into()),
             progress: 0,
             tags: Vec::new(),
+            collaborators: Vec::new(),
             custom_fields: Map::new(),
             sort_order: 0.0,
             created_at: String::new(),

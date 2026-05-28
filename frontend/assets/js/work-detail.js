@@ -118,6 +118,22 @@ var WorkDetail = (function() {
             avaEl.style.background = Work.colorOf(name);
         }
         _setField('wt-d-assignee', t.assignee, '未指派');
+
+        // T-119:协作者头像组 + 文字摘要
+        var collabs = Array.isArray(t.collaborators) ? t.collaborators : [];
+        var collabStack = document.getElementById('wt-d-collab-stack');
+        var collabText = document.getElementById('wt-d-collab-text');
+        if (collabStack) {
+            collabStack.innerHTML = collabs.slice(0, 4).map(function(n) {
+                return '<span class="wt-avatar wt-avatar-sm" style="background:' + Work.colorOf(n) + '" title="' + (n || '').replace(/"/g, '&quot;') + '">' + (n || '?').slice(0, 1) + '</span>';
+            }).join('');
+        }
+        if (collabText) {
+            if (collabs.length === 0) collabText.textContent = '—';
+            else if (collabs.length === 1) collabText.textContent = collabs[0];
+            else collabText.textContent = collabs[0] + ' 等 ' + collabs.length + ' 人';
+        }
+
         _setField('wt-d-level', t.level, '—');
         _setField('wt-d-freq', t.freq, '—');
         _setField('wt-d-priority-field', p.label, '—');
@@ -131,6 +147,7 @@ var WorkDetail = (function() {
 
         // 字段点击 → 复用 WorkTable 的编辑通道
         _bindFieldClick('wt-d-field-assignee', function(ev) { WorkTable.editText(t.id, 'assignee'); });
+        _bindFieldClick('wt-d-field-collaborators', function(ev) { WorkTable.editCollaborators(t.id); });
         _bindFieldClick('wt-d-field-level',    function(ev) { WorkTable.openPick(t.id, 'level',    document.getElementById('wt-d-field-level')); });
         _bindFieldClick('wt-d-field-freq',     function(ev) { WorkTable.openPick(t.id, 'freq',     document.getElementById('wt-d-field-freq')); });
         _bindFieldClick('wt-d-field-priority', function(ev) { WorkTable.openPick(t.id, 'priority', document.getElementById('wt-d-field-priority')); });
