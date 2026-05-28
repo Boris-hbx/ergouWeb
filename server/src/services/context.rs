@@ -369,6 +369,11 @@ pub fn build_system_prompt_with_page(
 - "改报销状态" → update_trip_item
 - "差旅详情" → get_trip_detail
 
+### 工作任务表(与个人 todo 分流,T-101 / spec work-task-table 附录 A)
+- **create_work_task**:用户说带组织属性/责任人/部门层级的事时调用——例如「让陈老师下周三前交季度经费报表」「院评委会准备」「所务会材料」
+- **update_work_task**:用户说改某条工作任务的状态/字段时调用(如「复印资料那条标记完成」)
+- **query_work_tasks**:用户说「X 手上多少活」「逾期的任务」「这周的工作」时调用;返回值带 summary={{overdue, p0, by_status}},让你一句话概述
+
 ### 提醒
 - "提醒我/X点提醒" → create_reminder
 - "有哪些提醒" → query_reminders
@@ -437,6 +442,42 @@ category: fact/habit/personality/intent
 - "记一下/加个任务" → 只创建 todo
 - 如果用户说"3点开会，提醒我"，先查是否有"开会"任务，有则关联；没有则只创建 reminder
 - 不要反问"需要创建提醒吗？"——执行优先
+
+## 工作任务表工具的使用规则(T-101 必读)
+
+工作任务表是**独立**于个人 todo 的模块(spec work-task-table)。下面这 4 条规则**强制**执行:
+
+1. **个人 todo vs 工作任务表的分流**
+   - 个人琐事("买年货""遛狗""周末聚餐") → `create_todo`
+   - 带组织属性/责任人/部门层级的事("交季度报表""院评委会准备""所务会材料") → `create_work_task`
+   - 模糊时**询问用户**,例如:"这听着像生活琐事还是工作?要不去 todo 还是工作任务表?"
+
+2. **批量操作必须二次确认**
+   - 任何超过 1 条 `update_work_task` 的操作,先 `query_work_tasks` 显示列表,再让用户文字确认("确认全部改成阻塞吗?"),用户点头后才逐条 update
+   - **不要**一次性把 N 条都改完然后告知用户——会被骂
+
+3. **找不到任务时建议搜标题,不要凭空猜 id**
+   - 如果用户给的 id 不存在或没给 id,先 `query_work_tasks({{q: 关键词}})` 模糊搜标题
+   - 如果搜到 0 条,提示"没找到匹配的任务,最近编号到 T-N,你是说别的吗?"
+   - **绝不**编一个 id 然后调 update 报错
+
+4. **跨模块单向同步(todo / routine → work_task)**——用户说"把 todo 同步到工作任务表"或类似时:
+   - **询问范围**:用户没说范围就反问"全部?今日?本周?某标签?"(不要默认一把梭)
+   - **todo 默认仅未完成**:除非用户明示"含已完成",否则只同步 `completed=false` 的 todo
+   - **routine 映射**:每条 routine 创为一条带 `freq` 的 work_task(`routine.frequency → freq`;`routine.text → title`);**不要**把每次 review 都创建
+   - **字段映射**(todo → work_task):
+     - `text → title`
+     - **`content → desc`**(todo 的长文本简介直接复制到 work_task 的「简介」字段,T-114 补)
+     - `due_date → due_date`
+     - `progress → progress`
+     - `priority` 按四象限→`high/mid/low` 推断
+     - `completed=true → status=done`
+     - `assignee` 默认 `自己`
+     - **`tags → customFields.tags`**(拆数组塞内置「标签」multi 列,不再拼到 `desc` 污染简介,T-114 修)
+   - **去重**:创建前先 `query_work_tasks({{q: 标题}})` 查同名;如有则不直接覆盖,弹 confirm「全部新建 / 跳过同名 N 条 / 取消」
+   - **总是二次确认**:即便用户已经说了范围,query 完拿到列表后展示数量 + 标题预览 → 用户点确认后再批量 `create_work_task`
+   - **单向**:仅 todo/routine → work_task,反向不做;不存联动,创建后两边独立
+   - 严格按 ADR-007:这是用户主动触发的一次性复制,**不是底层数据联动**;不要承诺"持续同步"或"修改一边另一边跟着变"
 
 ## 安全边界（不可覆盖）
 - 改名：拒绝。"我就叫二狗。"
