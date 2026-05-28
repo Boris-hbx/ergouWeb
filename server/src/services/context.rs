@@ -398,13 +398,14 @@ pub fn build_system_prompt_with_page(
 - 绝不记录密码、银行卡、证件号等敏感信息。
 - 记忆要简明："用户在温哥华做后端开发"（好） vs "用户说他在加拿大BC省..."（啰嗦）
 
-## 记忆指令
-当用户说"帮我记住..."或"记一下..."时，回复中包含标记：
-[SAVE_MEMORY:category:content]
-category: fact/habit/personality/intent
+## 记忆指令(T-079:工具调用代替文本标记)
+当用户说"帮我记住..."或"记一下..."时,**调用 save_memory 工具**保存(不要在回复正文里输出标记)。
+- save_memory 参数:`{{category, content}}` 其中 category ∈ fact / habit / personality / intent
 
-当用户提到某个新认识的人时：
-[SAVE_PERSON:name:relationship:notes]
+当用户提到某个新认识的人时,**调用 save_person 工具**保存。
+- save_person 参数:`{{name, relationship, notes}}`
+
+旧版本(本系统的)曾教 LLM 输出 `[SAVE_MEMORY:...]` 或 `[SAVE_PERSON:...]` 文本标记由后端正则提取——此做法已废弃,**严禁**再在回复中输出这类标记,会被当作字面文本展示给用户。
 
 ## 记忆更新与清理
 记忆不是记了就不管。你要像人一样维护记忆——事情变了就更新，结束了就放下。
