@@ -253,6 +253,24 @@ var Work = (function() {
         }
     }
 
+    // T-118:心电图折叠状态(localStorage 持久化,默认折叠)
+    function _heartStripOpen() {
+        return localStorage.getItem('workHeartStripOpen') === '1';
+    }
+    function _applyHeartStripState() {
+        var wrap = document.getElementById('wt-heart-strip');
+        var btn = document.getElementById('wt-heart-toggle');
+        if (!wrap) return;
+        var open = _heartStripOpen();
+        wrap.classList.toggle('open', open);
+        if (btn) btn.classList.toggle('active', open);
+    }
+    function toggleHeartStrip() {
+        var open = !_heartStripOpen();
+        localStorage.setItem('workHeartStripOpen', open ? '1' : '0');
+        _applyHeartStripState();
+    }
+
     // 当前激活视图重渲;给子模块用(列设置改完、单元格改完 → 调一次)
     // T-103 B.3:完成动画期间 _renderFrozen=true 跳过重渲(避免动画被 redraw 打断)
     // T-109:opts.stagger 透传到表格视图(仅切 Tab / 切视图 / 首次加载触发动效;
@@ -262,6 +280,7 @@ var Work = (function() {
         opts = opts || {};
         _updateTabCounts();   // T-098:每次重渲都刷 Tab 计数(任务新增/编辑/删除自动联动)
         _renderHeartStrip();  // T-103 B.1:心电图也跟着数据刷
+        _applyHeartStripState();  // T-118:每次 render 都同步折叠态(首次进入也生效)
         if (_view === 'table') WorkTable.render(opts);
         else if (_view === 'board') WorkBoard.render();
         else if (_view === 'cal') WorkCalendar.render();
@@ -484,6 +503,8 @@ var Work = (function() {
         clearDateFilter: clearDateFilter,
         dateFilter: dateFilter,
         freezeRender: freezeRender,
+        // T-118
+        toggleHeartStrip: toggleHeartStrip,
 
         rows: rows,
         columns: columns,

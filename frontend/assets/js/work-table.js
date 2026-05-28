@@ -132,10 +132,12 @@ var WorkTable = (function() {
                     + (v != null && v !== '' ? _esc(v) : '<span class="wt-empty">—</span>') + '</td>';
             case 'percent': {
                 var p = Math.max(0, Math.min(100, +v || 0));
-                // T-095:进度列点击复用 todo 的 slider 弹窗(openProgressDialog),不再走 prompt。
-                return '<td class="wt-editable" onclick="WorkTable.editProgress(' + t.id + ',\'' + _escAttr(k) + '\')">'
-                    + '<div class="wt-progress"><span class="wt-track"><span class="wt-fill" style="width:' + p + '%"></span></span>'
-                    + '<span class="wt-pct">' + p + '%</span></div></td>';
+                // T-095:进度列点击复用 todo 的 slider 弹窗(openProgressDialog)
+                // T-117:从横条改为 .progress-ring 环形(复用 components.css 的 todo 同款样式)
+                return '<td class="wt-editable wt-cell-progress" onclick="WorkTable.editProgress(' + t.id + ',\'' + _escAttr(k) + '\')">'
+                    + '<div class="progress-ring" style="--progress:' + p + '">'
+                    +   '<span class="progress-ring-text">' + p + '</span>'
+                    + '</div></td>';
             }
             case 'date': {
                 // T-098:用 YYYY-MM-DD 比较(lex 顺序 = 时间顺序);兼容 'MM-DD' 简写自动补当前年
@@ -394,9 +396,9 @@ var WorkTable = (function() {
             Work.updateRow(id, { customFields: cf, status: 'done' });
         }
 
-        // 2) 找到当前行 + 彩纸锚点(进度单元格;退而求其次取行)
+        // 2) 找到当前行 + 彩纸锚点(进度单元格;T-117:.wt-progress 横条已改环形 .progress-ring)
         var row = document.querySelector('#wt-table-view tr[data-id="' + id + '"]');
-        var anchor = row ? (row.querySelector('.wt-progress') || row.querySelector('.wt-num') || row) : document.body;
+        var anchor = row ? (row.querySelector('.progress-ring') || row.querySelector('.wt-cell-progress') || row.querySelector('.wt-num') || row) : document.body;
         _confettiBurst(anchor);
 
         // 3) 700ms 后给行加 .wt-removing,触发 translateX -30 opacity 0 缓动

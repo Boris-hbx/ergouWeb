@@ -970,6 +970,55 @@ table.wt-table {
   box-shadow: 0 1px 2px rgba(15,15,30,0.04), 0 4px 12px rgba(15,15,30,0.06);
   margin-bottom: 14px;
 }
+
+/* T-118:折叠容器(默认折叠,加 .open 类展开) */
+.wt-hs-collapse {
+  max-height: 0;
+  padding-top: 0; padding-bottom: 0;
+  margin-bottom: 0;
+  border-color: transparent;
+  box-shadow: none;
+  opacity: 0;
+  overflow: hidden;
+  transition:
+    max-height .35s var(--ease-spring),
+    padding .35s var(--ease-spring),
+    margin .35s var(--ease-spring),
+    opacity .25s ease-out,
+    border-color .25s ease-out,
+    box-shadow .25s ease-out;
+}
+.wt-hs-collapse.open {
+  max-height: 200px;
+  padding-top: 14px; padding-bottom: 14px;
+  margin-bottom: 14px;
+  border-color: var(--border-color);
+  box-shadow: 0 1px 2px rgba(15,15,30,0.04), 0 4px 12px rgba(15,15,30,0.06);
+  opacity: 1;
+}
+
+/* T-118:顶栏切换按钮(展开主色 / 折叠灰色) */
+.wt-heart-toggle {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted, #6B7280);
+  padding: 4px 11px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: transform .12s, color .15s, background .15s, border-color .15s;
+  margin-left: 6px;
+}
+.wt-heart-toggle:hover {
+  color: var(--primary-color);
+  transform: translateY(-1px);
+}
+.wt-heart-toggle.active {
+  color: var(--primary-color);
+  background: rgba(124, 77, 255, 0.10);
+  border-color: rgba(124, 77, 255, 0.30);
+  font-weight: 500;
+}
 .wt-hs-head {
   display: flex; align-items: center; justify-content: space-between;
   margin-bottom: 10px;
