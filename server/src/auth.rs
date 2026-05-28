@@ -95,6 +95,47 @@ pub struct UpdateAvatarRequest {
     pub avatar: String,
 }
 
+// ─── T-116:Bearer 路径辅助函数(spec auth § 12.5)===
+// 检查 Authorization: Bearer 头,有效 token 返回 user_id;否则 None(由 caller fallback 到 cookie)。
+// 同时更新 last_used_at(尽力而为,不阻塞鉴权)。
+fn try_bearer_user_id(parts: &Parts, state: &AppState) -> Option<String> {
+    let auth = parts.headers.get(http::header::AUTHORIZATION)?.to_str().ok()?;
+    let token = auth.strip_prefix("Bearer ")?.trim();
+    if token.is_empty() {
+        return None;
+    }
+    let hash = crate::routes::auth_tokens::hash_token(token);
+    let db = state.db.lock();
+    let user_id: Option<String> = db
+        .query_row(
+            "SELECT user_id FROM personal_tokens
+             WHERE token_hash = ?1 AND revoked_at IS NULL
+               AND (expires_at IS NULL OR expires_at > datetime('now'))",
+            [&hash],
+            |r| r.get(0),
+        )
+        .ok();
+    if user_id.is_some() {
+        let now = chrono::Utc::now().to_rfc3339();
+        let _ = db.execute(
+            "UPDATE personal_tokens SET last_used_at = ?1 WHERE token_hash = ?2",
+            rusqlite::params![&now, &hash],
+        );
+    }
+    user_id
+}
+
+// 拿当前 user 的 role / status 给 ActiveUserId / AdminUserId / OwnerUserId 用
+fn fetch_role_and_status(state: &AppState, user_id: &str) -> Option<(String, String)> {
+    let db = state.db.lock();
+    db.query_row(
+        "SELECT COALESCE(role, 'user'), COALESCE(status, 'active') FROM users WHERE id = ?1",
+        [user_id],
+        |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+    )
+    .ok()
+}
+
 // ─── Session middleware: extract UserId from cookie ───
 
 impl FromRequestParts<AppState> for UserId {
@@ -104,6 +145,11 @@ impl FromRequestParts<AppState> for UserId {
         parts: &mut Parts,
         state: &AppState,
     ) -> Result<Self, Self::Rejection> {
+        // T-116:Bearer 优先;fallback 到 cookie
+        if let Some(uid) = try_bearer_user_id(parts, state) {
+            return Ok(UserId(uid));
+        }
+
         // Extract cookie jar
         let jar = CookieJar::from_request_parts(parts, state)
             .await
@@ -141,6 +187,26 @@ impl FromRequestParts<AppState> for ActiveUserId {
         parts: &mut Parts,
         state: &AppState,
     ) -> Result<Self, Self::Rejection> {
+        // T-116:Bearer 优先;命中后仍需走 status 校验(suspended 用户即使 PAT 有效也拒)
+        if let Some(uid) = try_bearer_user_id(parts, state) {
+            let (_, status) = fetch_role_and_status(state, &uid).unwrap_or_else(|| ("user".into(), "active".into()));
+            return match status.as_str() {
+                "active" | "guest" => Ok(ActiveUserId(uid)),
+                "pending" => Err((
+                    StatusCode::FORBIDDEN,
+                    Json(serde_json::json!({"success": false, "error": "ACCOUNT_PENDING", "message": "账户审核中,暂时无法操作"})),
+                )),
+                "suspended" => Err((
+                    StatusCode::FORBIDDEN,
+                    Json(serde_json::json!({"success": false, "error": "ACCOUNT_SUSPENDED", "message": "账户已临时挂起,请联系管理员"})),
+                )),
+                _ => Err((
+                    StatusCode::FORBIDDEN,
+                    Json(serde_json::json!({"success": false, "error": "ACCOUNT_REJECTED", "message": "账户已被拒绝"})),
+                )),
+            };
+        }
+
         // Extract cookie jar
         let jar = CookieJar::from_request_parts(parts, state)
             .await
@@ -206,6 +272,21 @@ impl FromRequestParts<AppState> for AdminUserId {
         parts: &mut Parts,
         state: &AppState,
     ) -> Result<Self, Self::Rejection> {
+        // T-116:Bearer 优先;命中后仍走 role 校验
+        if let Some(uid) = try_bearer_user_id(parts, state) {
+            let role = fetch_role_and_status(state, &uid)
+                .map(|(r, _)| r)
+                .unwrap_or_else(|| "user".into());
+            return if role == "admin" || role == "owner" {
+                Ok(AdminUserId(uid))
+            } else {
+                Err((
+                    StatusCode::FORBIDDEN,
+                    Json(serde_json::json!({"success": false, "error": "PERMISSION_DENIED", "message": "权限不足"})),
+                ))
+            };
+        }
+
         let jar = CookieJar::from_request_parts(parts, state)
             .await
             .map_err(|_| unauthorized())?;
@@ -251,6 +332,21 @@ impl FromRequestParts<AppState> for OwnerUserId {
         parts: &mut Parts,
         state: &AppState,
     ) -> Result<Self, Self::Rejection> {
+        // T-116:Bearer 优先;命中后仍走 owner 校验
+        if let Some(uid) = try_bearer_user_id(parts, state) {
+            let role = fetch_role_and_status(state, &uid)
+                .map(|(r, _)| r)
+                .unwrap_or_else(|| "user".into());
+            return if role == "owner" {
+                Ok(OwnerUserId(uid))
+            } else {
+                Err((
+                    StatusCode::FORBIDDEN,
+                    Json(serde_json::json!({"success": false, "error": "PERMISSION_DENIED", "message": "仅系统所有者可执行此操作"})),
+                ))
+            };
+        }
+
         let jar = CookieJar::from_request_parts(parts, state)
             .await
             .map_err(|_| unauthorized())?;

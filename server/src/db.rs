@@ -426,6 +426,24 @@ fn create_tables(conn: &Connection) {
         );
         CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
 
+        -- T-116:个人访问令牌(PAT)。spec auth § 12。
+        --   长效 Bearer token 替代 session cookie 用于 CLI/CC 场景。
+        --   token_hash:Argon2id 哈希,不存明文。token_prefix:前 8 字符明文供列表识别。
+        --   revoke = 设 revoked_at(软撤销保留历史);expires_at NULL = 永不过期。
+        CREATE TABLE IF NOT EXISTS personal_tokens (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id       TEXT    NOT NULL REFERENCES users(id),
+            label         TEXT    NOT NULL,
+            token_hash    TEXT    NOT NULL,
+            token_prefix  TEXT    NOT NULL,
+            created_at    TEXT    NOT NULL,
+            last_used_at  TEXT,
+            expires_at    TEXT,
+            revoked_at    TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_pat_user ON personal_tokens(user_id);
+        CREATE INDEX IF NOT EXISTS idx_pat_hash ON personal_tokens(token_hash);
+
         -- Conversations (for 阿宝)
         CREATE TABLE IF NOT EXISTS conversations (
             id TEXT PRIMARY KEY,

@@ -888,6 +888,8 @@ loadSettingsData = async function() {
     Contacts.loadContacts();
     MemoryUI.load();
     SoulUI.loadParams();
+    // T-116:个人访问令牌列表
+    if (typeof PatUI !== 'undefined' && PatUI.refresh) PatUI.refresh();
 };
 
 // BUG-1 fix: settings.js 加载完成后立即应用头像，避免 checkAuth 竞态

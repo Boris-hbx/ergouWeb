@@ -28,3 +28,5 @@ pub mod share_links;
 pub mod sources;
 // T-107 SPEC insight v0.2
 pub mod annotations;
+// T-116 SPEC auth § 12 PAT
+pub mod auth_tokens;

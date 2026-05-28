@@ -28,7 +28,13 @@ pub fn build_app(state: state::AppState) -> Router {
         .route("/change-password", post(auth::change_password))
         .route("/avatar", put(auth::update_avatar))
         // T-096 / ADR-006:owner 紧急密码重置(必须双写 main.rs + lib.rs,见 memory duplicate-build-app-lib-rs.md)
-        .route("/owner-recovery", post(auth::owner_recovery));
+        .route("/owner-recovery", post(auth::owner_recovery))
+        // T-116 / spec auth § 12:个人访问令牌 PAT(CLI/CC 场景替代 cookie)
+        .route(
+            "/tokens",
+            get(routes::auth_tokens::list_tokens).post(routes::auth_tokens::create_token),
+        )
+        .route("/tokens/{id}", axum::routing::delete(routes::auth_tokens::revoke_token));
 
     let todo_routes = Router::new()
         .route(

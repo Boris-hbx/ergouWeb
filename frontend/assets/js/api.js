@@ -657,6 +657,11 @@ var API = (function() {
         annotationUpdate:        async function(aid, patch)   { return await request('PATCH',  '/annotations/' + aid, patch); },
         annotationDelete:        async function(aid)          { return await request('DELETE', '/annotations/' + aid); },
 
+        // ===== Personal Access Tokens (T-116 / spec auth § 12) =====
+        patList:   async function()       { return await request('GET',    '/auth/tokens'); },
+        patCreate: async function(data)   { return await request('POST',   '/auth/tokens', data); },
+        patRevoke: async function(id)     { return await request('DELETE', '/auth/tokens/' + id); },
+
         // ===== Sources (T-105 / spec § 8.2) =====
         sourceList:   async function(params) {
             var q = '';
