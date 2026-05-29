@@ -117,21 +117,24 @@ var WorkDetail = (function() {
             avaEl.textContent = (t.assignee || '?').charAt(0);
             avaEl.style.background = Work.colorOf(name);
         }
-        _setField('wt-d-assignee', t.assignee, '未指派');
-
-        // T-119:协作者头像组 + 文字摘要
+        // T-121:责任人字段合并显示「主 + 协作者头像组」(UI 不分主+协;数据层仍是双字段)
         var collabs = Array.isArray(t.collaborators) ? t.collaborators : [];
-        var collabStack = document.getElementById('wt-d-collab-stack');
-        var collabText = document.getElementById('wt-d-collab-text');
-        if (collabStack) {
-            collabStack.innerHTML = collabs.slice(0, 4).map(function(n) {
-                return '<span class="wt-avatar wt-avatar-sm" style="background:' + Work.colorOf(n) + '" title="' + (n || '').replace(/"/g, '&quot;') + '">' + (n || '?').slice(0, 1) + '</span>';
-            }).join('');
-        }
-        if (collabText) {
-            if (collabs.length === 0) collabText.textContent = '—';
-            else if (collabs.length === 1) collabText.textContent = collabs[0];
-            else collabText.textContent = collabs[0] + ' 等 ' + collabs.length + ' 人';
+        var assigneeEl = document.getElementById('wt-d-assignee');
+        if (assigneeEl) {
+            var mainName = t.assignee || '未指派';
+            var collabStackHtml = '';
+            if (collabs.length > 0) {
+                var shown = collabs.slice(0, 3);
+                var extra = collabs.length - shown.length;
+                var allNames = [t.assignee].concat(collabs).filter(Boolean).join('、');
+                collabStackHtml = ' <span class="wt-collab-stack" title="' + allNames.replace(/"/g, '&quot;') + '">'
+                    + shown.map(function(n) {
+                        return '<span class="wt-avatar wt-avatar-xs" style="background:' + Work.colorOf(n) + '">' + (n || '?').slice(0, 1) + '</span>';
+                      }).join('')
+                    + (extra > 0 ? '<span class="wt-collab-more">+' + extra + '</span>' : '')
+                    + '</span>';
+            }
+            assigneeEl.innerHTML = mainName.replace(/&/g, '&amp;').replace(/</g, '&lt;') + collabStackHtml;
         }
 
         _setField('wt-d-level', t.level, '—');
@@ -146,8 +149,8 @@ var WorkDetail = (function() {
         if (pctEl) pctEl.textContent = pct + '%';
 
         // 字段点击 → 复用 WorkTable 的编辑通道
-        _bindFieldClick('wt-d-field-assignee', function(ev) { WorkTable.editText(t.id, 'assignee'); });
-        _bindFieldClick('wt-d-field-collaborators', function(ev) { WorkTable.editCollaborators(t.id); });
+        // T-121:责任人 + 协作者统一编辑(单 input modal 逗号分隔)
+        _bindFieldClick('wt-d-field-assignee', function(ev) { WorkTable.editAssigneeCombined(t.id); });
         _bindFieldClick('wt-d-field-level',    function(ev) { WorkTable.openPick(t.id, 'level',    document.getElementById('wt-d-field-level')); });
         _bindFieldClick('wt-d-field-freq',     function(ev) { WorkTable.openPick(t.id, 'freq',     document.getElementById('wt-d-field-freq')); });
         _bindFieldClick('wt-d-field-priority', function(ev) { WorkTable.openPick(t.id, 'priority', document.getElementById('wt-d-field-priority')); });

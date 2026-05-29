@@ -278,6 +278,41 @@ table.wt-table {
   border-radius: 8px;
   font-weight: 600;
 }
+
+/* T-120 日历进度小环(复用 .progress-ring,缩到 16×16) + 已完成实心主色 ✓ */
+.progress-ring-mini {
+  width: 16px; height: 16px;
+  margin-right: 4px;
+  vertical-align: -3px;
+}
+.progress-ring-mini::before {
+  /* 调小内圆,适配 16×16 外圈 */
+  width: 10px; height: 10px;
+}
+.progress-ring-mini .progress-ring-text {
+  font-size: 7px;
+}
+.progress-ring-done {
+  /* 已完成 = 实心主色 + ✓ 勾(覆盖 conic-gradient) */
+  background: var(--primary-color, #7C4DFF) !important;
+}
+.progress-ring-done::before {
+  /* 内圆变为主色,形成实心效果 */
+  background: var(--primary-color, #7C4DFF) !important;
+}
+.progress-ring-done .progress-ring-text {
+  color: #fff !important;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+/* T-120 日历已完成事项视觉:划线 + 灰色 */
+.wt-cal-task-done {
+  color: var(--text-mute, #9CA3AF);
+  text-decoration: line-through;
+  text-decoration-color: rgba(156, 163, 175, 0.6);
+}
+.wt-cal-task-done .progress-ring-mini { text-decoration: none; }
 .wt-due { font-variant-numeric: tabular-nums; }
 .wt-due.overdue { color: var(--danger-color); font-weight: 600; }
 /* T-098: 逾期徽章(在截止日单元格内,任务 due < today && status != done 时显示) */

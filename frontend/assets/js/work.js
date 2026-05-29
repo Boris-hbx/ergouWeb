@@ -164,14 +164,20 @@ var Work = (function() {
     //        自动生效,不要在每个视图各自实现 done 过滤。
     //        已完成档案 WorkDone 直接调 Work.rows() 拿原始数据 + 自己 filter done,
     //        不走 applyTimeTabFilter,因此不受本变更影响。
-    // 语义(spec § 6.1 / T-113 修订):
-    //   all   = 所有未删除 **且 status != 'done'**
+    // T-120:加 opts.includeDone 让**日历视图**显式 opt-out T-113 全局规则(日历是"时序视角"
+    //        看历史/现在/未来;其它视图仍是"待办视角")。默认 false 不破坏既有行为。
+    // 语义(spec § 6.1 / T-113 修订 / T-120 例外):
+    //   all   = 所有未删除 **且 status != 'done'**(opts.includeDone=true 时含 done)
     //   today = (due == today  ∪  due < today 逾期) AND status != 'done'
     //   week  = due in 本周(ISO,周一首日)  ∪  逾期未完成
     //   month = due in 本月  ∪  逾期未完成
-    function applyTimeTabFilter(rows) {
-        // T-113:统一排除 done(主任务表所有视图的中心过滤点)
-        rows = rows.filter(function(t) { return t.status !== 'done'; });
+    function applyTimeTabFilter(rows, opts) {
+        opts = opts || {};
+        // T-113:统一排除 done(主任务表所有视图的中心过滤点);
+        // T-120:日历视图传 includeDone=true 时跳过
+        if (!opts.includeDone) {
+            rows = rows.filter(function(t) { return t.status !== 'done'; });
+        }
         // T-103 B.1:单日过滤优先(覆盖时间 tab 语义)
         if (_dateFilter) {
             return rows.filter(function(t) {

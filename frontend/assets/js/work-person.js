@@ -209,30 +209,28 @@ var WorkPerson = (function() {
         card.dataset.person = g.name;
         var overdue = _overdueCount(g.tasks);
         var p0 = _p0Count(g.tasks);
-        var collabN = _collabCount(g.tasks);   // T-119:协作任务数
+        // T-121:不再单独统计"协作 N",视觉与主任务平等
         var statsHtml =
             '<span class="wt-person-stats-total">' + g.tasks.length + ' 任务</span>'
           + (overdue ? '<span class="wt-person-stats-overdue">⏰ ' + overdue + ' 逾期</span>' : '')
-          + (p0      ? '<span class="wt-person-stats-p0">⚡ ' + p0 + ' P0</span>' : '')
-          + (collabN ? '<span class="wt-person-stats-collab">🤝 ' + collabN + ' 协作</span>' : '');
+          + (p0      ? '<span class="wt-person-stats-p0">⚡ ' + p0 + ' P0</span>' : '');
         var avatarBg = Work.colorOf(g.name);
         var initial = _initialOf(g.name);
 
-        // T-119:tasks 现在是 [{task, isCollab}];协作任务行右上加灰「协作」标
+        // T-121:取消"协作"区分 UI(memory single-user-simplicity);
+        //   tasks 仍是 [{task, isCollab}],但任务行视觉不再区分主+协,所有卡看着都平等
+        //   保留:_groupRows 双 push(主+协卡都出现)+ 拖拽限制(协作任务不允许从协作者卡拖走)
         var taskListHtml = g.tasks.map(function(it) {
             var t = it.task;
             var due = _dueLabel(t);
             var p0Pill = (t.priority === 'high') ? '<span class="wt-person-pill wt-person-pill-p0">P0</span>' : '';
-            var collabPill = it.isCollab ? '<span class="wt-person-pill wt-person-pill-collab" title="协作者">协作</span>' : '';
             var doneCls = (t.status === 'done') ? ' wt-person-task-done' : '';
-            var collabCls = it.isCollab ? ' wt-person-task-collab' : '';
-            return '<div class="wt-person-task' + doneCls + collabCls + '" '
-                +    (it.isCollab ? '' : 'draggable="true" ')   // T-119:协作任务不允许从此卡拖走(转交语义只走主责任人卡)
+            return '<div class="wt-person-task' + doneCls + '" '
+                +    (it.isCollab ? '' : 'draggable="true" ')   // 协作任务不允许从此卡拖走(转交语义只走主责任人卡)
                 +    'data-tid="' + t.id + '" data-from="' + _esc(g.name) + '">'
                 +    '<div class="wt-person-check" data-tid="' + t.id + '"></div>'
                 +    '<div class="wt-person-task-title" data-tid="' + t.id + '">' + _esc(t.title || '(无标题)') + '</div>'
                 +    '<div class="wt-person-task-meta">'
-                +      collabPill
                 +      p0Pill
                 +      '<span class="wt-person-pill ' + due.cls + '">' + _esc(due.text) + '</span>'
                 +    '</div>'

@@ -34,8 +34,25 @@ var WorkCalendar = (function() {
         var today = _todayMD(now);
         var todayYmd = _todayYmd(now);
 
+        // T-120:月头统计本月任务数(含 done);月头展示「N 件(含 X 已完成)」
+        var monthTotal = 0;
+        var monthDone = 0;
+        rows.forEach(function(t) {
+            if (!t.due) return;
+            var s = '' + t.due;
+            var mmdd = s.length >= 5 ? s.slice(-5) : '';
+            var mmStr = ('0' + month).slice(-2);
+            if (mmdd.slice(0, 2) === mmStr) {
+                monthTotal++;
+                if (t.status === 'done') monthDone++;
+            }
+        });
+        var monthLabel = year + ' 年 ' + month + ' 月 · 共 ' + monthTotal + ' 件'
+            + (monthDone > 0 ? '(含 ' + monthDone + ' 已完成)' : '')
+            + ' · 按截止日(可拖任务条改日期)';
+
         var dow = ['一', '二', '三', '四', '五', '六', '日'];
-        var html = '<div class="wt-cal-month-label">' + year + ' 年 ' + month + ' 月 · 按截止日(可拖任务条改日期)</div>'
+        var html = '<div class="wt-cal-month-label">' + monthLabel + '</div>'
                  + '<div class="wt-cal">';
         dow.forEach(function(d) { html += '<div class="wt-cal-dow">' + d + '</div>'; });
         // 上月末填充(dim 格,不接收 drop)
@@ -55,23 +72,34 @@ var WorkCalendar = (function() {
             rows.filter(function(t) { return _matchesDay(t.due, mm, dd); })
                 .forEach(function(t) {
                     var s = WorkTable._statusBy(t.status);
-                    // T-119:主首字 + 协作者数(如 "陈+2" 表示主"陈" + 2 个协作者)
+                    var isDone = (t.status === 'done');
+                    // T-120:进度小环(16×16,复用 .progress-ring;已完成 = 实心主色 + ✓)
+                    var progress = Math.max(0, Math.min(100, +t.progress || 0));
+                    var ringCls = isDone ? 'progress-ring progress-ring-mini progress-ring-done' : 'progress-ring progress-ring-mini';
+                    var ringInner = isDone ? '✓' : '';
+                    var ringHtml = '<span class="' + ringCls + '" style="--progress:' + progress + '">'
+                        + '<span class="progress-ring-text">' + ringInner + '</span>'
+                        + '</span>';
+                    // T-119 / T-121:主首字 + 协作者数;UI 不强调主+协区分
                     var collabs = Array.isArray(t.collaborators) ? t.collaborators : [];
                     var aPrefix = t.assignee ? WorkTable._esc(t.assignee.charAt(0)) : '';
                     var collabSuffix = collabs.length > 0 ? '<span style="opacity:0.65">+' + collabs.length + '</span>' : '';
                     var nameTag = (aPrefix || collabs.length > 0)
                         ? '<span style="color:var(--primary-color);font-weight:600;margin-right:3px">' + aPrefix + collabSuffix + '</span>'
                         : '';
-                    var titleAttr = t.title + (collabs.length ? ' (主:' + (t.assignee || '?') + ' + ' + collabs.join('、') + ')' : '');
+                    var titleAttr = t.title
+                        + (collabs.length ? ' (' + (t.assignee || '?') + '、' + collabs.join('、') + ')' : '')
+                        + (isDone ? ' [已完成]' : (progress > 0 ? ' [' + progress + '%]' : ''));
+                    var doneCls = isDone ? ' wt-cal-task-done' : '';
                     // T-100:日历项单击打开详情抽屉
                     // T-102:加 draggable + dragstart/dragend(同一元素同时支持点和拖,HTML5 不冲突)
-                    html += '<div class="wt-cal-task" data-id="' + t.id + '" '
+                    html += '<div class="wt-cal-task' + doneCls + '" data-id="' + t.id + '" '
                          +    'draggable="true" '
                          +    'ondragstart="WorkCalendar._onDragStart(event,' + t.id + ')" '
                          +    'ondragend="WorkCalendar._onDragEnd(event)" '
                          +    'onclick="WorkCalendar._openDetail(' + t.id + ')" '
                          +    'title="' + WorkTable._esc(titleAttr) + '">'
-                         +    WorkTable._esc(s.label.charAt(0)) + ' ' + nameTag + WorkTable._esc(t.title)
+                         +    ringHtml + nameTag + WorkTable._esc(t.title)
                          +  '</div>';
                 });
             html += '</div>';
@@ -89,9 +117,12 @@ var WorkCalendar = (function() {
     }
 
     function _visibleRows() {
+        // T-120:日历显式走 applyTimeTabFilter + opts.includeDone=true,opt-out T-113 全局过滤 done
+        //   日历是"时序视角"(看历史/现在/未来),与表格/看板/人员/分布的"待办视角"语义不同
+        //   与 T-111 已完成档案互补(档案=月度复盘列表,日历=某天看那天)
+        var rows = Work.applyTimeTabFilter(Work.rows(), { includeDone: true });
         var fEl = document.getElementById('wt-filter');
         var f = fEl ? fEl.value : '';
-        var rows = Work.rows();
         if (!f) return rows;
         return rows.filter(function(t) { return t.assignee === f; });
     }

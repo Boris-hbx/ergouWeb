@@ -90,22 +90,24 @@ var WorkTable = (function() {
                 +    'onclick="WorkTable.editText(' + t.id + ',\'title\')">' + title + '</td>';
         }
         if (k === 'assignee') {
-            // T-119:主责任人头像 + 协作者头像组(<=3,超出 +N);点击仍走 editText 改主责任人
-            //   编辑协作者通过抽屉的「🤝 协作者」字段(走 WorkTable.editCollaborators)
+            // T-121:UI 不再区分主+协,统一"平等多人";点击 → 单 input modal 逗号分隔
+            //   数据层仍是 assignee(主)+ collaborators(协) — 前端拆解 + LLM 仍走双字段
+            //   hover 头像区显示完整名单
             var name = v || '—';
             var collabs = Array.isArray(t.collaborators) ? t.collaborators : [];
             var collabHtml = '';
             if (collabs.length > 0) {
                 var shown = collabs.slice(0, 3);
                 var extra = collabs.length - shown.length;
-                collabHtml = '<span class="wt-collab-stack" title="协作者:' + _esc(collabs.join('、')) + '">'
+                var allNames = [v].concat(collabs).filter(Boolean).join('、');
+                collabHtml = '<span class="wt-collab-stack" title="' + _esc(allNames) + '">'
                     + shown.map(function(c) {
                         return '<span class="wt-avatar wt-avatar-xs" style="background:' + _avatarColor(c) + '">' + _esc(('' + c).slice(0, 1)) + '</span>';
                       }).join('')
                     + (extra > 0 ? '<span class="wt-collab-more">+' + extra + '</span>' : '')
                     + '</span>';
             }
-            return '<td class="wt-editable" onclick="WorkTable.editText(' + t.id + ',\'assignee\')">'
+            return '<td class="wt-editable" onclick="WorkTable.editAssigneeCombined(' + t.id + ')">'
                 +    '<span class="wt-assignee">' + _avatarHTML(v || '?')
                 +    '<span class="wt-aname">' + _esc(name) + '</span>'
                 +    collabHtml
@@ -622,7 +624,41 @@ var WorkTable = (function() {
         _rs = null;
     }
 
+    // T-121:责任人 + 协作者合并编辑(单 input,逗号分隔自动拆解)
+    //   按 memory single-user-simplicity:Boris 一人用,UI 不区分主+协,统一"平等多人"
+    //   数据层仍走 T-119 的 assignee + collaborators 双字段(后端 + LLM 工具不变)
+    function editAssigneeCombined(id) {
+        var t = Work.rowById(id);
+        if (!t) return;
+        var initial = '';
+        if (t.assignee) initial = t.assignee;
+        if (Array.isArray(t.collaborators) && t.collaborators.length > 0) {
+            initial = (initial ? initial + '，' : '') + t.collaborators.join('，');
+        }
+        openTextInputDialog({
+            label: '修改「责任人」',
+            initial: initial,
+            type: 'text',
+            placeholder: '多人用逗号分隔,如:我，张三，李四',
+            onConfirm: function(v) {
+                var text = ('' + v).trim();
+                // 中文 / 英文 逗号 / 分号 都识别
+                var parts = text.split(/[,，;；]\s*/).map(function(s) { return s.trim(); }).filter(Boolean);
+                // 去重保留首次出现位置
+                var seen = {};
+                var unique = [];
+                parts.forEach(function(p) {
+                    if (!seen[p]) { seen[p] = 1; unique.push(p); }
+                });
+                var assignee = unique[0] || '';
+                var collaborators = unique.slice(1);
+                Work.updateRow(id, { assignee: assignee, collaborators: collaborators });
+            },
+        });
+    }
+
     // T-119:协作者多选编辑(候选来自所有现存 assignee+collaborators 去重,剔除当前主责任人)
+    // T-121 后:已不在 UI 流程里使用(抽屉协作者字段移除),保留为公共 API 供未来扩展
     function editCollaborators(id) {
         var t = Work.rowById(id);
         if (!t) return;
@@ -666,7 +702,8 @@ var WorkTable = (function() {
         editDate: editDate,   // T-104
         editNumber: editNumber,
         editProgress: editProgress,
-        editCollaborators: editCollaborators,   // T-119
+        editCollaborators: editCollaborators,   // T-119(保留 API,T-121 后 UI 不主动调用)
+        editAssigneeCombined: editAssigneeCombined,   // T-121
         toggleCheck: toggleCheck,
         openPick: openPick,
         openText: openText,
