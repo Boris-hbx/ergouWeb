@@ -1,18 +1,23 @@
-// ========== Insight — 洞察模块入口 + 列表页 (T-106 P1) ==========
+// ========== Insight v0.3 — 洞察模块 (T-123) ==========
 //
-// 工作 Hub 第 2 张卡的"洞察"入口由 Insight.openHub() 触发。
-// 模块内部有两层视图:列表(`insight-list-view`)/详情(`insight-detail-view`),由 Insight.openDetail / InsightDetail.close 切换。
-// 候选池(`insight-capture-sidebar`)在列表页右侧固定;详情页内 source 由 InsightDetail 自管。
+// v0.3 大重构(spec v0.3):废弃 v0.2 的 source 候选池 / annotation 锚点 / publish 分享,
+// 简化为「单层 insight_task + 单 textarea 反馈」。
 //
-// 数据流(列表):
-//   API.insightList({status?}) → 渲染表格行;
-//   每行点击 → Insight.openDetail(id) → InsightDetail.open(id);
-//   候选池由 InsightCapture 模块管理(并行刷新)。
+// 工作 Hub「📍 洞察」卡 → Insight.openHub()。
+// 模块内两层视图(div 显隐,非 URL 路由):
+//   列表页  `insight-list-view`   —— 顶部录入区(textarea + input_type 自动识别)+ 任务列表
+//   详情页  `insight-detail-view` —— 三块:任务信息 / 最新报告(markdown)/ 反馈框
+//
+// Hybrid:Web 只录入 + 看 + 写反馈;生成/修订由 Claude Code 跑 `/insight :id`。
+// 报告 markdown 复用 InsightMd.render()。
 
 var Insight = (function() {
-    var _insights = [];
+    var _tasks = [];
     var _statusFilter = '';
-    var _showNewForm = false;
+    var _detailId = null;
+    var _detail = null;       // 当前详情 task(含内嵌 report)
+    var _typeManual = false;  // 用户是否手动改过录入类型下拉
+    var _showRaw = false;     // 详情页原文折叠状态
 
     function _esc(s) {
         return ('' + (s == null ? '' : s))
@@ -20,105 +25,103 @@ var Insight = (function() {
             .replace(/"/g, '&quot;');
     }
 
+    // ---- 标签 / 文案 ----
     function _statusLabel(s) {
-        return ({
-            collecting: '收集中',
-            ready:      '等待生成',
-            processing: '生成中',
-            editing:    '编辑中',
-            published:  '已发布',
-            archived:   '已归档',
-        })[s] || s;
+        return ({ ready: '待处理', processing: '生成中', done: '已完成' })[s] || s;
     }
-    function _statusClass(s) { return 'ins-st-' + s; }
+    function _typeLabel(t) {
+        return ({ url: '链接', topic: '主题', prompt: '指令', note: '随想' })[t] || t;
+    }
     function _templateLabel(t) {
-        return ({ survey: '综述型', decision: '决策型', watch: '追踪型' })[t] || t;
+        return ({ survey: '综述型', decision: '决策型', watch: '追踪型' })[t] || (t || '自动');
     }
     function _shortTime(iso) {
         if (!iso) return '';
         try {
             var d = new Date(iso);
-            var now = new Date();
-            var diffH = (now - d) / 36e5;
-            if (diffH < 1) return Math.max(1, Math.round(diffH * 60)) + ' 分钟前';
+            var diffH = (Date.now() - d.getTime()) / 36e5;
+            if (diffH < 1)  return Math.max(1, Math.round(diffH * 60)) + ' 分钟前';
             if (diffH < 24) return Math.round(diffH) + ' 小时前';
             if (diffH < 24 * 7) return Math.round(diffH / 24) + ' 天前';
             return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
         } catch (_) { return iso; }
     }
 
+    // 前端自动识别 input_type(spec § 五,与后端 detect_input_type 一致,作录入实时提示)
+    function detectInputType(text) {
+        var t = (text || '').trim();
+        var lower = t.toLowerCase();
+        if ((lower.indexOf('http://') >= 0 || lower.indexOf('https://') >= 0)
+            && t.split(/\s+/).length === 1) {
+            return 'url';
+        }
+        var n = Array.from(t).length;
+        if (n <= 80) return 'topic';
+        var markers = ['帮我','请','分析','总结','对比','写一份','写一篇','整理','给我','梳理','评估'];
+        for (var i = 0; i < markers.length; i++) {
+            if (t.indexOf(markers[i]) >= 0) return 'prompt';
+        }
+        return 'note';
+    }
+
     // ============ Hub 切换 ============
     function openHub() {
-        // 隐藏工作 Hub + 任务表视图,显示洞察视图
         var hub = document.getElementById('work-hub');
         var tableView = document.getElementById('work-table-view');
         var insView = document.getElementById('work-insight-view');
         if (hub) hub.style.display = 'none';
         if (tableView) tableView.style.display = 'none';
         if (insView) insView.style.display = '';
-
-        // 默认进列表页(关掉详情)
-        var listEl = document.getElementById('insight-list-view');
-        var detEl  = document.getElementById('insight-detail-view');
-        if (listEl) listEl.classList.remove('ins-hidden');
-        if (detEl)  detEl.classList.add('ins-hidden');
-
-        _renderList();   // 先渲染骨架
-        refreshList();   // 异步加载数据
+        _showDetail(false);
+        _renderList();
+        refreshList();
     }
 
     function backToHub() {
-        // 关详情(如果开着)
+        // 详情开着 → 回列表
         var detEl = document.getElementById('insight-detail-view');
         if (detEl && !detEl.classList.contains('ins-hidden')) {
-            if (typeof InsightDetail !== 'undefined') InsightDetail.close();
+            _detailId = null;
+            _detail = null;
+            _showDetail(false);
+            refreshList();
             return;
         }
-        // 列表页 → 回工作 Hub
+        // 列表 → 工作 Hub
         var insView = document.getElementById('work-insight-view');
         var hub = document.getElementById('work-hub');
         if (insView) insView.style.display = 'none';
         if (hub) hub.style.display = '';
     }
 
-    // ============ 列表渲染 ============
+    function _showDetail(on) {
+        var listEl = document.getElementById('insight-list-view');
+        var detEl  = document.getElementById('insight-detail-view');
+        if (listEl) listEl.classList.toggle('ins-hidden', !!on);
+        if (detEl)  detEl.classList.toggle('ins-hidden', !on);
+    }
+
+    // ============ 列表页 ============
     function _renderList() {
         var host = document.getElementById('insight-list-view');
         if (!host) return;
-        host.innerHTML = ''
-          + '<div class="ins-list-main">'
+        host.innerHTML =
+            '<div class="ins-list-main">'
           +   '<div class="ins-list-head">'
-          +     '<h2>洞察</h2>'
-          +     '<span class="ins-count-pill">' + _insights.length + ' 个</span>'
+          +     '<h2>📍 洞察</h2>'
+          +     '<span class="ins-count-pill">' + _tasks.length + ' 个</span>'
           +     '<div class="ins-list-spacer"></div>'
           +     _statusFilterHtml()
-          +     '<button class="ins-btn ins-btn-primary" onclick="Insight.toggleNewForm()">+ 新建洞察</button>'
           +   '</div>'
-          +   _newFormHtml()
+          +   _captureHtml()
           +   '<div class="ins-list-table">' + _tableHtml() + '</div>'
-          + '</div>'
-          + '<aside class="ins-capture-aside" id="insight-capture-sidebar"></aside>';
-
-        // 候选池侧栏由 InsightCapture 渲染
-        if (typeof InsightCapture !== 'undefined') InsightCapture.refresh();
-
-        // 自动 focus 新建标题输入
-        if (_showNewForm) {
-            var ti = document.getElementById('ins-new-title');
-            if (ti) ti.focus();
-        }
+          + '</div>';
+        var ta = document.getElementById('ins-cap-text');
+        if (ta) _syncDetectedType();
     }
 
     function _statusFilterHtml() {
-        var opts = [
-            ['',           '全部'],
-            ['collecting', '收集中'],
-            ['ready',      '等待生成'],
-            ['processing', '生成中'],
-            ['editing',    '编辑中'],
-            ['published',  '已发布'],
-            ['archived',   '已归档'],
-        ];
+        var opts = [['','全部'], ['ready','待处理'], ['processing','生成中'], ['done','已完成']];
         return '<select class="ins-filter" onchange="Insight.setFilter(this.value)">'
           + opts.map(function(o) {
               return '<option value="' + o[0] + '"' + (_statusFilter === o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
@@ -126,139 +129,116 @@ var Insight = (function() {
           + '</select>';
     }
 
-    function _newFormHtml() {
-        if (!_showNewForm) return '';
-        return '<div class="ins-new-form">'
-          + '<input id="ins-new-title" type="text" placeholder="主题/标题(必填)" '
-          +   'onkeydown="if(event.key===\'Enter\')Insight.submitNew();if(event.key===\'Escape\')Insight.toggleNewForm()">'
-          + '<input id="ins-new-topic" type="text" placeholder="一句话描述(可选)" '
-          +   'onkeydown="if(event.key===\'Enter\')Insight.submitNew();if(event.key===\'Escape\')Insight.toggleNewForm()">'
-          + '<select id="ins-new-template">'
-          +   '<option value="survey">综述型</option>'
-          +   '<option value="decision">决策型</option>'
-          +   '<option value="watch">追踪型</option>'
-          + '</select>'
-          + '<button class="ins-btn ins-btn-primary" onclick="Insight.submitNew()">创建</button>'
-          + '<button class="ins-btn ins-btn-ghost" onclick="Insight.toggleNewForm()">取消</button>'
+    // 顶部录入区:textarea + 自动识别类型下拉(可手动改)+ 创建
+    function _captureHtml() {
+        var sel = ['url','topic','prompt','note'].map(function(t) {
+            return '<option value="' + t + '">' + _typeLabel(t) + '</option>';
+        }).join('');
+        return '<div class="ins-capture">'
+          + '<textarea id="ins-cap-text" class="ins-cap-textarea" rows="3" '
+          +   'placeholder="贴个链接 / 写个主题 / 扔个 prompt / 记个随想…（Ctrl+Enter 创建）" '
+          +   'oninput="Insight.onCaptureInput()" '
+          +   'onkeydown="if((event.ctrlKey||event.metaKey)&&event.key===\'Enter\')Insight.submitNew()"></textarea>'
+          + '<div class="ins-cap-foot">'
+          +   '<label class="ins-cap-type-label">类型'
+          +     '<select id="ins-cap-type" class="ins-cap-type" onchange="Insight.onTypeManual()">' + sel + '</select>'
+          +   '</label>'
+          +   '<span class="ins-cap-type-hint" id="ins-cap-type-hint"></span>'
+          +   '<div class="ins-cap-spacer"></div>'
+          +   '<button class="ins-btn ins-btn-primary" onclick="Insight.submitNew()">创建</button>'
+          + '</div>'
           + '</div>';
     }
 
+    function onCaptureInput() {
+        if (!_typeManual) _syncDetectedType();
+    }
+    function onTypeManual() {
+        _typeManual = true;
+        var hint = document.getElementById('ins-cap-type-hint');
+        if (hint) hint.textContent = '已手动指定';
+    }
+    function _syncDetectedType() {
+        var ta = document.getElementById('ins-cap-text');
+        var sel = document.getElementById('ins-cap-type');
+        var hint = document.getElementById('ins-cap-type-hint');
+        if (!ta || !sel) return;
+        var txt = ta.value || '';
+        var t = detectInputType(txt);
+        sel.value = t;
+        if (hint) hint.textContent = txt.trim() ? '自动识别为「' + _typeLabel(t) + '」' : '';
+    }
+
     function _tableHtml() {
-        if (_insights.length === 0) {
+        if (_tasks.length === 0) {
             return '<div class="ins-list-empty">'
-              + '<div class="ins-list-empty-icon">🔍</div>'
+              + '<div class="ins-list-empty-icon">📍</div>'
               + '<div class="ins-list-empty-title">还没有洞察</div>'
-              + '<div class="ins-list-empty-sub">点上面「+ 新建洞察」开始一个研究项目;或先从右侧候选池捕获素材。</div>'
+              + '<div class="ins-list-empty-sub">在上面录入框贴链接、写主题、扔 prompt 或记随想,创建后让 Claude Code 跑 <code>/insight</code> 生成报告。</div>'
               + '</div>';
         }
         return '<table class="ins-table">'
-          + '<thead><tr>'
-          +   '<th>标题</th>'
-          +   '<th>主题</th>'
-          +   '<th>模板</th>'
-          +   '<th>状态</th>'
-          +   '<th>更新</th>'
-          +   '<th></th>'
-          + '</tr></thead>'
-          + '<tbody>' + _insights.map(_rowHtml).join('') + '</tbody>'
+          + '<thead><tr><th>标题</th><th>类型</th><th>状态</th><th>版本</th><th>更新</th><th></th></tr></thead>'
+          + '<tbody>' + _tasks.map(_rowHtml).join('') + '</tbody>'
           + '</table>';
     }
 
-    function _rowHtml(ins) {
-        return '<tr class="ins-row" onclick="Insight.openDetail(' + ins.id + ')">'
-          + '<td class="ins-row-title">' + _esc(ins.title) + (ins.currentReportId ? ' <span class="ins-row-ver">v?</span>' : '') + '</td>'
-          + '<td class="ins-row-topic">' + _esc(ins.topic || '—') + '</td>'
-          + '<td>' + _templateLabel(ins.template) + '</td>'
-          + '<td><span class="ins-pill ' + _statusClass(ins.status) + '">' + _statusLabel(ins.status) + '</span></td>'
-          + '<td>' + _shortTime(ins.updatedAt) + '</td>'
+    function _rowHtml(t) {
+        var ver = t.latestVersion ? 'v' + t.latestVersion : '—';
+        return '<tr class="ins-row" onclick="Insight.openDetail(' + t.id + ')">'
+          + '<td class="ins-row-title">' + _esc(t.title || '(无标题)') + '</td>'
+          + '<td><span class="ins-tag ins-tag-type">' + _typeLabel(t.inputType) + '</span></td>'
+          + '<td><span class="ins-pill ins-st-' + t.status + '">' + _statusLabel(t.status) + '</span></td>'
+          + '<td class="ins-row-ver">' + ver + '</td>'
+          + '<td>' + _shortTime(t.latestReportAt || t.updatedAt) + '</td>'
           + '<td class="ins-row-actions" onclick="event.stopPropagation()">'
-          +   (ins.status !== 'archived'
-              ? '<button class="ins-icon-btn" onclick="Insight.archive(' + ins.id + ')" title="归档">📦</button>'
-              : '<button class="ins-icon-btn" onclick="Insight.unarchive(' + ins.id + ')" title="取消归档">📤</button>')
-          +   '<button class="ins-icon-btn ins-icon-btn-x" onclick="Insight.confirmDelete(' + ins.id + ', \'' + _esc(ins.title) + '\')" title="删除">✕</button>'
+          +   '<button class="ins-icon-btn ins-icon-btn-x" onclick="Insight.confirmDelete(' + t.id + ',\'' + _esc(t.title).replace(/'/g, "\\'") + '\')" title="删除">✕</button>'
           + '</td>'
           + '</tr>';
     }
 
-    // ============ 数据加载 ============
     async function refreshList() {
         try {
             var params = _statusFilter ? { status: _statusFilter } : {};
-            var resp = await API.insightList(params);
-            _insights = (resp && resp.items) || [];
+            var resp = await API.insightTaskList(params);
+            _tasks = (resp && resp.items) || [];
             _renderList();
         } catch (e) {
-            console.error('[Insight] refreshList err', e);
+            console.error('[Insight] refreshList', e);
             if (typeof showToast === 'function') showToast('加载洞察列表失败', 'error');
         }
     }
 
-    // ============ 操作 ============
-    function setFilter(v) {
-        _statusFilter = v || '';
-        refreshList();
-    }
-
-    function toggleNewForm() {
-        _showNewForm = !_showNewForm;
-        _renderList();
-    }
+    function setFilter(v) { _statusFilter = v || ''; refreshList(); }
 
     async function submitNew() {
-        var titleEl = document.getElementById('ins-new-title');
-        var topicEl = document.getElementById('ins-new-topic');
-        var tmplEl  = document.getElementById('ins-new-template');
-        if (!titleEl) return;
-        var title = (titleEl.value || '').trim();
-        if (!title) {
-            if (typeof showToast === 'function') showToast('标题不能为空', 'warning');
-            titleEl.focus();
+        var ta = document.getElementById('ins-cap-text');
+        var sel = document.getElementById('ins-cap-type');
+        if (!ta) return;
+        var content = (ta.value || '').trim();
+        if (!content) {
+            if (typeof showToast === 'function') showToast('录入内容不能为空', 'warning');
+            ta.focus();
             return;
         }
-        var data = { title: title };
-        if (topicEl && topicEl.value) data.topic = topicEl.value.trim();
-        if (tmplEl && tmplEl.value)   data.template = tmplEl.value;
+        var data = { inputContent: content };
+        if (sel && sel.value) data.inputType = sel.value;
         try {
-            var resp = await API.insightCreate(data);
+            var resp = await API.insightTaskCreate(data);
             if (resp && resp.success) {
-                _showNewForm = false;
-                if (typeof showToast === 'function') showToast('已创建', 'success');
-                await refreshList();
-                // 直接进详情页(顺手开始加 source)
-                openDetail(resp.item.id);
+                _typeManual = false;
+                if (typeof showToast === 'function') showToast('已创建,等 Claude Code 处理', 'success');
+                openDetail(resp.item.id);   // 创建后跳详情
             }
         } catch (e) {
-            console.error('[Insight] create err', e);
+            console.error('[Insight] create', e);
             if (typeof showToast === 'function') showToast('创建失败', 'error');
         }
     }
 
-    function openDetail(id) {
-        if (typeof InsightDetail !== 'undefined') {
-            InsightDetail.open(id);
-        }
-    }
-
-    async function archive(id) {
-        try {
-            await API.insightUpdate(id, { status: 'archived' });
-            await refreshList();
-        } catch (e) { console.error('[Insight] archive err', e); }
-    }
-    async function unarchive(id) {
-        // 取消归档:回到 collecting(若无报告)或 editing(若有)
-        var ins = _insights.find(function(x) { return x.id === id; });
-        if (!ins) return;
-        var to = ins.currentReportId ? 'editing' : 'collecting';
-        try {
-            await API.insightUpdate(id, { status: to });
-            await refreshList();
-        } catch (e) { console.error('[Insight] unarchive err', e); }
-    }
-
     function confirmDelete(id, title) {
-        var msg = '彻底删除「' + _esc(title) + '」?<br>'
-            + '<small style="color:#6B7280">软删除,不可在 UI 恢复(数据库保留 30 天)。包括的 source / report / 分享链接也会失效。</small>';
+        var msg = '删除「' + _esc(title) + '」?<br>'
+            + '<small style="color:#6B7280">软删除(数据库保留 30 天),报告一并失效。</small>';
         if (window.AppUtils && AppUtils.showConfirm) {
             AppUtils.showConfirm(msg, function() { _doDelete(id); }, { confirmText: '删除', danger: true });
         } else if (confirm('删除「' + title + '」?')) {
@@ -267,12 +247,194 @@ var Insight = (function() {
     }
     async function _doDelete(id) {
         try {
-            await API.insightDelete(id);
+            await API.insightTaskDelete(id);
             if (typeof showToast === 'function') showToast('已删除', 'info');
+            if (_detailId === id) { _detailId = null; _detail = null; _showDetail(false); }
             await refreshList();
         } catch (e) {
-            console.error('[Insight] delete err', e);
+            console.error('[Insight] delete', e);
             if (typeof showToast === 'function') showToast('删除失败', 'error');
+        }
+    }
+
+    // ============ 详情页 ============
+    async function openDetail(id) {
+        _detailId = id;
+        _showRaw = false;
+        _showDetail(true);
+        var host = document.getElementById('insight-detail-view');
+        if (host) host.innerHTML = '<div class="ins-det-loading">加载中…</div>';
+        await _loadDetail();
+    }
+
+    async function _loadDetail() {
+        if (_detailId == null) return;
+        try {
+            var resp = await API.insightTaskGet(_detailId);
+            if (resp && resp.success) {
+                _detail = resp.item;
+                _renderDetail();
+            }
+        } catch (e) {
+            console.error('[Insight] loadDetail', e);
+            if (typeof showToast === 'function') showToast('加载详情失败', 'error');
+        }
+    }
+
+    function _renderDetail() {
+        var host = document.getElementById('insight-detail-view');
+        if (!host || !_detail) return;
+        var t = _detail;
+        host.innerHTML =
+            '<div class="ins-det">'
+          +   _detailInfoHtml(t)
+          +   _detailReportHtml(t)
+          +   _detailFeedbackHtml(t)
+          + '</div>';
+    }
+
+    // 块 1:任务信息
+    function _detailInfoHtml(t) {
+        var tmplSel = '<option value=""' + (!t.template ? ' selected' : '') + '>自动(LLM 选)</option>'
+          + ['survey','decision','watch'].map(function(x) {
+              return '<option value="' + x + '"' + (t.template === x ? ' selected' : '') + '>' + _templateLabel(x) + '</option>';
+            }).join('');
+        var raw = _showRaw
+            ? '<div class="ins-det-raw">' + _esc(t.inputContent) + '</div>'
+            : '';
+        var snapshot = (t.sourceSnapshot && _showRaw)
+            ? '<div class="ins-det-raw ins-det-snapshot"><div class="ins-det-raw-label">抓取快照</div>' + _esc(t.sourceSnapshot) + '</div>'
+            : '';
+        return '<section class="ins-det-card ins-det-info">'
+          + '<div class="ins-det-info-top">'
+          +   '<input id="ins-det-title" class="ins-det-title-input" value="' + _esc(t.title) + '" '
+          +     'onchange="Insight.saveTitle(this.value)" placeholder="(无标题)">'
+          +   '<span class="ins-pill ins-st-' + t.status + '">' + _statusLabel(t.status) + '</span>'
+          + '</div>'
+          + '<div class="ins-det-meta">'
+          +   '<span class="ins-tag ins-tag-type">' + _typeLabel(t.inputType) + '</span>'
+          +   '<label class="ins-det-tmpl">模板 '
+          +     '<select onchange="Insight.saveTemplate(this.value)">' + tmplSel + '</select>'
+          +   '</label>'
+          +   '<button class="ins-link-btn" onclick="Insight.toggleRaw()">' + (_showRaw ? '收起原文 ▲' : '展开原文 ▼') + '</button>'
+          + '</div>'
+          + raw
+          + snapshot
+          + '</section>';
+    }
+
+    // 块 2:最新报告
+    function _detailReportHtml(t) {
+        var rep = t.report;
+        var inner;
+        if (t.status === 'processing') {
+            inner = '<div class="ins-det-pending">'
+              + '<span class="ins-spin">⏳</span> 正在生成…'
+              + '<button class="ins-btn ins-btn-ghost ins-btn-sm" onclick="Insight.abort()">中止</button>'
+              + '</div>';
+        } else if (rep && rep.contentMd) {
+            // 有报告就渲染(done;或 ready 修订中仍可看旧版)
+            var banner = (t.status === 'ready')
+                ? '<div class="ins-det-rep-banner">📝 已提交反馈,等待 Claude Code 出新版(下方为上一版 v' + rep.version + ')</div>'
+                : '';
+            inner = banner
+              + '<div class="ins-det-rep-head">报告 v' + rep.version + ' · ' + _templateLabel(rep.template) + '</div>'
+              + '<div class="ins-md ins-det-rep-body">' + (typeof InsightMd !== 'undefined' ? InsightMd.render(rep.contentMd) : _esc(rep.contentMd)) + '</div>';
+        } else {
+            inner = '<div class="ins-det-pending">'
+              + '⏳ 等待 Claude Code 处理 —— 在 CC 端跑 <code>/insight ' + t.id + '</code>'
+              + '</div>';
+        }
+        return '<section class="ins-det-card ins-det-report">'
+          + '<div class="ins-det-card-title">最新报告 '
+          +   '<button class="ins-link-btn" onclick="Insight.reload()" title="刷新状态">↻ 刷新</button>'
+          + '</div>'
+          + inner
+          + '</section>';
+    }
+
+    // 块 3:反馈框
+    function _detailFeedbackHtml(t) {
+        if (t.status === 'done') {
+            return '<section class="ins-det-card ins-det-feedback">'
+              + '<div class="ins-det-card-title">写反馈让 CC 改一版</div>'
+              + '<textarea id="ins-fb-text" class="ins-fb-textarea" rows="3" '
+              +   'placeholder="想让报告怎么改?写一句…提交后状态回「待处理」,下次跑 /insight 时按反馈修订">' + _esc(t.feedbackNote || '') + '</textarea>'
+              + '<div class="ins-fb-foot">'
+              +   '<button class="ins-btn ins-btn-primary" onclick="Insight.submitFeedback()">提交反馈</button>'
+              + '</div>'
+              + '</section>';
+        }
+        if (t.status === 'ready' && t.feedbackNote) {
+            return '<section class="ins-det-card ins-det-feedback ins-det-feedback-readonly">'
+              + '<div class="ins-det-card-title">待修订反馈</div>'
+              + '<div class="ins-fb-readonly">' + _esc(t.feedbackNote) + '</div>'
+              + '</section>';
+        }
+        return '';   // ready 无反馈 / processing 不显示反馈框
+    }
+
+    // ---- 详情操作 ----
+    function toggleRaw() { _showRaw = !_showRaw; _renderDetail(); }
+    function reload() { _loadDetail(); }
+
+    async function saveTitle(v) {
+        var title = (v || '').trim();
+        if (!_detail || title === _detail.title) return;
+        try {
+            var resp = await API.insightTaskUpdate(_detailId, { title: title });
+            if (resp && resp.success) { _detail = resp.item; }
+        } catch (e) {
+            console.error('[Insight] saveTitle', e);
+            if (typeof showToast === 'function') showToast('保存标题失败', 'error');
+        }
+    }
+
+    async function saveTemplate(v) {
+        // 空 = "自动",后端校验只收 survey/decision/watch;留空不回写(保持 LLM 自选)
+        if (!_detail || !v || v === _detail.template) return;
+        try {
+            var resp = await API.insightTaskUpdate(_detailId, { template: v });
+            if (resp && resp.success) { _detail = resp.item; _renderDetail(); }
+        } catch (e) {
+            console.error('[Insight] saveTemplate', e);
+            if (typeof showToast === 'function') showToast('保存模板失败', 'error');
+        }
+    }
+
+    async function abort() {
+        try {
+            var resp = await API.insightTaskRelease(_detailId);
+            if (resp && resp.success) {
+                _detail = resp.item;
+                _renderDetail();
+                if (typeof showToast === 'function') showToast('已中止', 'info');
+            }
+        } catch (e) {
+            console.error('[Insight] abort', e);
+            if (typeof showToast === 'function') showToast('中止失败', 'error');
+        }
+    }
+
+    async function submitFeedback() {
+        var ta = document.getElementById('ins-fb-text');
+        if (!ta) return;
+        var note = (ta.value || '').trim();
+        if (!note) {
+            if (typeof showToast === 'function') showToast('反馈不能为空', 'warning');
+            ta.focus();
+            return;
+        }
+        try {
+            var resp = await API.insightTaskUpdate(_detailId, { feedbackNote: note });
+            if (resp && resp.success) {
+                _detail = resp.item;
+                _renderDetail();
+                if (typeof showToast === 'function') showToast('反馈已提交,等 CC 修订', 'success');
+            }
+        } catch (e) {
+            console.error('[Insight] submitFeedback', e);
+            if (typeof showToast === 'function') showToast('提交反馈失败', 'error');
         }
     }
 
@@ -281,11 +443,17 @@ var Insight = (function() {
         backToHub: backToHub,
         refreshList: refreshList,
         setFilter: setFilter,
-        toggleNewForm: toggleNewForm,
+        onCaptureInput: onCaptureInput,
+        onTypeManual: onTypeManual,
         submitNew: submitNew,
         openDetail: openDetail,
-        archive: archive,
-        unarchive: unarchive,
         confirmDelete: confirmDelete,
+        toggleRaw: toggleRaw,
+        reload: reload,
+        saveTitle: saveTitle,
+        saveTemplate: saveTemplate,
+        abort: abort,
+        submitFeedback: submitFeedback,
+        detectInputType: detectInputType,
     };
 })();

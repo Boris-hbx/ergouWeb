@@ -981,3 +981,135 @@
   font-family: inherit;
   margin-bottom: 12px;
 }
+
+/* ===================================================================
+ * 洞察 v0.3 (T-123):单层 insight_task + textarea 反馈
+ * 列表(录入区 + 表)/ 详情(任务信息 / 报告 / 反馈三块)
+ * 仅桌面(不写 @media,守 memory web-desktop-only-no-mobile)
+ * =================================================================== */
+
+/* v0.3 列表无候选池侧栏 → 覆盖 v0.2 的双列 grid 为单列 */
+.ins-list-main { display: block; }
+.ins-list-table { max-width: 920px; }
+
+/* 状态 pill:v0.3 三档 */
+.ins-st-done { background: var(--ins-ok-soft); color: #047857; }
+
+/* 类型小标签 */
+.ins-tag {
+  display: inline-block; padding: 1px 8px; border-radius: 5px;
+  font-size: 11.5px; font-weight: 500; white-space: nowrap;
+}
+.ins-tag-type { background: var(--ins-primary-soft); color: var(--ins-primary); }
+
+/* ---- 录入区 ---- */
+.ins-capture {
+  max-width: 920px;
+  background: #fff;
+  border: 1px solid var(--ins-border);
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 16px;
+  box-shadow: var(--ins-shadow);
+}
+.ins-cap-textarea {
+  width: 100%; box-sizing: border-box;
+  border: 1px solid var(--ins-border); border-radius: 7px;
+  padding: 9px 11px; font-size: 14px; line-height: 1.55; resize: vertical;
+  color: var(--ins-text); font-family: inherit;
+}
+.ins-cap-textarea:focus {
+  outline: none; border-color: var(--ins-primary);
+  box-shadow: 0 0 0 3px var(--ins-primary-soft);
+}
+.ins-cap-foot { display: flex; align-items: center; gap: 10px; margin-top: 9px; }
+.ins-cap-type-label { font-size: 12.5px; color: var(--ins-text-mute); display: flex; align-items: center; gap: 5px; }
+.ins-cap-type {
+  padding: 4px 8px; border: 1px solid var(--ins-border); border-radius: 6px;
+  font-size: 12.5px; color: var(--ins-text); background: #fff;
+}
+.ins-cap-type-hint { font-size: 12px; color: var(--ins-text-faint); }
+.ins-cap-spacer { flex: 1; }
+
+/* ---- 详情页 ---- */
+.ins-det { max-width: 920px; display: flex; flex-direction: column; gap: 14px; }
+.ins-det-loading { padding: 40px; text-align: center; color: var(--ins-text-faint); }
+.ins-det-card {
+  background: #fff; border: 1px solid var(--ins-border);
+  border-radius: 10px; padding: 14px 16px; box-shadow: var(--ins-shadow);
+}
+.ins-det-card-title {
+  font-size: 13px; font-weight: 600; color: var(--ins-text-mute);
+  margin-bottom: 10px; display: flex; align-items: center; gap: 8px;
+}
+
+/* 块1 任务信息 */
+.ins-det-info-top { display: flex; align-items: center; gap: 10px; }
+.ins-det-title-input {
+  flex: 1; border: 1px solid transparent; border-radius: 6px;
+  padding: 5px 8px; font-size: 18px; font-weight: 600; color: var(--ins-text);
+  background: transparent; font-family: inherit;
+}
+.ins-det-title-input:hover { border-color: var(--ins-border); }
+.ins-det-title-input:focus { outline: none; border-color: var(--ins-primary); background: #fff; box-shadow: 0 0 0 3px var(--ins-primary-soft); }
+.ins-det-meta { display: flex; align-items: center; gap: 14px; margin-top: 10px; flex-wrap: wrap; }
+.ins-det-tmpl { font-size: 12.5px; color: var(--ins-text-mute); display: flex; align-items: center; gap: 5px; }
+.ins-det-tmpl select { padding: 3px 7px; border: 1px solid var(--ins-border); border-radius: 6px; font-size: 12.5px; background: #fff; color: var(--ins-text); }
+.ins-link-btn {
+  background: none; border: none; color: var(--ins-primary); cursor: pointer;
+  font-size: 12.5px; padding: 2px 4px; border-radius: 4px;
+}
+.ins-link-btn:hover { background: var(--ins-primary-soft); }
+.ins-det-raw {
+  margin-top: 10px; padding: 10px 12px; background: var(--ins-bg-elev);
+  border-radius: 7px; font-size: 13px; line-height: 1.6; color: var(--ins-text);
+  white-space: pre-wrap; max-height: 320px; overflow-y: auto;
+}
+.ins-det-raw-label { font-size: 11.5px; font-weight: 600; color: var(--ins-text-faint); margin-bottom: 6px; }
+.ins-det-snapshot { margin-top: 8px; }
+
+/* 块2 报告 */
+.ins-det-pending {
+  padding: 18px; text-align: center; color: var(--ins-text-mute);
+  font-size: 14px; background: var(--ins-bg-elev); border-radius: 8px;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+}
+.ins-det-pending code { background: rgba(0,0,0,.05); padding: 1px 6px; border-radius: 4px; font-size: 12.5px; }
+.ins-spin { display: inline-block; animation: ins-spin 1.4s linear infinite; }
+@keyframes ins-spin { to { transform: rotate(360deg); } }
+.ins-det-rep-banner {
+  background: var(--ins-warn-soft); color: #8B5A00; font-size: 12.5px;
+  padding: 7px 10px; border-radius: 7px; margin-bottom: 10px;
+}
+.ins-det-rep-head { font-size: 12px; color: var(--ins-text-faint); margin-bottom: 10px; }
+
+/* 报告 markdown 正文 */
+.ins-md { font-size: 14px; line-height: 1.7; color: var(--ins-text); }
+.ins-md h1, .ins-md h2, .ins-md h3 { font-weight: 600; line-height: 1.35; margin: 18px 0 8px; }
+.ins-md h1 { font-size: 21px; }
+.ins-md h2 { font-size: 18px; }
+.ins-md h3 { font-size: 15px; }
+.ins-md p { margin: 8px 0; }
+.ins-md ul, .ins-md ol { margin: 8px 0; padding-left: 22px; }
+.ins-md li { margin: 3px 0; }
+.ins-md code { background: var(--ins-bg-elev); padding: 1px 6px; border-radius: 4px; font-size: 13px; }
+.ins-md pre { background: var(--ins-bg-elev); padding: 12px 14px; border-radius: 8px; overflow-x: auto; }
+.ins-md pre code { background: none; padding: 0; }
+.ins-md blockquote { border-left: 3px solid var(--ins-border-strong); margin: 10px 0; padding: 2px 14px; color: var(--ins-text-mute); }
+.ins-md a { color: var(--ins-primary); }
+.ins-md table { border-collapse: collapse; margin: 10px 0; font-size: 13px; }
+.ins-md th, .ins-md td { border: 1px solid var(--ins-border); padding: 6px 10px; }
+.ins-md th { background: var(--ins-bg-elev); }
+
+/* 块3 反馈 */
+.ins-fb-textarea {
+  width: 100%; box-sizing: border-box; border: 1px solid var(--ins-border);
+  border-radius: 7px; padding: 9px 11px; font-size: 13.5px; line-height: 1.55;
+  resize: vertical; color: var(--ins-text); font-family: inherit;
+}
+.ins-fb-textarea:focus { outline: none; border-color: var(--ins-primary); box-shadow: 0 0 0 3px var(--ins-primary-soft); }
+.ins-fb-foot { display: flex; justify-content: flex-end; margin-top: 9px; }
+.ins-fb-readonly {
+  padding: 10px 12px; background: var(--ins-warn-soft); border-radius: 7px;
+  font-size: 13px; line-height: 1.6; color: #8B5A00; white-space: pre-wrap;
+}

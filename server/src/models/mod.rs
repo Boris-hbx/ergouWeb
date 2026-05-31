@@ -19,3 +19,5 @@ pub mod share_link;
 pub mod source;
 // T-107 SPEC insight v0.2
 pub mod annotation;
+// T-122 SPEC insight v0.3(单层 insight_task)
+pub mod insight_task;

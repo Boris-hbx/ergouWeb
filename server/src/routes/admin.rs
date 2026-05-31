@@ -1539,6 +1539,222 @@ pub async fn migrate_todo_content(
     )
 }
 
+// ============ T-122: 洞察 v0.3 数据迁移 ============
+//
+// 把 v0.2 的 insights(双层模型)迁移到 v0.3 的 insight_tasks(单层)。
+// SPEC: specs/insight/spec.md v0.3 § 十一。
+//
+// 每条 insight:
+//   - 新建 insight_task: input_type='topic', input_content=insight.topic,
+//     template=insight.template, status(有 report → done,否则 ready)
+//   - 关联 sources 的 content 拼到 source_snapshot(带 title,`\n\n---\n\n` 分隔)
+//   - 每条 report 迁到 insight_reports(version 保留,content_md 保留)
+//   - current_report_id 指向最新(max version)report 的新 id
+//   - annotations / share_links 不迁移
+//
+// 安全约束:
+//   - 只迁调用方自己的 user_id(不跨用户)
+//   - 幂等:已迁过(同 user + input_content + input_type='topic' 已存在)→ skip
+//   - 老表不删(保留只读 30 天)
+
+pub async fn migrate_insight_v0_3(
+    State(state): State<AppState>,
+    admin: AdminUserId,
+) -> impl IntoResponse {
+    let db = state.db.lock();
+    let user_id = admin.0.clone();
+    let now = chrono::Utc::now().to_rfc3339();
+
+    // 1) 扫调用方的 insights(老表)
+    struct OldInsight {
+        id: i64,
+        topic: String,
+        template: String,
+    }
+    let mut insights: Vec<OldInsight> = Vec::new();
+    {
+        let mut stmt = match db.prepare(
+            "SELECT id, topic, template FROM insights WHERE user_id = ?1 AND deleted = 0",
+        ) {
+            Ok(s) => s,
+            Err(e) => {
+                tracing::error!("[migrate-insight-v0.3] prepare insights: {}", e);
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({"success": false, "error": "内部错误"})),
+                );
+            }
+        };
+        let mapped = stmt.query_map(rusqlite::params![&user_id], |r| {
+            Ok(OldInsight {
+                id: r.get(0)?,
+                topic: r.get(1)?,
+                template: r.get(2)?,
+            })
+        });
+        if let Ok(iter) = mapped {
+            for r in iter.flatten() {
+                insights.push(r);
+            }
+        }
+    }
+
+    let scanned = insights.len();
+    let mut migrated: usize = 0;
+    let mut skipped: usize = 0;
+    let mut errors: Vec<String> = Vec::new();
+
+    for ins in &insights {
+        // 幂等:已迁过则跳过
+        let already: bool = db
+            .query_row(
+                "SELECT COUNT(*) > 0 FROM insight_tasks \
+                 WHERE user_id = ?1 AND input_type = 'topic' AND input_content = ?2 AND deleted = 0",
+                rusqlite::params![&user_id, &ins.topic],
+                |r| r.get(0),
+            )
+            .unwrap_or(false);
+        if already {
+            skipped += 1;
+            continue;
+        }
+
+        // 拼接 sources → source_snapshot
+        let mut snapshots: Vec<String> = Vec::new();
+        if let Ok(mut s) = db.prepare(
+            "SELECT COALESCE(title, ''), COALESCE(content, '') FROM sources \
+             WHERE insight_id = ?1 AND user_id = ?2 AND deleted = 0 ORDER BY id ASC",
+        ) {
+            if let Ok(iter) = s.query_map(rusqlite::params![ins.id, &user_id], |r| {
+                Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?))
+            }) {
+                for (title, content) in iter.flatten() {
+                    if content.trim().is_empty() {
+                        continue;
+                    }
+                    if title.trim().is_empty() {
+                        snapshots.push(content);
+                    } else {
+                        snapshots.push(format!("## {title}\n\n{content}"));
+                    }
+                }
+            }
+        }
+        let source_snapshot = snapshots.join("\n\n---\n\n");
+
+        // 读 insight 的 reports
+        struct OldReport {
+            version: i64,
+            content_md: String,
+            generated_by: String,
+            model_used: String,
+            revision_note: String,
+            created_at: String,
+        }
+        let mut reports: Vec<OldReport> = Vec::new();
+        if let Ok(mut s) = db.prepare(
+            "SELECT version, content_md, COALESCE(generated_by,''), COALESCE(model_used,''), \
+                    COALESCE(revision_note,''), created_at \
+             FROM reports WHERE insight_id = ?1 ORDER BY version ASC",
+        ) {
+            if let Ok(iter) = s.query_map(rusqlite::params![ins.id], |r| {
+                Ok(OldReport {
+                    version: r.get(0)?,
+                    content_md: r.get(1)?,
+                    generated_by: r.get(2)?,
+                    model_used: r.get(3)?,
+                    revision_note: r.get(4)?,
+                    created_at: r.get(5)?,
+                })
+            }) {
+                for r in iter.flatten() {
+                    reports.push(r);
+                }
+            }
+        }
+
+        // 状态映射(spec § 十一):有 report → done(已有可看的报告),否则 ready(待处理)
+        let new_status = if reports.is_empty() { "ready" } else { "done" };
+        let title = crate::models::insight_task::derive_title(&ins.topic);
+
+        // 建 insight_task
+        if let Err(e) = db.execute(
+            "INSERT INTO insight_tasks \
+                (user_id, title, input_type, input_content, template, status, feedback_note, source_snapshot, created_at, updated_at) \
+             VALUES (?1, ?2, 'topic', ?3, ?4, ?5, '', ?6, ?7, ?7)",
+            rusqlite::params![&user_id, &title, &ins.topic, &ins.template, new_status, &source_snapshot, &now],
+        ) {
+            errors.push(format!("insight #{} task insert: {e}", ins.id));
+            continue;
+        }
+        let new_task_id = db.last_insert_rowid();
+
+        // 迁 reports,记录最新版的新 id
+        let mut latest_new_report_id: Option<i64> = None;
+        for rep in &reports {
+            if let Err(e) = db.execute(
+                "INSERT INTO insight_reports \
+                    (task_id, user_id, version, template, content_md, parent_report_id, revision_note, generated_by, model_used, created_at) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, NULL, ?6, ?7, ?8, ?9)",
+                rusqlite::params![
+                    new_task_id,
+                    &user_id,
+                    rep.version,
+                    &ins.template,
+                    &rep.content_md,
+                    &rep.revision_note,
+                    &rep.generated_by,
+                    &rep.model_used,
+                    &rep.created_at,
+                ],
+            ) {
+                errors.push(format!("insight #{} report v{} insert: {e}", ins.id, rep.version));
+                continue;
+            }
+            latest_new_report_id = Some(db.last_insert_rowid());
+        }
+
+        // current_report_id 指向最新版
+        if let Some(rid) = latest_new_report_id {
+            let _ = db.execute(
+                "UPDATE insight_tasks SET current_report_id = ?1 WHERE id = ?2 AND user_id = ?3",
+                rusqlite::params![rid, new_task_id, &user_id],
+            );
+        }
+
+        migrated += 1;
+        tracing::info!(
+            "[migrate-insight-v0.3] insight #{} → task #{} ({} reports)",
+            ins.id, new_task_id, reports.len()
+        );
+    }
+
+    let summary = format!(
+        "scanned={scanned} migrated={migrated} skipped={skipped} errors={}",
+        errors.len()
+    );
+    insert_audit_log(
+        &db,
+        &user_id,
+        "migrate_insight_v0.3",
+        None,
+        Some("insight_tasks"),
+        Some(&summary),
+    );
+    tracing::info!("[migrate-insight-v0.3] done: {}", summary);
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "success": true,
+            "scanned": scanned,
+            "migrated": migrated,
+            "skipped": skipped,
+            "errors": errors,
+        })),
+    )
+}
+
 #[cfg(test)]
 mod migrate_tests {
     use crate::test_helpers::{auth_cookie, create_test_user, test_state};
@@ -1735,5 +1951,174 @@ mod migrate_tests {
             )
             .unwrap();
         assert_eq!(desc, "", "他人 work_task 不应被触碰");
+    }
+
+    // ============ T-122: 洞察 v0.3 迁移测试 ============
+
+    fn seed_old_insight(
+        state: &crate::state::AppState,
+        user_id: &str,
+        topic: &str,
+        template: &str,
+        status: &str,
+    ) -> i64 {
+        let db = state.db.lock();
+        let now = chrono::Utc::now().to_rfc3339();
+        db.execute(
+            "INSERT INTO insights (user_id, title, topic, template, status, created_at, updated_at) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6)",
+            rusqlite::params![user_id, topic, topic, template, status, now],
+        )
+        .unwrap();
+        db.last_insert_rowid()
+    }
+
+    fn seed_old_source(
+        state: &crate::state::AppState,
+        user_id: &str,
+        insight_id: i64,
+        title: &str,
+        content: &str,
+    ) {
+        let db = state.db.lock();
+        let now = chrono::Utc::now().to_rfc3339();
+        db.execute(
+            "INSERT INTO sources (user_id, insight_id, kind, title, content, created_at, updated_at) \
+             VALUES (?1, ?2, 'text', ?3, ?4, ?5, ?5)",
+            rusqlite::params![user_id, insight_id, title, content, now],
+        )
+        .unwrap();
+    }
+
+    fn seed_old_report(
+        state: &crate::state::AppState,
+        insight_id: i64,
+        version: i64,
+        content_md: &str,
+    ) {
+        let db = state.db.lock();
+        let now = chrono::Utc::now().to_rfc3339();
+        db.execute(
+            "INSERT INTO reports (insight_id, version, template, content_md, generated_by, model_used, created_at, updated_at) \
+             VALUES (?1, ?2, 'survey', ?3, 'claude-code', 'claude-opus', ?4, ?4)",
+            rusqlite::params![insight_id, version, content_md, now],
+        )
+        .unwrap();
+    }
+
+    async fn run_migrate_insight(app: &axum::Router, cookie: &str) -> JsonValue {
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/admin/migrate-insight-v0.3")
+                    .header("Cookie", cookie)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        body_json(resp).await
+    }
+
+    #[tokio::test]
+    async fn migrates_insight_with_sources_and_reports() {
+        let (state, uid, cookie) = admin_setup().await;
+        let ins_id = seed_old_insight(&state, &uid, "Gemini 对比", "survey", "published");
+        seed_old_source(&state, &uid, ins_id, "源A", "内容甲");
+        seed_old_source(&state, &uid, ins_id, "源B", "内容乙");
+        seed_old_report(&state, ins_id, 1, "报告 v1");
+        seed_old_report(&state, ins_id, 2, "报告 v2");
+        let app = crate::build_app(state.clone());
+
+        let j = run_migrate_insight(&app, &cookie).await;
+        assert_eq!(j["success"], true);
+        assert_eq!(j["scanned"], 1);
+        assert_eq!(j["migrated"], 1);
+
+        let db = state.db.lock();
+        // 新 task 建好
+        let (task_id, input_type, status, snapshot, cur_report): (
+            i64,
+            String,
+            String,
+            String,
+            Option<i64>,
+        ) = db
+            .query_row(
+                "SELECT id, input_type, status, source_snapshot, current_report_id \
+                 FROM insight_tasks WHERE user_id = ?1 AND input_content = 'Gemini 对比'",
+                rusqlite::params![&uid],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)),
+            )
+            .unwrap();
+        assert_eq!(input_type, "topic");
+        assert_eq!(status, "done");
+        assert!(snapshot.contains("内容甲") && snapshot.contains("内容乙"));
+        assert!(snapshot.contains("\n\n---\n\n"), "多源用分隔符");
+
+        // 两条 report 迁过来,current 指向 v2
+        let rep_count: i64 = db
+            .query_row(
+                "SELECT COUNT(*) FROM insight_reports WHERE task_id = ?1",
+                rusqlite::params![task_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(rep_count, 2);
+        let cur_version: i64 = db
+            .query_row(
+                "SELECT version FROM insight_reports WHERE id = ?1",
+                rusqlite::params![cur_report.unwrap()],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(cur_version, 2, "current_report_id 指向最新版");
+    }
+
+    #[tokio::test]
+    async fn migrate_is_idempotent() {
+        let (state, uid, cookie) = admin_setup().await;
+        seed_old_insight(&state, &uid, "幂等主题", "survey", "collecting");
+        let app = crate::build_app(state.clone());
+
+        let j1 = run_migrate_insight(&app, &cookie).await;
+        assert_eq!(j1["migrated"], 1);
+
+        // 第二次:已迁过 → skipped,不重复建
+        let j2 = run_migrate_insight(&app, &cookie).await;
+        assert_eq!(j2["migrated"], 0);
+        assert_eq!(j2["skipped"], 1);
+
+        let db = state.db.lock();
+        let n: i64 = db
+            .query_row(
+                "SELECT COUNT(*) FROM insight_tasks WHERE user_id = ?1 AND input_content = '幂等主题'",
+                rusqlite::params![&uid],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(n, 1, "不重复建 task");
+    }
+
+    #[tokio::test]
+    async fn migrate_no_report_maps_to_ready() {
+        let (state, uid, cookie) = admin_setup().await;
+        seed_old_insight(&state, &uid, "空报告主题", "decision", "collecting");
+        let app = crate::build_app(state.clone());
+
+        let j = run_migrate_insight(&app, &cookie).await;
+        assert_eq!(j["migrated"], 1);
+
+        let db = state.db.lock();
+        let status: String = db
+            .query_row(
+                "SELECT status FROM insight_tasks WHERE user_id = ?1 AND input_content = '空报告主题'",
+                rusqlite::params![&uid],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(status, "ready", "无 report → ready");
     }
 }

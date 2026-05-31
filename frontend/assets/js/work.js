@@ -35,6 +35,11 @@ var Work = (function() {
         var tableView = document.getElementById('work-table-view');
         if (hub) hub.style.display = '';
         if (tableView) tableView.style.display = 'none';
+        // 回 Hub 时一并收起其它子视图(洞察 / 已完成档案),避免导航往返后残留覆盖
+        var insView = document.getElementById('work-insight-view');
+        var doneView = document.getElementById('work-done-view');
+        if (insView) insView.style.display = 'none';
+        if (doneView) doneView.style.display = 'none';
         // T-100:回到 Hub 时关闭详情抽屉(任务表已隐藏,抽屉应一起退场)
         if (typeof WorkDetail !== 'undefined' && WorkDetail.isOpen()) {
             WorkDetail.closeDetail();

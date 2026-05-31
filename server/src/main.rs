@@ -410,6 +410,35 @@ pub fn build_app(state: AppState) -> Router {
             axum::routing::patch(routes::annotations::update_annotation)
                 .delete(routes::annotations::delete_annotation),
         )
+        // Insight v0.3(T-122 / SPEC insight v0.3)— 单层 insight_task,
+        // 必须与 lib.rs build_app 同步(memory:duplicate-build-app-lib-rs)。
+        .route(
+            "/insight-tasks",
+            get(routes::insight_tasks::list_tasks).post(routes::insight_tasks::create_task),
+        )
+        .route(
+            "/insight-tasks/{id}",
+            get(routes::insight_tasks::get_task)
+                .patch(routes::insight_tasks::update_task)
+                .delete(routes::insight_tasks::delete_task),
+        )
+        .route(
+            "/insight-tasks/{id}/claim",
+            post(routes::insight_tasks::claim_task),
+        )
+        .route(
+            "/insight-tasks/{id}/release",
+            post(routes::insight_tasks::release_task),
+        )
+        // `/latest` 必须在动态 reports 之前(本组无 /{version},但保持静态优先习惯)
+        .route(
+            "/insight-tasks/{id}/reports/latest",
+            get(routes::insight_tasks::get_latest_report),
+        )
+        .route(
+            "/insight-tasks/{id}/reports",
+            get(routes::insight_tasks::list_reports).post(routes::insight_tasks::create_report),
+        )
         .nest(
             "/soul-state",
             Router::new()
@@ -469,6 +498,8 @@ pub fn build_app(state: AppState) -> Router {
                 .route("/people/{id}", put(routes::admin::update_person).delete(routes::admin::delete_person))
                 // T-115:一次性回补 todo.content → work_task.desc
                 .route("/migrate-todo-content", post(routes::admin::migrate_todo_content))
+                // T-122:洞察 v0.3 数据迁移(insights → insight_tasks)
+                .route("/migrate-insight-v0.3", post(routes::admin::migrate_insight_v0_3))
                 // T-089 块2:30 req/min/user 限流 —— 防暴力枚举 / DoS。
                 // route_layer 比 layer 更紧凑;仅作用于 admin 路由子树。
                 .route_layer(axum::middleware::from_fn_with_state(

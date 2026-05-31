@@ -30,3 +30,5 @@ pub mod sources;
 pub mod annotations;
 // T-116 SPEC auth § 12 PAT
 pub mod auth_tokens;
+// T-122 SPEC insight v0.3(单层 insight_task)
+pub mod insight_tasks;

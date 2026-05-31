@@ -1024,6 +1024,49 @@ fn create_tables(conn: &Connection) {
         );
         CREATE INDEX IF NOT EXISTS idx_annotations_report ON annotations(report_id, status, deleted);
         CREATE INDEX IF NOT EXISTS idx_annotations_user_insight ON annotations(user_id, insight_id, deleted);
+
+        -- ============ Insight v0.3(T-122 / SPEC insight v0.3)============
+        -- 大重构:废弃 source+insight 双层 + annotation anchor,统一为单层 insight_task。
+        -- 老表(insights / sources / reports / annotations / share_links)保留只读 30 天用于迁移,
+        -- 数据迁移走 POST /api/admin/migrate-insight-v0.3,迁移 + 用户确认后再删。
+        -- 详见 specs/insight/spec.md v0.3 § 四。
+        --
+        -- 一条记录 = 一个洞察任务;既存原始输入(input_content / source_snapshot)
+        -- 也关联最新报告(current_report_id)。3 档状态 ready/processing/done。
+        -- current_report_id 不声明 FK(避免与 insight_reports 循环引用,与 v0.2 insights 表惯例一致)。
+        CREATE TABLE IF NOT EXISTS insight_tasks (
+            id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id            TEXT    NOT NULL REFERENCES users(id),
+            title              TEXT    NOT NULL DEFAULT '',
+            input_type         TEXT    NOT NULL,
+            input_content      TEXT    NOT NULL,
+            template           TEXT,
+            status             TEXT    NOT NULL DEFAULT 'ready',
+            current_report_id  INTEGER,
+            feedback_note      TEXT    NOT NULL DEFAULT '',
+            source_snapshot    TEXT    NOT NULL DEFAULT '',
+            created_at         TEXT    NOT NULL,
+            updated_at         TEXT    NOT NULL,
+            deleted            INTEGER NOT NULL DEFAULT 0,
+            deleted_at         TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_insight_tasks_user ON insight_tasks(user_id, deleted, status);
+
+        -- 版本化报告快照;每次 CC 写报告 +1 version,最新版挂回 task.current_report_id。
+        CREATE TABLE IF NOT EXISTS insight_reports (
+            id                INTEGER PRIMARY KEY AUTOINCREMENT,
+            task_id           INTEGER NOT NULL REFERENCES insight_tasks(id),
+            user_id           TEXT    NOT NULL,
+            version           INTEGER NOT NULL,
+            template          TEXT    NOT NULL,
+            content_md        TEXT    NOT NULL DEFAULT '',
+            parent_report_id  INTEGER,
+            revision_note     TEXT    NOT NULL DEFAULT '',
+            generated_by      TEXT    NOT NULL DEFAULT '',
+            model_used        TEXT    NOT NULL DEFAULT '',
+            created_at        TEXT    NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_insight_reports_task ON insight_reports(task_id, version DESC);
         ",
     )
     .expect("Failed to create tables");
