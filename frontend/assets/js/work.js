@@ -19,6 +19,8 @@ var Work = (function() {
     var _timeTab = 'all';   // T-098:时间镜头 Tab(all / today / week / month)
     var _dateFilter = null; // T-103 B.1:点心电图柱后单日过滤(YYYY-MM-DD);覆盖 _timeTab
     var _renderFrozen = false; // T-103 B.3:完成动画期间冻结 render,避免动画被打断
+    var _searchQuery = '';     // T-130:全局搜索词(已 trim + lowercase),跨 5 视图;空 = 不过滤
+    var _searchTimer = null;   // T-130:debounce 150ms 计时器
 
     // ============ 生命周期 ============
     function init() {
@@ -183,6 +185,11 @@ var Work = (function() {
         if (!opts.includeDone) {
             rows = rows.filter(function(t) { return t.status !== 'done'; });
         }
+        // T-130:全局搜索(_searchQuery 模块态,工具栏 input 设置)。5 视图都过本函数 →
+        //        一处生效;opts.skipSearch=true 仅供表格算「共 M 项」基数时绕过。
+        if (_searchQuery && !opts.skipSearch) {
+            rows = rows.filter(_matchesSearch);
+        }
         // T-103 B.1:单日过滤优先(覆盖时间 tab 语义)
         if (_dateFilter) {
             return rows.filter(function(t) {
@@ -233,6 +240,61 @@ var Work = (function() {
         var first = new Date(d.getFullYear(), d.getMonth(), 1);
         var last  = new Date(d.getFullYear(), d.getMonth() + 1, 0);
         return { start: _ymd(first), end: _ymd(last) };
+    }
+
+    // ============ T-130:全局搜索 ============
+    // 匹配规则(忽略大小写 + 子串包含):title / desc / assignee / collaborators[] /
+    // 内置「标签」/ 所有自定义列(customFields)。**不**匹配 status/priority/level/freq 的
+    // enum 值(那些走筛选下拉)。纯前端 filter,不调后端。
+    function _hay(v, q) { return v != null && ('' + v).toLowerCase().indexOf(q) >= 0; }
+    function _matchVal(v, q) {
+        if (Array.isArray(v)) {
+            for (var i = 0; i < v.length; i++) if (_hay(v[i], q)) return true;
+            return false;
+        }
+        return _hay(v, q);
+    }
+    function _matchesSearch(t) {
+        var q = _searchQuery;
+        if (!q) return true;
+        if (_hay(t.title, q) || _hay(t.desc, q) || _hay(t.assignee, q)) return true;
+        var cols = Array.isArray(t.collaborators) ? t.collaborators : [];
+        for (var i = 0; i < cols.length; i++) if (_hay(cols[i], q)) return true;
+        // 内置「标签」multi(task.tags 或 customFields.tags,与 work-distribution 同款读法)
+        var tags = (t.tags != null) ? t.tags : (t.customFields && t.customFields.tags);
+        if (_matchVal(tags, q)) return true;
+        // 自定义列:customFields 所有 value
+        var cf = t.customFields || {};
+        for (var k in cf) {
+            if (!Object.prototype.hasOwnProperty.call(cf, k)) continue;
+            if (_matchVal(cf[k], q)) return true;
+        }
+        return false;
+    }
+
+    function searchQuery() { return _searchQuery; }
+
+    // 工具栏 input oninput → debounce 150ms 后过滤
+    function onSearchInput(v) {
+        if (_searchTimer) clearTimeout(_searchTimer);
+        _searchTimer = setTimeout(function() { _setSearch(v); }, 150);
+    }
+    // Esc 清空
+    function onSearchKey(ev) {
+        if (ev && ev.key === 'Escape') clearSearch();
+    }
+    function clearSearch() {
+        if (_searchTimer) { clearTimeout(_searchTimer); _searchTimer = null; }
+        var inp = document.getElementById('wt-search');
+        if (inp) inp.value = '';
+        _setSearch('');
+        if (inp) inp.focus();
+    }
+    function _setSearch(v) {
+        _searchQuery = ('' + (v || '')).trim().toLowerCase();
+        render();   // 小动作:静默重渲(不传 stagger,守 memory animation-scale-rule)
+        var clr = document.getElementById('wt-search-clear');
+        if (clr) clr.style.display = _searchQuery ? '' : 'none';
     }
 
     // T-098:每次 render 时刷新 4 个 Tab 的实时计数 + 逾期 ⚠ 徽章
@@ -516,6 +578,11 @@ var Work = (function() {
         freezeRender: freezeRender,
         // T-118
         toggleHeartStrip: toggleHeartStrip,
+        // T-130:全局搜索
+        searchQuery: searchQuery,
+        onSearchInput: onSearchInput,
+        onSearchKey: onSearchKey,
+        clearSearch: clearSearch,
 
         rows: rows,
         columns: columns,

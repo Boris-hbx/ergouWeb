@@ -55,11 +55,19 @@ var WorkTable = (function() {
         return el ? el.value : '';
     }
     function _visibleRows() {
-        // T-098:先过时间镜头 Tab,再过责任人(两层叠加)
+        // T-098:先过时间镜头 Tab,再过责任人(两层叠加);T-130:applyTimeTabFilter 已含搜索
         var rows = Work.applyTimeTabFilter(Work.rows());
         var f = _filterValue();
         if (!f) return rows;
         return rows.filter(function(t) { return t.assignee === f; });
+    }
+
+    // T-130:不含搜索的可见数(算「N 条命中 / 共 M 项」里的 M)
+    function _baseRowCount() {
+        var rows = Work.applyTimeTabFilter(Work.rows(), { skipSearch: true });
+        var f = _filterValue();
+        if (f) rows = rows.filter(function(t) { return t.assignee === f; });
+        return rows.length;
     }
 
     // ============ 工具栏右侧:责任人筛选下拉 (每次 render 重建) ============
@@ -258,14 +266,25 @@ var WorkTable = (function() {
         if (!cols || !cols.length) return;
         _refillFilter();
 
-        // 总数胶囊
+        // 总数胶囊(T-130:搜索激活时改「N 条命中 / 共 M 项」)
         var rows = _visibleRows();
+        var q = Work.searchQuery();
         var tot = document.getElementById('wt-total');
-        if (tot) tot.textContent = '共 ' + rows.length + ' 项';
+        if (tot) {
+            tot.textContent = q
+                ? (rows.length + ' 条命中 / 共 ' + _baseRowCount() + ' 项')
+                : ('共 ' + rows.length + ' 项');
+        }
 
         // 表格本体(只在 table 视图下渲染)
         var host = document.getElementById('wt-table-view');
         if (!host) return;
+
+        // T-130:搜索 0 命中 → 空状态(其它视图自然显示空,无需特判)
+        if (q && rows.length === 0) {
+            host.innerHTML = '<div class="wt-search-empty">🔍 无匹配任务,试试别的词</div>';
+            return;
+        }
 
         // 计算表格总宽
         var sumW = SERIAL_W;
