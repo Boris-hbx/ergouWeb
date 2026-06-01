@@ -64,17 +64,14 @@
         });
     }
 
-    // P3:动态加载 insight-citation.js 让公开分享页也有 popover
-    function loadCitationModule() {
-        return new Promise(function(resolve, reject) {
-            if (typeof InsightCitation !== 'undefined') return resolve();
+    // T-129:动态加载 insight-markdown.js,公开页复用 InsightMd 的 .ins-report 排版 + 思辨 callout
+    function loadInsightMd() {
+        return new Promise(function(resolve) {
+            if (typeof InsightMd !== 'undefined') return resolve();
             var s = document.createElement('script');
-            s.src = '/assets/js/insight-citation.js';
+            s.src = '/assets/js/insight-markdown.js';
             s.onload = resolve;
-            s.onerror = function() {
-                console.warn('[share] insight-citation.js load failed (popover disabled)');
-                resolve();
-            };
+            s.onerror = function() { console.warn('[share] insight-markdown.js load failed (fallback to marked)'); resolve(); };
             document.head.appendChild(s);
         });
     }
@@ -91,37 +88,38 @@
     function render(d) {
         var task = d.task || {};
         var rep = d.report || {};
-        var mdHtml = '<pre>' + esc(rep.contentMd || '') + '</pre>';
-        if (typeof marked !== 'undefined') {
-            try {
-                mdHtml = sanitize(marked.parse(rep.contentMd || '', { breaks: true, gfm: true }));
-            } catch (e) {
-                console.error('[share] markdown render err', e);
-            }
+        var bodyHtml;
+        if (typeof InsightMd !== 'undefined' && InsightMd.render) {
+            bodyHtml = InsightMd.render(rep.contentMd || '');
+        } else if (typeof marked !== 'undefined') {
+            try { bodyHtml = sanitize(marked.parse(rep.contentMd || '', { breaks: true, gfm: true })); }
+            catch (e) { console.error('[share] markdown render err', e); bodyHtml = '<pre>' + esc(rep.contentMd || '') + '</pre>'; }
+        } else {
+            bodyHtml = '<pre>' + esc(rep.contentMd || '') + '</pre>';
         }
-        var tl = templateLabel(rep.template);
+        // 发布版页头:isPublic=true → 只标题 + 时间,不显徽章/版本(spec § 8.5 点 3)
+        var cover = (typeof InsightMd !== 'undefined' && InsightMd.cover)
+            ? InsightMd.cover({ title: task.title, createdAt: rep.createdAt }, true)
+            : '<header class="ins-report-cover"><h1>' + esc(task.title || '(无标题)') + '</h1></header>';
         var model = rep.modelUsed ? (' · ' + esc(rep.modelUsed)) : '';
 
         app.innerHTML = ''
-            + '<article class="share-article">'
-            +   '<header class="share-header">'
-            +     '<h1>' + esc(task.title || '(无标题)') + '</h1>'
-            +     '<div class="share-meta">'
-            +       '<time>' + formatDate(rep.createdAt) + '</time> · '
-            +       '<span class="share-version">v' + (rep.version || '?') + '</span>'
-            +       (tl ? ' · ' + tl : '')
-            +     '</div>'
-            +   '</header>'
-            +   '<div class="share-md">' + mdHtml + '</div>'
-            +   '<footer class="share-footer">本报告由二狗(AI)生成,仅供参考' + model + ' · 生成于 ' + formatDate(rep.createdAt) + '</footer>'
+            + '<article class="ins-report">'
+            +   cover
+            +   '<div class="ins-report-body">' + bodyHtml + '</div>'
+            +   '<footer class="ins-report-footer"><span class="ai">本报告由二狗(AI)生成,仅供参考' + model + ' · 生成于 ' + formatDate(rep.createdAt) + '</span></footer>'
             + '</article>';
 
-        // 设置文档标题(便于浏览器 tab 显示 / 收藏)
         if (task.title) document.title = task.title + ' · 洞察';
+        // T-129:渲染后把「思辨」节包成 callout
+        var rb = app.querySelector('.ins-report-body');
+        if (rb && typeof InsightMd !== 'undefined' && InsightMd.decorate) InsightMd.decorate(rb);
     }
 
-    loadMarked()
-        .catch(function(e) { console.error('[share] marked load fail', e); })
+    Promise.all([
+        loadMarked().catch(function(e) { console.error('[share] marked load fail', e); }),
+        loadInsightMd()
+    ])
         .then(function() { return fetch('/r/' + token + '/data'); })
         .then(function(resp) {
             if (resp.status === 410) {

@@ -302,6 +302,9 @@ var Insight = (function() {
           +   _detailHistoryHtml(t)
           +   _detailFeedbackHtml(t)
           + '</div>';
+        // T-129:渲染后把「思辨」节包成 callout
+        var rb = host.querySelector('.ins-report-body');
+        if (rb && typeof InsightMd !== 'undefined' && InsightMd.decorate) InsightMd.decorate(rb);
     }
 
     // 块 1:任务信息
@@ -348,9 +351,12 @@ var Insight = (function() {
             var banner = (t.status === 'ready')
                 ? '<div class="ins-det-rep-banner">📝 已提交反馈,等待 Claude Code 出新版(下方为上一版 v' + rep.version + ')</div>'
                 : '';
+            var cover = (typeof InsightMd !== 'undefined' && InsightMd.cover)
+                ? InsightMd.cover({ template: rep.template, version: rep.version, createdAt: rep.createdAt, modelUsed: rep.modelUsed }, false)
+                : '';
             inner = banner
-              + '<div class="ins-det-rep-head">报告 v' + rep.version + ' · ' + _templateLabel(rep.template) + '</div>'
-              + '<div class="ins-md ins-det-rep-body">' + (typeof InsightMd !== 'undefined' ? InsightMd.render(rep.contentMd) : _esc(rep.contentMd)) + '</div>';
+              + cover
+              + '<div class="ins-report-body">' + (typeof InsightMd !== 'undefined' ? InsightMd.render(rep.contentMd) : _esc(rep.contentMd)) + '</div>';
         } else {
             inner = '<div class="ins-det-pending">'
               + '⏳ 等待 Claude Code 处理 —— 在 CC 端跑 <code>/insight ' + t.id + '</code>'

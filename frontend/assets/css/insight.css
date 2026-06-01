@@ -1103,6 +1103,50 @@
 .ins-md th, .ins-md td { border: 1px solid var(--ins-border); padding: 6px 10px; }
 .ins-md th { background: var(--ins-bg-elev); }
 
+/* ===== T-129 报告排版体系 .ins-report(详情页;公开分享页同款另见 share.css)===== */
+.ins-report-metabar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ins-text-mute); margin-bottom: 16px; }
+.ins-report-cover { margin-bottom: 18px; }
+.ins-report-cover h1 { font-size: 25px; line-height: 1.3; font-weight: 700; color: #17132b; margin-bottom: 10px; letter-spacing: -.01em; }
+.ins-cover-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13px; color: var(--ins-text-mute); }
+.ins-cover-dot { color: var(--ins-text-faint); }
+.ins-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 11px; border-radius: 999px; font-size: 12.5px; font-weight: 600; color: #fff; }
+.ins-badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,.85); }
+.ins-badge.survey { background: #7C4DFF; }
+.ins-badge.decision { background: #2563EB; }
+.ins-badge.watch { background: #0D9488; }
+
+.ins-report-body { font-size: 15.5px; line-height: 1.78; color: #2a2733; }
+.ins-report-body > :first-child { margin-top: 0; }
+.ins-report-body h2 { font-size: 20px; font-weight: 700; color: #17132b; margin: 32px 0 12px; padding-top: 18px; border-top: 1px solid var(--ins-border); letter-spacing: -.005em; }
+.ins-report-body h2:first-of-type { border-top: 0; padding-top: 0; margin-top: 4px; }
+.ins-report-body h2::before { content: ""; display: inline-block; width: 3px; height: 17px; background: var(--ins-primary); border-radius: 2px; margin-right: 10px; vertical-align: -2px; }
+.ins-report-body h3 { font-size: 16px; font-weight: 700; color: #2a2436; margin: 22px 0 8px; }
+.ins-report-body p { margin: 0 0 14px; }
+.ins-report-body strong { color: #17132b; font-weight: 670; }
+.ins-report-body a { color: var(--ins-primary); text-decoration: none; border-bottom: 1px solid var(--ins-primary-strong); }
+.ins-report-body a:hover { border-bottom-color: var(--ins-primary); }
+.ins-report-body ul, .ins-report-body ol { margin: 0 0 14px; padding-left: 22px; }
+.ins-report-body li { margin: 5px 0; }
+.ins-report-body ul li::marker { color: var(--ins-primary); }
+.ins-report-body table { width: 100%; border-collapse: separate; border-spacing: 0; margin: 6px 0 18px; border: 1px solid var(--ins-border); border-radius: 10px; overflow: hidden; font-size: 14px; }
+.ins-report-body th { background: var(--ins-primary-soft); color: #3a2f5c; font-weight: 650; text-align: left; padding: 9px 13px; border-bottom: 1px solid var(--ins-border); }
+.ins-report-body td { padding: 9px 13px; border-bottom: 1px solid var(--ins-border); color: #33303d; }
+.ins-report-body tbody tr:nth-child(even) { background: #FBFAFE; }
+.ins-report-body tbody tr:last-child td { border-bottom: 0; }
+.ins-report-body blockquote { margin: 0 0 16px; padding: 12px 16px; background: var(--ins-bg-elev); border-left: 3px solid var(--ins-primary-strong); border-radius: 0 8px 8px 0; color: var(--ins-text-mute); }
+.ins-report-body blockquote p { margin: 0; }
+.ins-report-body code { background: var(--ins-bg-elev); border: 1px solid var(--ins-border); border-radius: 5px; padding: 1px 6px; font: 13px/1.5 "SFMono-Regular", Consolas, monospace; color: #5b3fb0; }
+.ins-report-body pre { background: var(--ins-bg-elev); border: 1px solid var(--ins-border); border-radius: 10px; padding: 14px 16px; overflow: auto; margin: 0 0 16px; }
+.ins-report-body pre code { background: none; border: 0; padding: 0; color: #2a2733; }
+.ins-report-body hr { border: 0; border-top: 1px dashed var(--ins-border); margin: 26px 0; }
+.ins-report-body sup { font-size: .72em; font-weight: 600; color: var(--ins-primary); vertical-align: super; line-height: 0; }
+
+/* 思辨 callout(差异化高亮)*/
+.ins-sibian { position: relative; margin: 26px 0 18px; padding: 18px 20px 6px 22px; background: linear-gradient(180deg, var(--ins-primary-soft), rgba(124,77,255,.04)); border: 1px solid var(--ins-primary-strong); border-left: 4px solid var(--ins-primary); border-radius: 0 12px 12px 0; }
+.ins-sibian-head { display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 700; color: #4a2fa0; margin-bottom: 8px; }
+.ins-sibian-head .tag { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--ins-primary); background: #fff; border: 1px solid var(--ins-primary-strong); border-radius: 999px; padding: 2px 9px; }
+.ins-sibian ul li::marker { color: var(--ins-primary); }
+
 /* 块3 反馈 */
 .ins-fb-textarea {
   width: 100%; box-sizing: border-box; border: 1px solid var(--ins-border);
