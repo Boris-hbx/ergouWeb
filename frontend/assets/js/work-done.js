@@ -18,6 +18,7 @@ var WorkDone = (function() {
     var _monthStates = {};
     // T-111 + B.-1:仅在切窗口/首次加载/折叠展开时触发 stagger;切责任人/标签下拉静默
     var _renderStagger = false;
+    var _completions = [];   // T-131:周期任务完成记录(API.workAllCompletions)
 
     function _esc(s) {
         return ('' + (s == null ? '' : s))
@@ -76,6 +77,11 @@ var WorkDone = (function() {
         if (!Work.rows() || Work.rows().length === 0) {
             try { await Work.reload(); } catch (_) {}
         }
+        // T-131:拉周期任务完成记录(并入档案)
+        try {
+            var r = await API.workAllCompletions();
+            if (r && r.success) _completions = r.items || [];
+        } catch (e) { console.error('[WorkDone] completions', e); }
         _loaded = true;
     }
 
@@ -90,6 +96,17 @@ var WorkDone = (function() {
         var rows = Work.rows().filter(function(t) {
             return t.status === 'done' || t.progress === 100;
         });
+        // T-131:并入周期任务完成记录(每条 = 一次完成,按 completedAt 落月;🔁 前缀标识)
+        rows = rows.concat((_completions || []).map(function(c) {
+            return {
+                id: 'wtc-' + c.id,
+                title: '🔁 ' + (c.title || '(无标题)'),
+                assignee: '', collaborators: [], tags: [],
+                priority: 'mid', status: 'done', progress: 100,
+                updatedAt: c.completedAt || '',
+                _recur: true
+            };
+        }));
         var range = _windowRange();
         if (range) {
             rows = rows.filter(function(t) {

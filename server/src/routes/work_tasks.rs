@@ -14,7 +14,7 @@ use axum::{
     http::StatusCode,
     Json,
 };
-use chrono::Utc;
+use chrono::{Datelike, Duration, NaiveDate, Utc};
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value as JsonValue};
@@ -316,18 +316,46 @@ pub fn update_task_impl(
     id: i64,
     mut patch: UpdateWorkTaskRequest,
 ) -> Result<Option<WorkTask>, String> {
-    // 1) 先读 old_status + 旧 custom_fields(merge 需要)
-    let existing: Option<(String, String)> = db
+    // 1) 先读 old_status + 旧 custom_fields(merge 需要)+ freq/due_date(T-131 周期复发判断)
+    let existing: Option<(String, String, String, Option<String>)> = db
         .query_row(
-            "SELECT status, custom_fields FROM work_tasks \
+            "SELECT status, custom_fields, freq, due_date FROM work_tasks \
              WHERE id = ?1 AND user_id = ?2 AND deleted = 0",
             params![id, user_id],
-            |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)),
+            |r| {
+                Ok((
+                    r.get::<_, String>(0)?,
+                    r.get::<_, String>(1)?,
+                    r.get::<_, String>(2)?,
+                    r.get::<_, Option<String>>(3)?,
+                ))
+            },
         )
         .ok();
-    let Some((old_status, old_custom_raw)) = existing else {
+    let Some((old_status, old_custom_raw, freq, cur_due)) = existing else {
         return Ok(None);
     };
+
+    // T-131:周期任务(freq != 一次性)完成 → 不归档,写完成历史 + 重置进度 + 顺延 due_date。
+    //   覆盖 patch(status→todo / progress→0 / due_date→下个周期),后续按普通更新落库。
+    //   一次性任务(freq 空或'一次性')完成仍走 status=done 归档,行为不变。
+    let wants_complete = patch.status.as_deref() == Some("done")
+        || patch.progress.map(|p| p >= 100).unwrap_or(false);
+    let is_periodic = !freq.is_empty() && freq != "一次性";
+    if wants_complete && is_periodic && old_status != "done" {
+        let now = now_rfc3339();
+        db.execute(
+            "INSERT INTO work_task_completions \
+                (task_id, user_id, completed_at, cycle_due_date, created_at) \
+             VALUES (?1, ?2, ?3, ?4, ?3)",
+            params![id, user_id, &now, &cur_due],
+        )
+        .map_err(|e| format!("insert completion: {e}"))?;
+        let new_due = next_cycle_due(cur_due.as_deref(), &freq);
+        patch.status = Some("todo".to_string());
+        patch.progress = Some(0);
+        patch.due_date = Some(new_due);
+    }
 
     // 2) 'P0' alias → 'high'
     if let Some(ref p) = patch.priority {
@@ -459,6 +487,118 @@ fn load_task(db: &Connection, user_id: &str, id: i64) -> Option<WorkTask> {
         "SELECT {SELECT_COLS} FROM work_tasks WHERE id = ?1 AND user_id = ?2 AND deleted = 0"
     );
     db.query_row(&sql, params![id, user_id], row_to_task).ok()
+}
+
+// ============ T-131:周期复发 顺延计算 ============
+
+/// 按 freq 顺延 due_date(base 不存在则按 today)。月/季越界按目标月最后一天(避免 1/31→2/31)。
+fn next_cycle_due(base: Option<&str>, freq: &str) -> String {
+    let today = Utc::now().date_naive();
+    let d = base.and_then(parse_due).unwrap_or(today);
+    let nd = match freq {
+        "每日" => d + Duration::days(1),
+        "每周" => d + Duration::days(7),
+        "每月" => add_months(d, 1),
+        "每季" => add_months(d, 3),
+        _ => d + Duration::days(7), // 兜底(is_periodic 已排除一次性)
+    };
+    nd.format("%Y-%m-%d").to_string()
+}
+/// 解析 'YYYY-MM-DD';'MM-DD' 补当前年;否则 None。
+fn parse_due(s: &str) -> Option<NaiveDate> {
+    let s = s.trim();
+    if let Ok(d) = NaiveDate::parse_from_str(s, "%Y-%m-%d") {
+        return Some(d);
+    }
+    if s.len() == 5 && s.as_bytes().get(2) == Some(&b'-') {
+        let y = Utc::now().year();
+        if let Ok(d) = NaiveDate::parse_from_str(&format!("{y}-{s}"), "%Y-%m-%d") {
+            return Some(d);
+        }
+    }
+    None
+}
+fn last_day_of_month(y: i32, m: u32) -> u32 {
+    let (ny, nm) = if m == 12 { (y + 1, 1) } else { (y, m + 1) };
+    NaiveDate::from_ymd_opt(ny, nm, 1)
+        .and_then(|d| d.pred_opt())
+        .map(|d| d.day())
+        .unwrap_or(28)
+}
+fn add_months(d: NaiveDate, n: u32) -> NaiveDate {
+    let total = d.month0() + n;
+    let y = d.year() + (total / 12) as i32;
+    let month = total % 12 + 1;
+    let day = d.day().min(last_day_of_month(y, month));
+    NaiveDate::from_ymd_opt(y, month, day).unwrap_or(d)
+}
+
+/// GET /api/work/tasks/:id/completions — 某周期任务的完成历史(倒序)。
+pub async fn list_completions(
+    State(state): State<AppState>,
+    user_id: UserId,
+    Path(id): Path<i64>,
+) -> (StatusCode, Json<JsonValue>) {
+    let db = state.db.lock();
+    let mut stmt = match db.prepare(
+        "SELECT id, completed_at, cycle_due_date, note FROM work_task_completions \
+         WHERE task_id = ?1 AND user_id = ?2 ORDER BY completed_at DESC",
+    ) {
+        Ok(s) => s,
+        Err(e) => return db_error("completions prepare", e),
+    };
+    let rows = stmt.query_map(params![id, &user_id.0], |r| {
+        Ok(json!({
+            "id": r.get::<_, i64>(0)?,
+            "completedAt": r.get::<_, String>(1)?,
+            "cycleDueDate": r.get::<_, Option<String>>(2)?,
+            "note": r.get::<_, String>(3)?,
+        }))
+    });
+    let rows = match rows {
+        Ok(r) => r,
+        Err(e) => return db_error("completions query", e),
+    };
+    let items: Vec<JsonValue> = rows.filter_map(|r| r.ok()).collect();
+    (
+        StatusCode::OK,
+        Json(json!({ "success": true, "items": items, "count": items.len() })),
+    )
+}
+
+/// GET /api/work/task-completions — 本人所有周期完成记录(已完成档案用,JOIN 任务标题)。
+pub async fn list_all_completions(
+    State(state): State<AppState>,
+    user_id: UserId,
+) -> (StatusCode, Json<JsonValue>) {
+    let db = state.db.lock();
+    let mut stmt = match db.prepare(
+        "SELECT c.id, c.task_id, c.completed_at, c.cycle_due_date, t.title, t.freq \
+         FROM work_task_completions c JOIN work_tasks t ON c.task_id = t.id \
+         WHERE c.user_id = ?1 ORDER BY c.completed_at DESC",
+    ) {
+        Ok(s) => s,
+        Err(e) => return db_error("all completions prepare", e),
+    };
+    let rows = stmt.query_map(params![&user_id.0], |r| {
+        Ok(json!({
+            "id": r.get::<_, i64>(0)?,
+            "taskId": r.get::<_, i64>(1)?,
+            "completedAt": r.get::<_, String>(2)?,
+            "cycleDueDate": r.get::<_, Option<String>>(3)?,
+            "title": r.get::<_, String>(4)?,
+            "freq": r.get::<_, String>(5)?,
+        }))
+    });
+    let rows = match rows {
+        Ok(r) => r,
+        Err(e) => return db_error("all completions query", e),
+    };
+    let items: Vec<JsonValue> = rows.filter_map(|r| r.ok()).collect();
+    (
+        StatusCode::OK,
+        Json(json!({ "success": true, "items": items, "count": items.len() })),
+    )
 }
 
 // ============ HTTP handlers(薄壳,委托 impl) ============
@@ -1345,5 +1485,118 @@ mod tests {
         let arr = items.as_array().unwrap();
         assert_eq!(arr.len(), 1);
         assert_eq!(arr[0]["title"], "oldA"); // 只有未完成的逾期
+    }
+
+    // ============ T-131:周期复发测试 ============
+
+    #[test]
+    fn next_cycle_week_day_month_quarter() {
+        assert_eq!(next_cycle_due(Some("2026-05-25"), "每周"), "2026-06-01");
+        assert_eq!(next_cycle_due(Some("2026-05-25"), "每日"), "2026-05-26");
+        assert_eq!(next_cycle_due(Some("2026-05-25"), "每月"), "2026-06-25");
+        assert_eq!(next_cycle_due(Some("2026-05-25"), "每季"), "2026-08-25");
+        // 月末越界 clamp:1/31 + 1月 → 2/28(2026 非闰年)
+        assert_eq!(next_cycle_due(Some("2026-01-31"), "每月"), "2026-02-28");
+        // 跨年
+        assert_eq!(next_cycle_due(Some("2026-12-15"), "每月"), "2027-01-15");
+    }
+
+    #[tokio::test]
+    async fn periodic_task_recurs_not_archived_on_complete() {
+        let state = test_state();
+        let (_uid, token) = create_test_user(&state, "t131p", "Pa55word1");
+        let cookie = auth_cookie(&token);
+        let app = crate::build_app(state);
+
+        // 建 freq=每月、due=2026-05-25
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/work/tasks")
+                    .header("Cookie", &cookie)
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(r#"{"title":"月报","freq":"每月","due":"2026-05-25"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let id = body_json(resp).await["item"]["id"].as_i64().unwrap();
+
+        // 完成(PATCH status=done)→ 周期任务不归档:status=todo, progress=0, due 顺延
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("PATCH")
+                    .uri(format!("/api/work/tasks/{id}"))
+                    .header("Cookie", &cookie)
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(r#"{"status":"done"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let j = body_json(resp).await;
+        assert_eq!(j["item"]["status"], "todo");
+        assert_eq!(j["item"]["progress"], 0);
+        assert_eq!(j["item"]["due"], "2026-06-25");
+
+        // 完成历史 1 条,cycleDueDate = 完成时的 due
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/api/work/tasks/{id}/completions"))
+                    .header("Cookie", &cookie)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let jc = body_json(resp).await;
+        assert_eq!(jc["count"], 1);
+        assert_eq!(jc["items"][0]["cycleDueDate"], "2026-05-25");
+    }
+
+    #[tokio::test]
+    async fn oneoff_task_archives_normally_unchanged() {
+        let state = test_state();
+        let (_uid, token) = create_test_user(&state, "t131o", "Pa55word1");
+        let cookie = auth_cookie(&token);
+        let app = crate::build_app(state);
+
+        // 默认 freq 空 = 一次性
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/work/tasks")
+                    .header("Cookie", &cookie)
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(r#"{"title":"一次性活"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let id = body_json(resp).await["item"]["id"].as_i64().unwrap();
+
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("PATCH")
+                    .uri(format!("/api/work/tasks/{id}"))
+                    .header("Cookie", &cookie)
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(r#"{"status":"done"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let j = body_json(resp).await;
+        assert_eq!(j["item"]["status"], "done");
+        assert_eq!(j["item"]["progress"], 100); // 一次性完成自动 100,行为不变
     }
 }

@@ -911,6 +911,19 @@ fn create_tables(conn: &Connection) {
         CREATE INDEX IF NOT EXISTS idx_work_tasks_user ON work_tasks(user_id, deleted);
         CREATE INDEX IF NOT EXISTS idx_work_tasks_due  ON work_tasks(user_id, due_date);
 
+        -- 周期任务完成历史(T-131):freq != '一次性' 的任务每次完成写一条;一次性任务不写(走 status=done 归档)。
+        CREATE TABLE IF NOT EXISTS work_task_completions (
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            task_id        INTEGER NOT NULL REFERENCES work_tasks(id),
+            user_id        TEXT    NOT NULL,
+            completed_at   TEXT    NOT NULL,
+            cycle_due_date TEXT,
+            note           TEXT    NOT NULL DEFAULT '',
+            created_at     TEXT    NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_wtc_task ON work_task_completions(task_id, completed_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_wtc_user_archive ON work_task_completions(user_id, completed_at DESC);
+
         -- Work columns (per-user schema config for the work_tasks table)
         --   On first access, backend seeds 9 builtin rows (see models::work_column::builtin_seed).
         --   builtin=1 → cannot be deleted; sys=1 → options semantics fixed (status / priority).

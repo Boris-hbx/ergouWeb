@@ -324,6 +324,15 @@ pub fn build_app(state: AppState) -> Router {
             axum::routing::patch(routes::work_tasks::update_task)
                 .delete(routes::work_tasks::delete_task),
         )
+        // T-131:周期任务完成历史
+        .route(
+            "/work/tasks/{id}/completions",
+            get(routes::work_tasks::list_completions),
+        )
+        .route(
+            "/work/task-completions",
+            get(routes::work_tasks::list_all_completions),
+        )
         .route(
             "/work/columns",
             get(routes::work_columns::list_columns)

@@ -616,6 +616,9 @@ var API = (function() {
         workCreateTask:   async function(data)     { return await request('POST',   '/work/tasks', data); },
         workUpdateTask:   async function(id, data) { return await request('PATCH',  '/work/tasks/' + id, data); },
         workDeleteTask:   async function(id)       { return await request('DELETE', '/work/tasks/' + id); },
+        // T-131 周期任务完成历史
+        workTaskCompletions: async function(id)    { return await request('GET',    '/work/tasks/' + id + '/completions'); },
+        workAllCompletions:  async function()      { return await request('GET',    '/work/task-completions'); },
         workListColumns:  async function()         { return await request('GET',    '/work/columns'); },
         workSaveColumns:  async function(patches)  { return await request('PUT',    '/work/columns', { columns: patches }); },
         workAddColumn:    async function(data)     { return await request('POST',   '/work/columns', data); },

@@ -181,6 +181,22 @@ var WorkDetail = (function() {
                 : '<div class="wt-d-tl-empty">暂无活动记录</div>';
         }
 
+        // T-131:周期任务 → 异步拉完成历史,插到时间线顶部("🔁 完成(本期截止 X)")
+        if (tlEl && t.freq && t.freq !== '一次性') {
+            var forId = t.id;
+            API.workTaskCompletions(t.id).then(function(r) {
+                if (_currentId !== forId) return;   // 已切到别的任务 → 丢弃
+                var el = document.getElementById('wt-d-timeline');
+                if (!el || !r || !r.success || !r.items || !r.items.length) return;
+                var hist = r.items.map(function(c) {
+                    var cyc = c.cycleDueDate ? '(本期截止 ' + _esc(c.cycleDueDate) + ')' : '';
+                    return '<div class="wt-d-tl-item">🔁 完成 ' + cyc
+                        + '<span class="wt-d-tl-when">' + _esc(_fmtTime(c.completedAt)) + '</span></div>';
+                }).join('');
+                el.innerHTML = hist + el.innerHTML;
+            }).catch(function(e) { console.error('[WorkDetail] completions', e); });
+        }
+
         // 底部元信息
         _setText('wt-d-created', _fmtTime(t.createdAt));
         _setText('wt-d-updated', _fmtTime(t.updatedAt));
