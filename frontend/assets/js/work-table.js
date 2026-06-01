@@ -33,6 +33,97 @@ var WorkTable = (function() {
     function _statusBy(k) { for (var i = 0; i < STATUS.length; i++) if (STATUS[i].key === k) return STATUS[i]; return STATUS[0]; }
     function _prioBy(k)   { for (var i = 0; i < PRIORITY.length; i++) if (PRIORITY[i].key === k) return PRIORITY[i]; return PRIORITY[1]; }
 
+    // ============ T-132:表头列筛选(Excel 风) ============
+    // 结构:{ colKey: Set<选中的存储值> };存在某 key = 该列筛选生效(只显示值 ∈ Set 的行)。
+    // 纯前端内存态;切时间 Tab / 分组不清空(正交叠加);仅表格视图生效。
+    var _colFilters = {};
+
+    // 可筛列:select / status / multi 类型 + 责任人(取代旧工具栏下拉)。文本走搜索、日期走 Tab、数字本轮不做。
+    function _isFilterable(col) {
+        if (!col) return false;
+        return col.type === 'select' || col.type === 'status' || col.type === 'multi' || col.key === 'assignee';
+    }
+
+    // 读某行某列的存储值数组(multi → 多个;空 → ['']  代表「(空白)」)
+    function _rowColValues(t, col) {
+        var key = col.key, raw;
+        if (key === 'assignee' || key === 'status' || key === 'priority' || key === 'level' || key === 'freq') {
+            raw = t[key];
+        } else if (key === 'tags') {
+            raw = (t.tags != null) ? t.tags : (t.customFields && t.customFields.tags);
+        } else {
+            raw = (t.customFields && t.customFields[key]);
+        }
+        var arr;
+        if (Array.isArray(raw)) arr = raw.filter(function(v) { return v != null && ('' + v).trim() !== ''; }).map(String);
+        else if (raw != null && ('' + raw).trim() !== '') arr = [String(raw)];
+        else arr = [];
+        return arr.length ? arr : [''];
+    }
+
+    // 存储值 → 浮层显示文案(status/priority 是 key 要映射;其它即原值;空 → (空白))
+    function _valueLabel(col, v) {
+        if (v === '' || v == null) return '(空白)';
+        if (col.key === 'status' || col.type === 'status') return _statusBy(v).label;
+        if (col.key === 'priority') return _prioBy(v).label;
+        return '' + v;
+    }
+
+    function _hasAnyColFilter() {
+        for (var k in _colFilters) if (Object.prototype.hasOwnProperty.call(_colFilters, k)) return true;
+        return false;
+    }
+
+    // 跨列 AND;同列内 multi 任一命中即可(OR)
+    function _passColFilters(t) {
+        for (var key in _colFilters) {
+            if (!Object.prototype.hasOwnProperty.call(_colFilters, key)) continue;
+            var sel = _colFilters[key];
+            var col = Work.colByKey(key);
+            if (!col) continue;
+            var vals = _rowColValues(t, col);
+            var hit = vals.some(function(v) { return sel.has(v); });
+            if (!hit) return false;
+        }
+        return true;
+    }
+
+    // 点表头漏斗 → 弹值勾选浮层(候选 = 非 done 数据里该列去重值;空白置末)
+    function openColFilter(ev, key) {
+        if (ev && ev.stopPropagation) ev.stopPropagation();
+        var col = Work.colByKey(key);
+        if (!col) return;
+        var anchor = (ev && ev.currentTarget) || (ev && ev.target);
+        var base = Work.rows().filter(function(t) { return t.status !== 'done'; });  // 状态候选不含「已完成」
+        var seen = {}, values = [], hasBlank = false;
+        base.forEach(function(t) {
+            _rowColValues(t, col).forEach(function(v) {
+                if (v === '') { hasBlank = true; return; }
+                if (!Object.prototype.hasOwnProperty.call(seen, v)) { seen[v] = 1; values.push(v); }
+            });
+        });
+        var options = values.map(function(v) { return { value: v, label: _valueLabel(col, v) }; });
+        if (hasBlank) options.push({ value: '', label: '(空白)' });   // (空白) 永远置末
+        var allVals = options.map(function(o) { return o.value; });
+        var selected = _colFilters[key] ? Array.from(_colFilters[key]) : allVals.slice();  // 无筛 = 全选
+        WorkPick.openFilter({
+            anchor: anchor,
+            options: options,
+            selected: selected,
+            onConfirm: function(checked) {
+                if (checked.length >= allVals.length) delete _colFilters[key];   // 全选 = 不筛
+                else _colFilters[key] = new Set(checked);
+                Work.render();
+            },
+            onClear: function() { delete _colFilters[key]; Work.render(); },
+        });
+    }
+
+    function clearAllFilters() {
+        _colFilters = {};
+        Work.render();
+    }
+
     // ============ 头像配色 ============
     // T-099:统一改走 Work.colorOf(name) hash 取色,所有视图同人同色。
     // 原本是"按出现顺序分配",会导致表格和人员视图同人异色。
@@ -45,45 +136,20 @@ var WorkTable = (function() {
             .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
-    // ============ filter / group:从工具栏 select 读 ============
-    function _filterValue() {
-        var el = document.getElementById('wt-filter');
-        return el ? el.value : '';
-    }
+    // ============ group:从工具栏 select 读(责任人筛选 T-132 已改表头漏斗) ============
     function _groupValue() {
         var el = document.getElementById('wt-group');
         return el ? el.value : '';
     }
     function _visibleRows() {
-        // T-098:先过时间镜头 Tab,再过责任人(两层叠加);T-130:applyTimeTabFilter 已含搜索
+        // T-098 时间 Tab + T-130 全局搜索(applyTimeTabFilter 内含)+ T-132 表头列筛选
         var rows = Work.applyTimeTabFilter(Work.rows());
-        var f = _filterValue();
-        if (!f) return rows;
-        return rows.filter(function(t) { return t.assignee === f; });
+        return _hasAnyColFilter() ? rows.filter(_passColFilters) : rows;
     }
 
-    // T-130:不含搜索的可见数(算「N 条命中 / 共 M 项」里的 M)
+    // T-130/T-132:不含搜索 + 不含列筛选的可见数(算「N 条命中 / 共 M 项」里的 M)
     function _baseRowCount() {
-        var rows = Work.applyTimeTabFilter(Work.rows(), { skipSearch: true });
-        var f = _filterValue();
-        if (f) rows = rows.filter(function(t) { return t.assignee === f; });
-        return rows.length;
-    }
-
-    // ============ 工具栏右侧:责任人筛选下拉 (每次 render 重建) ============
-    function _refillFilter() {
-        var sel = document.getElementById('wt-filter');
-        if (!sel) return;
-        var cur = sel.value;
-        var names = [];
-        Work.rows().forEach(function(t) {
-            if (t.assignee && names.indexOf(t.assignee) < 0) names.push(t.assignee);
-        });
-        sel.innerHTML = '<option value="">全部责任人</option>'
-            + names.map(function(n) {
-                var safe = _esc(n);
-                return '<option value="' + safe + '"' + (n === cur ? ' selected' : '') + '>' + safe + '</option>';
-            }).join('');
+        return Work.applyTimeTabFilter(Work.rows(), { skipSearch: true }).length;
     }
 
     // ============ 单元格渲染(按列类型) ============
@@ -140,7 +206,10 @@ var WorkTable = (function() {
             case 'select': {
                 var has = v != null && v !== '';
                 var cls = (k === 'freq') ? 'wt-fq' : 'wt-lv';
-                return '<td>' + (has
+                // T-131:周期任务(freq 非「一次性」)加 🔁 标记,一眼看出会自动顺延复发
+                var recur = (k === 'freq' && has && v !== '一次性')
+                    ? '<span class="wt-recur" title="周期任务:完成后自动顺延,不归档">🔁</span> ' : '';
+                return '<td>' + recur + (has
                     ? '<span class="wt-pill ' + cls + '" onclick="WorkTable.openPick(' + t.id + ',\'' + _escAttr(k) + '\',this)">' + _esc(v) + '</span>'
                     : '<span class="wt-pill wt-pill-empty" onclick="WorkTable.openPick(' + t.id + ',\'' + _escAttr(k) + '\',this)">选择</span>')
                   + '</td>';
@@ -264,25 +333,30 @@ var WorkTable = (function() {
         var withStagger = !!opts.stagger;
         var cols = Work.columns();
         if (!cols || !cols.length) return;
-        _refillFilter();
 
-        // 总数胶囊(T-130:搜索激活时改「N 条命中 / 共 M 项」)
+        // 总数胶囊(T-130 搜索 / T-132 列筛选生效时改「N 条命中 / 共 M 项」)
         var rows = _visibleRows();
         var q = Work.searchQuery();
+        var filtering = !!q || _hasAnyColFilter();
         var tot = document.getElementById('wt-total');
         if (tot) {
-            tot.textContent = q
+            tot.textContent = filtering
                 ? (rows.length + ' 条命中 / 共 ' + _baseRowCount() + ' 项')
                 : ('共 ' + rows.length + ' 项');
         }
+        // T-132:「✕ 清除全部筛选」链接仅在有列筛选时显示
+        var clr = document.getElementById('wt-clear-filters');
+        if (clr) clr.style.display = _hasAnyColFilter() ? '' : 'none';
 
         // 表格本体(只在 table 视图下渲染)
         var host = document.getElementById('wt-table-view');
         if (!host) return;
 
-        // T-130:搜索 0 命中 → 空状态(其它视图自然显示空,无需特判)
-        if (q && rows.length === 0) {
-            host.innerHTML = '<div class="wt-search-empty">🔍 无匹配任务,试试别的词</div>';
+        // T-130/T-132:筛选后 0 命中 → 空状态(其它视图自然显示空,无需特判)
+        if (filtering && rows.length === 0) {
+            host.innerHTML = '<div class="wt-search-empty">🔍 没有匹配的任务,试试放宽筛选条件'
+                + (_hasAnyColFilter() ? ' · <a class="wt-clear-link" onclick="WorkTable.clearAllFilters()">✕ 清除全部筛选</a>' : '')
+                + '</div>';
             return;
         }
 
@@ -299,12 +373,19 @@ var WorkTable = (function() {
             + '</colgroup>';
 
         // thead — 表头不可点(原则 3);只在两列之间出拖动条;最右列右侧不放拖动条
+        // T-132:可筛列加漏斗图标(独立小热区,不占文字/拖宽条);该列有筛选生效时高亮
         var thead = '<thead><tr><th class="wt-num-th">#</th>'
             + cols.map(function(c, i) {
                 var rz = (i < cols.length - 1)
                     ? '<span class="wt-resizer" title="拖动调整左右两列的列宽" onmousedown="WorkTable._resizeStart(event,' + i + ')"></span>'
                     : '';
-                return '<th>' + _esc(c.name) + rz + '</th>';
+                var funnel = '';
+                if (_isFilterable(c)) {
+                    var active = !!_colFilters[c.key];
+                    funnel = '<span class="wt-funnel' + (active ? ' active' : '') + '" title="筛选「' + _esc(c.name) + '」"'
+                        + ' onclick="WorkTable.openColFilter(event,\'' + _escAttr(c.key) + '\')">🔽</span>';
+                }
+                return '<th>' + _esc(c.name) + funnel + rz + '</th>';
             }).join('')
             + '</tr></thead>';
 
@@ -419,6 +500,10 @@ var WorkTable = (function() {
 
     // T-103 B.3:完成动画 — 彩纸 + 行淡出;期间冻结 render 避免被打断
     function _doCompletionWithCelebration(id, c, field) {
+        // T-131:周期任务(freq != 一次性)完成不归档——彩纸照放,但行不淡出;
+        //   后端会返回 status=todo/progress=0/顺延 due,freezeRender 期满重渲自然刷回重置行。
+        var _t0 = Work.rowById(id);
+        var periodic = !!(_t0 && _t0.freq && _t0.freq !== '一次性');
         // 1) 立刻发 PATCH(乐观更新);但冻结 render 1100ms,让动画跑完再重渲
         if (Work.freezeRender) Work.freezeRender(1100);
 
@@ -438,10 +523,12 @@ var WorkTable = (function() {
         var anchor = row ? (row.querySelector('.progress-ring') || row.querySelector('.wt-cell-progress') || row.querySelector('.wt-num') || row) : document.body;
         _confettiBurst(anchor);
 
-        // 3) 700ms 后给行加 .wt-removing,触发 translateX -30 opacity 0 缓动
-        setTimeout(function() {
-            if (row && row.parentNode) row.classList.add('wt-removing');
-        }, 700);
+        // 3) 一次性:700ms 后给行加 .wt-removing 淡出移档案;周期任务:不淡出(行保留)
+        if (!periodic) {
+            setTimeout(function() {
+                if (row && row.parentNode) row.classList.add('wt-removing');
+            }, 700);
+        }
         // 4) Work.freezeRender 期满会自动调 render(),replace DOM,自然结束动画
     }
 
@@ -1010,6 +1097,9 @@ var WorkTable = (function() {
         openText: openText,
         closeText: closeText,
         saveText: saveText,
+        // T-132:表头列筛选
+        openColFilter: openColFilter,
+        clearAllFilters: clearAllFilters,
         // 给 thead 行内 onmousedown 用
         _resizeStart: _resizeStart,
         // 给 work-board.js 复用(头像配色 / 状态/优先级元数据)

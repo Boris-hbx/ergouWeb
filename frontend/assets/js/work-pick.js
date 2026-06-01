@@ -18,6 +18,7 @@
 
 var WorkPick = (function() {
     var _state = null;  // { anchor, options, isMulti, chosen, onConfirm }
+    var _fstate = null; // T-132 列筛选模式:{ anchor, options:[{value,label}], checked:Set, search, onConfirm, onClear }
 
     function open(opts) {
         if (!opts || !opts.anchor) {
@@ -42,11 +43,95 @@ var WorkPick = (function() {
             onConfirm: opts.onConfirm || function() {},
         };
         _render();
-        _position();
+        _position(_state.anchor);
         var bd = document.getElementById('wt-pick-bd');
         var pop = document.getElementById('wt-pick');
         if (bd) bd.classList.add('open');
         if (pop) pop.classList.add('open');
+    }
+
+    // ============ T-132:Excel 风列筛选浮层 ============
+    // opts: { anchor, options:[{value,label}], selected:[value,...], onConfirm:fn(checkedValues[]), onClear:fn }
+    // 复用本模块的浮层 DOM(#wt-pick)+ 定位 + 遮罩关闭。
+    function openFilter(opts) {
+        if (!opts || !opts.anchor) { console.error('[WorkPick] openFilter: missing anchor'); return; }
+        _state = null;
+        var options = opts.options || [];
+        var sel = {};
+        (opts.selected || []).forEach(function(v) { sel[v] = 1; });
+        var checked = {};
+        // selected 缺省(无筛选)= 全选
+        options.forEach(function(o) {
+            checked[o.value] = (opts.selected && opts.selected.length >= 0) ? !!sel[o.value] : true;
+        });
+        _fstate = {
+            anchor: opts.anchor, options: options, checked: checked, search: '',
+            onConfirm: opts.onConfirm || function() {}, onClear: opts.onClear || function() {},
+        };
+        _renderFilter();
+        _position(opts.anchor);
+        var bd = document.getElementById('wt-pick-bd');
+        var pop = document.getElementById('wt-pick');
+        if (bd) bd.classList.add('open');
+        if (pop) pop.classList.add('open');
+        var si = document.getElementById('wt-pick-search-input');
+        if (si) si.focus();
+    }
+
+    function _renderFilter() {
+        var pop = document.getElementById('wt-pick');
+        if (!pop || !_fstate) return;
+        var q = _fstate.search.toLowerCase();
+        var visible = _fstate.options.filter(function(o) {
+            return !q || ('' + o.label).toLowerCase().indexOf(q) >= 0;
+        });
+        var allChecked = visible.length > 0 && visible.every(function(o) { return _fstate.checked[o.value]; });
+        var rows = visible.map(function(o) {
+            var on = !!_fstate.checked[o.value];
+            return '<div class="wt-pick-opt' + (on ? ' selected' : '') + '" data-val="' + _escAttr(o.value) + '">'
+                 +   '<span class="wt-pick-check">' + (on ? '☑' : '☐') + '</span>'
+                 +   '<span>' + _escape(o.label) + '</span></div>';
+        }).join('') || '<div class="wt-pick-noval">无候选值</div>';
+        pop.innerHTML =
+            '<div class="wt-pick-search"><input id="wt-pick-search-input" type="text" placeholder="🔍 搜索值…" value="' + _escAttr(_fstate.search) + '"></div>'
+          + '<div class="wt-pick-list">'
+          +   '<div class="wt-pick-opt wt-pick-all" data-all="1"><span class="wt-pick-check">' + (allChecked ? '☑' : '☐') + '</span><span>(全选)</span></div>'
+          +   rows
+          + '</div>'
+          + '<div class="wt-pick-actions">'
+          +   '<button class="wt-mbtn" data-act="clearcol">清除该列</button>'
+          +   '<button class="wt-mbtn primary" data-act="fconfirm">确认</button>'
+          + '</div>';
+        var si = document.getElementById('wt-pick-search-input');
+        if (si) si.oninput = function() { _fstate.search = this.value; _renderFilter(); var n = document.getElementById('wt-pick-search-input'); if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); } };
+        pop.onclick = function(ev) {
+            if (ev.target.closest('.wt-pick-search')) return;
+            var allEl = ev.target.closest('.wt-pick-all');
+            if (allEl) {
+                var qq = _fstate.search.toLowerCase();
+                var vis = _fstate.options.filter(function(o) { return !qq || ('' + o.label).toLowerCase().indexOf(qq) >= 0; });
+                var allOn = vis.every(function(o) { return _fstate.checked[o.value]; });
+                vis.forEach(function(o) { _fstate.checked[o.value] = !allOn; });
+                _renderFilter();
+                return;
+            }
+            var optEl = ev.target.closest('.wt-pick-opt');
+            if (optEl && optEl.dataset.val !== undefined) {
+                var v = optEl.dataset.val;
+                _fstate.checked[v] = !_fstate.checked[v];
+                _renderFilter();
+                return;
+            }
+            var btn = ev.target.closest('button[data-act]');
+            if (btn) {
+                if (btn.dataset.act === 'clearcol') { var oc = _fstate.onClear; close(); try { oc(); } catch (e) { console.error('[WorkPick] onClear', e); } }
+                else if (btn.dataset.act === 'fconfirm') {
+                    var checkedVals = _fstate.options.filter(function(o) { return _fstate.checked[o.value]; }).map(function(o) { return o.value; });
+                    var cb = _fstate.onConfirm; close();
+                    try { cb(checkedVals); } catch (e) { console.error('[WorkPick] onConfirm', e); }
+                }
+            }
+        };
     }
 
     function close() {
@@ -55,6 +140,7 @@ var WorkPick = (function() {
         if (bd) bd.classList.remove('open');
         if (pop) pop.classList.remove('open');
         _state = null;
+        _fstate = null;
     }
 
     function _toggle(idx) {
@@ -116,11 +202,10 @@ var WorkPick = (function() {
         };
     }
 
-    function _position() {
-        if (!_state) return;
+    function _position(anchor) {
         var pop = document.getElementById('wt-pick');
-        if (!pop || !_state.anchor) return;
-        var rect = _state.anchor.getBoundingClientRect();
+        if (!pop || !anchor) return;
+        var rect = anchor.getBoundingClientRect();
         // 防止溢出右边界:把 left 夹在 [8, viewportWidth - 310] 之间
         var vw = window.innerWidth || document.documentElement.clientWidth;
         var maxLeft = vw - 310;
@@ -135,9 +220,13 @@ var WorkPick = (function() {
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;');
     }
+    function _escAttr(s) {
+        return _escape(s).replace(/"/g, '&quot;');
+    }
 
     return {
         open: open,
+        openFilter: openFilter,   // T-132
         close: close,
     };
 })();

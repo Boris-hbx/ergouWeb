@@ -565,6 +565,37 @@ table.wt-table {
   padding: 6px 14px; font-size: 0.82rem; border-radius: 8px;
 }
 
+/* ============ T-132:表头列筛选 ============ */
+/* 表头漏斗图标:独立小热区,不占文字点击与右侧拖宽条 */
+.wt-funnel {
+  display: inline-block; margin-left: 5px; font-size: 0.62rem; line-height: 1;
+  color: #C3C9D4; cursor: pointer; vertical-align: middle; user-select: none;
+  transition: color .12s; position: relative; z-index: 2;
+}
+.wt-table th:hover .wt-funnel { color: #9CA3AF; }
+.wt-funnel:hover { color: var(--primary-color); }
+/* 该列有筛选生效:主色 + 右上角小圆点角标 */
+.wt-funnel.active { color: var(--primary-color); }
+.wt-funnel.active::after {
+  content: ''; position: absolute; top: -2px; right: -3px;
+  width: 5px; height: 5px; border-radius: 50%; background: var(--primary-color);
+}
+/* 筛选浮层:值搜索框 + (全选) 行 + 无候选提示(复用 .wt-pick / .wt-pick-opt) */
+.wt-pick-search { padding: 2px 4px 6px; }
+.wt-pick-search input {
+  width: 100%; box-sizing: border-box; padding: 6px 10px;
+  border: 1px solid var(--border-color); border-radius: 7px; font-size: 0.82rem;
+  color: var(--text-primary);
+}
+.wt-pick-search input:focus { outline: none; border-color: var(--primary-color); }
+.wt-pick-all { border-bottom: 1px dashed var(--border-light); font-weight: 600; }
+.wt-pick-noval { padding: 10px 12px; color: var(--text-muted); font-size: 0.82rem; }
+/* 工具栏「✕ 清除全部筛选」链接 + 空状态里的同款链接 */
+.wt-clear-filters, .wt-clear-link {
+  color: var(--primary-color); cursor: pointer; font-size: 0.82rem; white-space: nowrap;
+}
+.wt-clear-filters:hover, .wt-clear-link:hover { text-decoration: underline; }
+
 .wt-hidden { display: none; }
 
 /* ============ 人员视图(T-099)============
