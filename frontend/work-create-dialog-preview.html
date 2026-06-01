@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>新建任务弹窗 · 紧凑布局(spec § 7.7)设计预览</title>
+<style>
+  :root{
+    --card-bg:#fff; --text:#1f2937; --muted:#8a8f98; --border:#e3e5e8;
+    --primary:#7C4DFF; --primary-soft:rgba(124,77,255,.10); --hover:#f2f3f5;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:#eef0f4;color:var(--text);
+    font:14px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+    min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:48px 16px;}
+  .pv-note{position:fixed;top:0;left:0;right:0;background:#1b1830;color:#cfc8ec;
+    font-size:12.5px;padding:9px 18px;z-index:5;}
+  .pv-note b{color:#fff;}
+
+  /* ===== 拟落地样式(按 spec § 7.7 紧凑布局)===== */
+  .ov{background:var(--card-bg);border-radius:12px;width:560px;max-width:96vw;
+    box-shadow:0 8px 30px rgba(0,0,0,.18);}
+  .hd{padding:14px 20px;font-size:16px;font-weight:600;border-bottom:1px solid var(--border);}
+  .bd{padding:16px 20px;display:flex;flex-direction:column;gap:11px;}
+
+  .f{display:flex;flex-direction:column;gap:5px;min-width:0;}
+  .lb{font-size:12.5px;color:var(--muted);}
+  .in,.ta{width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 11px;
+      font-size:14px;font-family:inherit;}
+  .in:focus,.ta:focus{outline:none;border-color:var(--primary);}
+  .ta{min-height:62px;resize:vertical;}
+  .pk{border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13.5px;
+      cursor:pointer;color:var(--text);background:#fff;display:flex;align-items:center;
+      justify-content:space-between;gap:6px;}
+  .pk .car{color:var(--muted);font-size:11px;}
+  .pk.empty{color:#aaa;}
+
+  /* 行3:状态/优先级/层级/频率 —— 4 列并排 */
+  .row4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+  /* 行4:截止日 | 进度 —— 2 列 */
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+
+  /* 行5/6:折叠区 */
+  .fold{border:1px dashed var(--border);border-radius:8px;}
+  .fold-head{padding:8px 11px;font-size:13px;color:var(--primary);cursor:pointer;display:flex;align-items:center;gap:6px;}
+  .fold-head .tri{font-size:10px;}
+
+  .bar{display:flex;justify-content:flex-end;gap:8px;padding:13px 20px;border-top:1px solid var(--border);}
+  .btn{padding:8px 18px;border-radius:8px;border:none;cursor:pointer;font-size:14px;}
+  .ok{background:var(--primary);color:#fff;}
+  .cancel{background:var(--hover);color:var(--text);}
+
+  .row4 .pk{padding:8px 8px;}                 /* 4 列里更紧凑 */
+  .progress-wrap{display:flex;align-items:center;gap:8px;}
+  .progress-wrap input[type=range]{flex:1;accent-color:var(--primary);}
+  .pct{font-size:12.5px;color:var(--muted);min-width:30px;text-align:right;}
+
+  .cmp{width:560px;max-width:96vw;margin:16px auto 0;font-size:12px;color:#6b7280;line-height:1.7;}
+  .cmp b{color:#7C4DFF;}
+
+  @media (max-width:560px){ .row4{grid-template-columns:1fr 1fr;} }
+</style>
+</head>
+<body>
+  <div class="pv-note">🎨 <b>新建任务弹窗 · 紧凑布局(按 spec § 7.7)</b> —— 标题/责任人整行;状态/优先级/层级/频率 4 列一行;截止日/进度 2 列;简介+自定义默认折叠。560px、1080p 不滚动。</div>
+
+  <div>
+    <div class="ov">
+      <div class="hd">新建任务</div>
+      <div class="bd">
+        <!-- 行1:标题 -->
+        <div class="f">
+          <span class="lb">标题 *</span>
+          <input class="in" placeholder="任务标题(必填)" value="季度经费报表" autofocus>
+        </div>
+
+        <!-- 行2:责任人 -->
+        <div class="f">
+          <span class="lb">责任人</span>
+          <input class="in" placeholder="逗号分隔,首个为主负责人;留空=我" value="陈老师, 李秘书">
+        </div>
+
+        <!-- 行3:状态 / 优先级 / 层级 / 频率 —— 4 列 -->
+        <div class="row4">
+          <div class="f"><span class="lb">状态</span><div class="pk">待办<span class="car">▾</span></div></div>
+          <div class="f"><span class="lb">优先级</span><div class="pk">中<span class="car">▾</span></div></div>
+          <div class="f"><span class="lb">层级</span><div class="pk">个人<span class="car">▾</span></div></div>
+          <div class="f"><span class="lb">频率</span><div class="pk">每季<span class="car">▾</span></div></div>
+        </div>
+
+        <!-- 行4:截止日 | 进度 —— 2 列 -->
+        <div class="row2">
+          <div class="f"><span class="lb">截止日</span><div class="pk empty">📅 选择日期<span class="car">▾</span></div></div>
+          <div class="f"><span class="lb">进度</span>
+            <div class="progress-wrap"><input type="range" min="0" max="100" value="0"><span class="pct">0%</span></div>
+          </div>
+        </div>
+
+        <!-- 行5:简介(折叠) -->
+        <div class="fold">
+          <div class="fold-head"><span class="tri">▸</span> + 加简介</div>
+        </div>
+
+        <!-- 行6:自定义字段(折叠) -->
+        <div class="fold">
+          <div class="fold-head"><span class="tri">▸</span> + 2 个自定义字段</div>
+        </div>
+      </div>
+      <div class="bar">
+        <button class="btn cancel">取消</button>
+        <button class="btn ok">创建</button>
+      </div>
+    </div>
+
+    <div class="cmp">
+      按 <b>spec § 7.7</b>:行1 标题、行2 责任人 整行;<b>状态/优先级/层级/频率 一行 4 列</b>;截止日/进度 2 列;
+      <b>简介 + 自定义字段默认折叠</b>(点 ▸ 展开)。宽 560px、字段间距 11px、<b>1080p 屏不出滚动条</b>。
+      仍配置驱动(Work.columns 决定有哪些字段)、只标题必填、状态无"已完成"、创建后静默重渲。
+      <br>注:状态/优先级等点开选项的交互沿用现有 WorkPick 候选(spec 写"就地小药丸",可后续再细化,先把布局做对)。
+    </div>
+  </div>
+</body>
+</html>

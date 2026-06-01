@@ -663,9 +663,9 @@ var WorkTable = (function() {
         if (document.getElementById('wt-create-style')) return;
         var css = ''
           + '.wt-create-ov{position:fixed;inset:0;background:rgba(0,0,0,.32);display:flex;align-items:center;justify-content:center;z-index:1078;}'
-          + '.wt-create-box{background:var(--card-bg,#fff);border-radius:12px;width:min(520px,94vw);max-height:88vh;box-shadow:0 8px 30px rgba(0,0,0,.18);display:flex;flex-direction:column;}'
+          + '.wt-create-box{background:var(--card-bg,#fff);border-radius:12px;width:min(560px,96vw);max-height:90vh;box-shadow:0 8px 30px rgba(0,0,0,.18);display:flex;flex-direction:column;}'
           + '.wt-create-hd{padding:16px 18px;font-size:16px;font-weight:600;color:var(--text-color,#333);border-bottom:1px solid var(--border-color,#e3e5e8);}'
-          + '.wt-create-bd{padding:14px 18px;overflow:auto;display:flex;flex-direction:column;gap:12px;}'
+          + '.wt-create-bd{padding:16px 20px;overflow:auto;display:flex;flex-direction:column;gap:11px;}'
           + '.wt-create-f{display:flex;flex-direction:column;gap:5px;}'
           + '.wt-create-lb{font-size:13px;color:var(--text-muted,#888);}'
           + '.wt-create-in,.wt-create-ta{width:100%;border:1px solid var(--border-color,#e3e5e8);border-radius:8px;padding:9px 11px;font-size:14px;box-sizing:border-box;font-family:inherit;}'
@@ -679,7 +679,18 @@ var WorkTable = (function() {
           + '.wt-create-btn{padding:8px 18px;border-radius:8px;border:none;cursor:pointer;font-size:14px;}'
           + '.wt-create-ok{background:var(--primary-color,#4c6ef5);color:#fff;}'
           + '.wt-create-ok:disabled{opacity:.5;cursor:not-allowed;}'
-          + '.wt-create-cancel{background:var(--hover-bg,#f2f3f5);color:var(--text-color,#333);}';
+          + '.wt-create-cancel{background:var(--hover-bg,#f2f3f5);color:var(--text-color,#333);}'
+          + '.wt-create-row4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}'
+          + '.wt-create-row2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}'
+          + '.wt-create-row4 .wt-create-pk{padding:8px 8px;}'
+          + '.wt-create-fold{border:1px dashed var(--border-color,#e3e5e8);border-radius:8px;}'
+          + '.wt-create-fold-head{padding:8px 11px;font-size:13px;color:var(--primary-color,#4c6ef5);cursor:pointer;user-select:none;}'
+          + '.wt-create-fold-head .tri{font-size:10px;margin-right:3px;}'
+          + '.wt-create-fold-body{padding:0 11px 10px;display:flex;flex-direction:column;gap:10px;}'
+          + '.wt-create-slider{display:flex;align-items:center;gap:8px;}'
+          + '.wt-create-slider input{flex:1;accent-color:var(--primary-color,#4c6ef5);}'
+          + '.wt-create-pct{font-size:12.5px;color:var(--text-muted,#888);min-width:32px;text-align:right;}'
+          + '@media(max-width:560px){.wt-create-row4{grid-template-columns:1fr 1fr;}}';
         var st = document.createElement('style');
         st.id = 'wt-create-style';
         st.textContent = css;
@@ -721,9 +732,32 @@ var WorkTable = (function() {
         var okBtn = null;
         function refresh() { if (okBtn) okBtn.disabled = !((state.title || '').trim()); }
 
-        for (var i = 0; i < cols.length; i++) {
-            bd.appendChild(_buildCreateField(cols[i], state, refresh));
+        // T-128 紧凑布局(spec § 7.7):标题/责任人整行 → 状态/优先级/层级/频率 4 列 →
+        //   截止日/进度 2 列 → 简介折叠 → 其余(标签+自定义列)折叠。仍配置驱动(按 Work.columns)。
+        var byKey = {};
+        for (var i = 0; i < cols.length; i++) byKey[cols[i].key] = cols[i];
+        var used = {};
+        function place(container, key) {
+            var c = byKey[key];
+            if (!c) return;
+            container.appendChild(_buildCreateField(c, state, refresh));
+            used[key] = 1;
         }
+        function gridRow(cls, keys) {
+            var present = keys.filter(function(k) { return byKey[k]; });
+            if (!present.length) return;
+            var g = document.createElement('div');
+            g.className = cls;
+            present.forEach(function(k) { place(g, k); });
+            bd.appendChild(g);
+        }
+        place(bd, 'title');                                          // 行1
+        place(bd, 'assignee');                                       // 行2
+        gridRow('wt-create-row4', ['status', 'priority', 'level', 'freq']);  // 行3
+        gridRow('wt-create-row2', ['due', 'progress']);              // 行4
+        if (byKey.desc) { bd.appendChild(_foldFields('+ 加简介', [byKey.desc], state, refresh)); used.desc = 1; }  // 行5
+        var rest = cols.filter(function(c) { return !used[c.key]; });  // 行6:标签 + 自定义列
+        if (rest.length) bd.appendChild(_foldFields('+ ' + rest.length + ' 个其他字段', rest, state, refresh));
         box.appendChild(bd);
 
         var bar = document.createElement('div');
@@ -756,6 +790,28 @@ var WorkTable = (function() {
         if (_createEl && _createEl.parentNode) _createEl.parentNode.removeChild(_createEl);
         _createEl = null;
         document.removeEventListener('keydown', _onCreateKey);
+    }
+
+    // T-128 紧凑布局:折叠区(简介 / 其他字段),默认收起,点头展开
+    function _foldFields(label, colsArr, state, onChange) {
+        var wrap = document.createElement('div');
+        wrap.className = 'wt-create-fold';
+        var head = document.createElement('div');
+        head.className = 'wt-create-fold-head';
+        head.innerHTML = '<span class="tri">▸</span>' + _esc(label);
+        var body = document.createElement('div');
+        body.className = 'wt-create-fold-body';
+        body.style.display = 'none';
+        colsArr.forEach(function(c) { body.appendChild(_buildCreateField(c, state, onChange)); });
+        head.addEventListener('click', function() {
+            var open = body.style.display !== 'none';
+            body.style.display = open ? 'none' : '';
+            var tri = head.querySelector('.tri');
+            if (tri) tri.textContent = open ? '▸' : '▾';
+        });
+        wrap.appendChild(head);
+        wrap.appendChild(body);
+        return wrap;
     }
 
     function _buildCreateField(col, state, onChange) {
@@ -794,9 +850,20 @@ var WorkTable = (function() {
             ctl = _mkCreatePick(col, state, (col.options || []).map(function(o) { return { key: o, label: o }; }), true);
         } else if (col.type === 'date') {
             ctl = _mkCreateDate(col, state);
-        } else if (col.type === 'number' || col.type === 'percent') {
-            ctl = _mkCreateInput('number', col.type === 'percent' ? '0-100;留空=0' : '');
-            if (col.type === 'percent') { ctl.min = '0'; ctl.max = '100'; }
+        } else if (col.type === 'percent') {
+            // T-128:进度用 slider(0-100)+ 百分比读数
+            ctl = document.createElement('div');
+            ctl.className = 'wt-create-slider';
+            var rng = document.createElement('input');
+            rng.type = 'range'; rng.min = '0'; rng.max = '100'; rng.value = '0';
+            var pctLbl = document.createElement('span');
+            pctLbl.className = 'wt-create-pct';
+            pctLbl.textContent = '0%';
+            rng.addEventListener('input', function() { state[col.key] = rng.value; pctLbl.textContent = rng.value + '%'; });
+            ctl.appendChild(rng);
+            ctl.appendChild(pctLbl);
+        } else if (col.type === 'number') {
+            ctl = _mkCreateInput('number', '');
             ctl.addEventListener('input', function() { state[col.key] = ctl.value; });
         } else if (col.type === 'longtext') {
             ctl = document.createElement('textarea');
