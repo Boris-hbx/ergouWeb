@@ -83,10 +83,14 @@
         app.innerHTML = '<div class="share-error">' + esc(msg) + '</div>';
     }
 
+    // v0.3 单层模型:数据 = { task:{title,inputType,createdAt}, report:{version,contentMd,template,modelUsed,createdAt}, includeNotes }
+    function templateLabel(t) {
+        return ({ survey: '综述型', decision: '决策型', watch: '追踪型' })[t] || '';
+    }
+
     function render(d) {
-        var ins = d.insight || {};
+        var task = d.task || {};
         var rep = d.report || {};
-        var srcs = d.sources || [];
         var mdHtml = '<pre>' + esc(rep.contentMd || '') + '</pre>';
         if (typeof marked !== 'undefined') {
             try {
@@ -95,51 +99,25 @@
                 console.error('[share] markdown render err', e);
             }
         }
-
-        var srcHtml = '';
-        if (srcs.length) {
-            srcHtml = '<section class="share-sources">'
-                + '<h2>引用来源 (' + srcs.length + ')</h2>'
-                + '<ol>'
-                + srcs.map(function(s) {
-                    var link = s.url
-                        ? '<a href="' + esc(s.url) + '" target="_blank" rel="noopener">' + esc(s.title || s.url) + '</a>'
-                        : esc(s.title || '(无标题)');
-                    return '<li data-src-id="' + s.id + '">'
-                        + kindIcon(s.kind) + ' ' + link
-                        + (s.author ? ' · <span class="share-author">' + esc(s.author) + '</span>' : '')
-                        + (s.note ? '<div class="share-src-note">' + esc(s.note) + '</div>' : '')
-                        + '</li>';
-                }).join('')
-                + '</ol>'
-                + '</section>';
-        }
+        var tl = templateLabel(rep.template);
+        var model = rep.modelUsed ? (' · ' + esc(rep.modelUsed)) : '';
 
         app.innerHTML = ''
             + '<article class="share-article">'
             +   '<header class="share-header">'
-            +     '<h1>' + esc(ins.title || '(无标题)') + '</h1>'
+            +     '<h1>' + esc(task.title || '(无标题)') + '</h1>'
             +     '<div class="share-meta">'
             +       '<time>' + formatDate(rep.createdAt) + '</time> · '
             +       '<span class="share-version">v' + (rep.version || '?') + '</span>'
+            +       (tl ? ' · ' + tl : '')
             +     '</div>'
-            +     (ins.topic ? '<div class="share-topic">' + esc(ins.topic) + '</div>' : '')
             +   '</header>'
             +   '<div class="share-md">' + mdHtml + '</div>'
-            +   srcHtml
-            +   '<footer class="share-footer">由二狗洞察生成 · 撤销后链接失效</footer>'
+            +   '<footer class="share-footer">本报告由二狗(AI)生成,仅供参考' + model + ' · 生成于 ' + formatDate(rep.createdAt) + '</footer>'
             + '</article>';
 
         // 设置文档标题(便于浏览器 tab 显示 / 收藏)
-        if (ins.title) document.title = ins.title + ' · 洞察';
-
-        // P3:挂 citation popover(hover [^N] 看原文片段)
-        loadCitationModule().then(function() {
-            if (typeof InsightCitation !== 'undefined') {
-                var mdEl = document.querySelector('.share-md');
-                if (mdEl) InsightCitation.attach(mdEl, rep.citations || [], srcs);
-            }
-        });
+        if (task.title) document.title = task.title + ' · 洞察';
     }
 
     loadMarked()

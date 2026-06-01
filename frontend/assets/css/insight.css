@@ -179,6 +179,8 @@
 .ins-table tbody tr { cursor: pointer; transition: background .12s; }
 .ins-table tbody tr:hover { background: var(--ins-bg-elev); }
 .ins-table tbody tr:last-child td { border-bottom: 0; }
+.ins-th-id { width: 52px; }
+.ins-row-id { width: 52px; color: var(--ins-text-faint); font-variant-numeric: tabular-nums; font-size: 12px; }
 .ins-row-title { font-weight: 500; color: var(--ins-text); }
 .ins-row-topic { color: var(--ins-text-mute); max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ins-row-ver  { color: var(--ins-text-faint); font-size: 11px; margin-left: 4px; }
@@ -1113,3 +1115,34 @@
   padding: 10px 12px; background: var(--ins-warn-soft); border-radius: 7px;
   font-size: 13px; line-height: 1.6; color: #8B5A00; white-space: pre-wrap;
 }
+
+/* 块2.5 分享(T-126)*/
+.ins-share {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--ins-border);
+}
+.ins-share-label { font-size: 12.5px; color: var(--ins-text-mute); }
+.ins-share-link {
+  flex: 1 1 220px; min-width: 150px; border: 1px solid var(--ins-border);
+  border-radius: 6px; padding: 6px 9px; font-size: 12.5px;
+  color: var(--ins-text-mute); background: var(--ins-bg-elev); font-family: inherit;
+}
+.ins-share-notes {
+  font-size: 12.5px; color: var(--ins-text-mute);
+  display: inline-flex; align-items: center; gap: 4px; cursor: pointer;
+}
+
+/* 块4 修订历史(T-127)*/
+.ins-hist-head {
+  cursor: pointer; user-select: none;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.ins-hist-caret { font-size: 11px; color: var(--ins-text-faint); }
+.ins-hist-list { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.ins-hist-item {
+  padding: 8px 11px; border: 1px solid var(--ins-border);
+  border-radius: 7px; background: var(--ins-bg-elev);
+}
+.ins-hist-ver { font-size: 12px; font-weight: 600; color: var(--ins-text); margin-bottom: 3px; }
+.ins-hist-note { font-size: 12.5px; line-height: 1.55; color: var(--ins-text-mute); white-space: pre-wrap; }
+.ins-hist-first { color: var(--ins-text-faint); font-style: italic; }

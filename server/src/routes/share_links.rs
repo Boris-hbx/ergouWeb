@@ -290,6 +290,9 @@ pub async fn list_shares_for_insight(
 /// GET /r/:token — 公开分享页。
 /// 返回最小 HTML 框架,JS 再 fetch /r/:token/data 拿 JSON 数据后渲染 MD。
 /// 撤销 → 410 Gone(明确告知"已撤销",非 404 模糊语义)。
+// T-126 起 `/r/{token}` 改由 `insight_share` 接管(v0.3 单层模型);以下 v0.2 公开页处理器
+// 与外壳常量保留作迁移参考,暂不路由 → 标记 allow(dead_code) 以过 clippy -D warnings。
+#[allow(dead_code)]
 pub async fn public_share_page(
     State(state): State<AppState>,
     Path(token): Path<String>,
@@ -322,6 +325,7 @@ pub async fn public_share_page(
 
 /// GET /r/:token/data — 公开 JSON(给 share.js fetch)。
 /// 撤销 → 410 Gone(JSON)。
+#[allow(dead_code)]
 pub async fn public_share_data(
     State(state): State<AppState>,
     Path(token): Path<String>,
@@ -471,6 +475,7 @@ pub async fn public_share_data(
 // ============ Public HTML 外壳 ============
 // 不挂任何模块代码;只引 share.css + share.js(T-106 写)。
 
+#[allow(dead_code)]
 const SHARE_SHELL_HTML: &str = r#"<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -488,6 +493,7 @@ const SHARE_SHELL_HTML: &str = r#"<!DOCTYPE html>
 </body>
 </html>"#;
 
+#[allow(dead_code)]
 const SHARE_410_HTML: &str = r#"<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -576,6 +582,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "v0.2 公开页 /r 已由 T-126 insight_share 接管;此 v0.2 公开页测试过时"]
     async fn share_then_public_get() {
         let state = test_state();
         let (_u, tok) = create_test_user(&state, "u1", "Pa55word1");
@@ -615,6 +622,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "v0.2 公开页 /r 已由 T-126 insight_share 接管;此 v0.2 公开页测试过时"]
     async fn retract_returns_410_on_public() {
         let state = test_state();
         let (_u, tok) = create_test_user(&state, "u2", "Pa55word1");
@@ -716,6 +724,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "v0.2 公开页 /r 已由 T-126 insight_share 接管;此 v0.2 公开页测试过时"]
     async fn publish_auto_revokes_previous_active() {
         let state = test_state();
         let (_u, tok) = create_test_user(&state, "u-rev2", "Pa55word1");

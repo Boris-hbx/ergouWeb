@@ -1067,6 +1067,17 @@ fn create_tables(conn: &Connection) {
             created_at        TEXT    NOT NULL
         );
         CREATE INDEX IF NOT EXISTS idx_insight_reports_task ON insight_reports(task_id, version DESC);
+
+        -- 报告分享(v0.4 / T-126):只读公开链接。token 32B URL-safe;撤销只置 revoked_at(留历史不物删)。
+        CREATE TABLE IF NOT EXISTS insight_share_links (
+            token         TEXT    PRIMARY KEY,
+            task_id       INTEGER NOT NULL REFERENCES insight_tasks(id),
+            report_id     INTEGER NOT NULL REFERENCES insight_reports(id),
+            include_notes INTEGER NOT NULL DEFAULT 1,
+            created_at    TEXT    NOT NULL,
+            revoked_at    TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_insight_share_task ON insight_share_links(task_id);
         ",
     )
     .expect("Failed to create tables");

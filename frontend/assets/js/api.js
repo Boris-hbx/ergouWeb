@@ -636,6 +636,10 @@ var API = (function() {
         insightTaskDelete:  async function(id)            { return await request('DELETE', '/insight-tasks/' + id); },
         insightTaskRelease: async function(id)            { return await request('POST',   '/insight-tasks/' + id + '/release', {}); },
         insightTaskReports: async function(id)            { return await request('GET',    '/insight-tasks/' + id + '/reports'); },
+        // T-126 报告分享(v0.4)
+        insightTaskPublish: async function(id, data)      { return await request('POST',   '/insight-tasks/' + id + '/publish', data || {}); },
+        insightTaskRetract: async function(id)            { return await request('POST',   '/insight-tasks/' + id + '/retract', {}); },
+        insightTaskShares:  async function(id)            { return await request('GET',    '/insight-tasks/' + id + '/share'); },
 
         // ===== Personal Access Tokens (T-116 / spec auth § 12) =====
         patList:   async function()       { return await request('GET',    '/auth/tokens'); },

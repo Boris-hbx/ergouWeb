@@ -543,26 +543,307 @@ var WorkTable = (function() {
         Work.updateRow(id, patch);
     }
 
-    // ============ 加行(T-095:走居中 modal,不再用原生 prompt)============
-    function addRow() {
-        openTextInputDialog({
-            label: '新任务标题',
-            initial: '',
-            type: 'text',
-            placeholder: '输入任务名',
-            onConfirm: function(name) {
-                if (!name || !('' + name).trim()) return;
-                Work.createRow({
-                    title: ('' + name).trim(),
-                    assignee: '我',
-                    level: '个人',
-                    freq: '一次性',
-                    status: 'todo',
-                    priority: 'mid',
-                    progress: 0,
-                });
-            },
+    // ============ 加行:新建任务弹窗(T-128 重做 T-124,配置驱动完整表单)============
+    // 工具栏主按钮 + 表格底部尾行两个入口都走 addRow() → openCreateDialog()。
+    // 弹窗遍历 Work.columns()(列配置真相来源)按每列 type 渲染控件;新增列自动多字段。
+    // 仅标题必填;状态候选不给"已完成"(完成走 §7.1 进度确认链)。
+    // 提交以原默认 payload 打底(保证后端必填字段)再叠加用户输入,一次 Work.createRow();
+    // createRow 内部走静默 render(不 stagger,防 T-109)。
+    function addRow() { openCreateDialog(); }
+
+    var _createEl = null;
+
+    function _ensureCreateStyle() {
+        if (document.getElementById('wt-create-style')) return;
+        var css = ''
+          + '.wt-create-ov{position:fixed;inset:0;background:rgba(0,0,0,.32);display:flex;align-items:center;justify-content:center;z-index:1078;}'
+          + '.wt-create-box{background:var(--card-bg,#fff);border-radius:12px;width:min(520px,94vw);max-height:88vh;box-shadow:0 8px 30px rgba(0,0,0,.18);display:flex;flex-direction:column;}'
+          + '.wt-create-hd{padding:16px 18px;font-size:16px;font-weight:600;color:var(--text-color,#333);border-bottom:1px solid var(--border-color,#e3e5e8);}'
+          + '.wt-create-bd{padding:14px 18px;overflow:auto;display:flex;flex-direction:column;gap:12px;}'
+          + '.wt-create-f{display:flex;flex-direction:column;gap:5px;}'
+          + '.wt-create-lb{font-size:13px;color:var(--text-muted,#888);}'
+          + '.wt-create-in,.wt-create-ta{width:100%;border:1px solid var(--border-color,#e3e5e8);border-radius:8px;padding:9px 11px;font-size:14px;box-sizing:border-box;font-family:inherit;}'
+          + '.wt-create-ta{min-height:78px;resize:vertical;}'
+          + '.wt-create-in:focus,.wt-create-ta:focus{outline:none;border-color:var(--primary-color,#4c6ef5);}'
+          + '.wt-create-pk{width:100%;border:1px solid var(--border-color,#e3e5e8);border-radius:8px;padding:9px 11px;font-size:14px;cursor:pointer;box-sizing:border-box;color:var(--text-color,#333);}'
+          + '.wt-create-pk:hover{border-color:var(--primary-color,#4c6ef5);}'
+          + '.wt-create-pk.empty{color:var(--text-muted,#aaa);}'
+          + '.wt-create-cbx{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:var(--text-color,#333);}'
+          + '.wt-create-bar{display:flex;justify-content:flex-end;gap:8px;padding:14px 18px;border-top:1px solid var(--border-color,#e3e5e8);}'
+          + '.wt-create-btn{padding:8px 18px;border-radius:8px;border:none;cursor:pointer;font-size:14px;}'
+          + '.wt-create-ok{background:var(--primary-color,#4c6ef5);color:#fff;}'
+          + '.wt-create-ok:disabled{opacity:.5;cursor:not-allowed;}'
+          + '.wt-create-cancel{background:var(--hover-bg,#f2f3f5);color:var(--text-color,#333);}';
+        var st = document.createElement('style');
+        st.id = 'wt-create-style';
+        st.textContent = css;
+        document.head.appendChild(st);
+    }
+
+    // 状态候选:新建不给"已完成"(完成必须走 §7.1 进度弹窗确认链 + 彩纸)
+    function _createStatusOpts() {
+        return STATUS.filter(function(s) { return s.key !== 'done'; })
+                     .map(function(s) { return { key: s.key, label: s.label }; });
+    }
+    function _createPrioOpts() {
+        return PRIORITY.map(function(p) { return { key: p.key, label: p.label }; });
+    }
+
+    function openCreateDialog() {
+        closeCreate();
+        _ensureCreateStyle();
+        var cols = Work.columns();
+        if (!cols || !cols.length) { showToast('列配置未加载', 'warning'); return; }
+
+        var state = {};
+
+        var ov = document.createElement('div');
+        ov.className = 'wt-create-ov';
+        ov.addEventListener('click', function(e) { if (e.target === ov) closeCreate(); });
+
+        var box = document.createElement('div');
+        box.className = 'wt-create-box';
+
+        var hd = document.createElement('div');
+        hd.className = 'wt-create-hd';
+        hd.textContent = '新建任务';
+        box.appendChild(hd);
+
+        var bd = document.createElement('div');
+        bd.className = 'wt-create-bd';
+
+        var okBtn = null;
+        function refresh() { if (okBtn) okBtn.disabled = !((state.title || '').trim()); }
+
+        for (var i = 0; i < cols.length; i++) {
+            bd.appendChild(_buildCreateField(cols[i], state, refresh));
+        }
+        box.appendChild(bd);
+
+        var bar = document.createElement('div');
+        bar.className = 'wt-create-bar';
+        var cancel = document.createElement('button');
+        cancel.className = 'wt-create-btn wt-create-cancel';
+        cancel.textContent = '取消';
+        cancel.addEventListener('click', closeCreate);
+        okBtn = document.createElement('button');
+        okBtn.className = 'wt-create-btn wt-create-ok';
+        okBtn.textContent = '创建';
+        okBtn.disabled = true;
+        okBtn.addEventListener('click', function() { _submitCreate(state); });
+        bar.appendChild(cancel);
+        bar.appendChild(okBtn);
+        box.appendChild(bar);
+
+        ov.appendChild(box);
+        document.body.appendChild(ov);
+        _createEl = ov;
+        document.addEventListener('keydown', _onCreateKey);
+
+        var first = box.querySelector('input,textarea');
+        if (first) first.focus();
+    }
+
+    function _onCreateKey(e) { if (e.key === 'Escape') closeCreate(); }
+
+    function closeCreate() {
+        if (_createEl && _createEl.parentNode) _createEl.parentNode.removeChild(_createEl);
+        _createEl = null;
+        document.removeEventListener('keydown', _onCreateKey);
+    }
+
+    function _buildCreateField(col, state, onChange) {
+        var row = document.createElement('div');
+        row.className = 'wt-create-f';
+        var isTitle = (col.key === 'title');
+
+        if (col.type === 'checkbox') {
+            var clab = document.createElement('label');
+            clab.className = 'wt-create-cbx';
+            var cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.addEventListener('change', function() { state[col.key] = cb.checked; });
+            clab.appendChild(cb);
+            clab.appendChild(document.createTextNode(col.name || col.key));
+            row.appendChild(clab);
+            return row;
+        }
+
+        var label = document.createElement('div');
+        label.className = 'wt-create-lb';
+        label.textContent = (col.name || col.key) + (isTitle ? ' *' : '');
+        row.appendChild(label);
+
+        var ctl;
+        if (col.key === 'assignee') {
+            ctl = _mkCreateInput('text', '逗号分隔,第一个为主负责人;留空=我');
+            ctl.addEventListener('input', function() { state[col.key] = ctl.value; });
+        } else if (col.type === 'status' || col.key === 'status') {
+            ctl = _mkCreatePick(col, state, _createStatusOpts(), false);
+        } else if (col.key === 'priority') {
+            ctl = _mkCreatePick(col, state, _createPrioOpts(), false);
+        } else if (col.type === 'select') {
+            ctl = _mkCreatePick(col, state, (col.options || []).map(function(o) { return { key: o, label: o }; }), false);
+        } else if (col.type === 'multi') {
+            ctl = _mkCreatePick(col, state, (col.options || []).map(function(o) { return { key: o, label: o }; }), true);
+        } else if (col.type === 'date') {
+            ctl = _mkCreateDate(col, state);
+        } else if (col.type === 'number' || col.type === 'percent') {
+            ctl = _mkCreateInput('number', col.type === 'percent' ? '0-100;留空=0' : '');
+            if (col.type === 'percent') { ctl.min = '0'; ctl.max = '100'; }
+            ctl.addEventListener('input', function() { state[col.key] = ctl.value; });
+        } else if (col.type === 'longtext') {
+            ctl = document.createElement('textarea');
+            ctl.className = 'wt-create-ta';
+            ctl.placeholder = '可空';
+            ctl.addEventListener('input', function() { state[col.key] = ctl.value; });
+        } else {
+            ctl = _mkCreateInput('text', isTitle ? '任务标题(必填)' : '');
+            ctl.addEventListener('input', function() { state[col.key] = ctl.value; if (isTitle) onChange(); });
+        }
+        row.appendChild(ctl);
+        return row;
+    }
+
+    function _mkCreateInput(type, ph) {
+        var el = document.createElement('input');
+        el.type = type; el.className = 'wt-create-in'; el.placeholder = ph || '';
+        return el;
+    }
+
+    // select/status/priority/multi → 复用 WorkPick 候选 UI
+    function _mkCreatePick(col, state, options, isMulti) {
+        var btn = document.createElement('div');
+        btn.className = 'wt-create-pk empty';
+        var EMPTY = isMulti ? '(无)' : '(默认)';
+        btn.textContent = EMPTY;
+        function labelFor(keys) {
+            var labs = options.filter(function(o) { return keys.indexOf(o.key) >= 0; })
+                              .map(function(o) { return o.label; });
+            return labs.length ? labs.join('、') : EMPTY;
+        }
+        btn.addEventListener('click', function() {
+            var cur = state[col.key];
+            var current = isMulti ? (Array.isArray(cur) ? cur : []) : (cur != null && cur !== '' ? [cur] : []);
+            WorkPick.open({
+                anchor: btn,
+                options: options,
+                current: current,
+                isMulti: !!isMulti,
+                onConfirm: function(chosen) {
+                    if (isMulti) {
+                        state[col.key] = chosen.slice();
+                        btn.classList.toggle('empty', chosen.length === 0);
+                    } else {
+                        state[col.key] = chosen[0] != null ? chosen[0] : '';
+                        btn.classList.toggle('empty', !state[col.key]);
+                    }
+                    btn.textContent = labelFor(isMulti ? chosen : (state[col.key] ? [state[col.key]] : []));
+                },
+            });
+            var pop = document.getElementById('wt-pick');
+            var bdg = document.getElementById('wt-pick-bd');
+            if (pop) pop.style.zIndex = '1200';
+            if (bdg) bdg.style.zIndex = '1199';
         });
+        return btn;
+    }
+
+    // date → 复用 datepicker(T-104 callback 模式)
+    function _mkCreateDate(col, state) {
+        var btn = document.createElement('div');
+        btn.className = 'wt-create-pk empty';
+        btn.textContent = '(无)';
+        btn.addEventListener('click', function() {
+            if (typeof window.toggleDatePicker !== 'function') { showToast('日期选择器未加载', 'warning'); return; }
+            window.toggleDatePicker({
+                anchor: btn,
+                initial: state[col.key] || '',
+                onSelect: function(ymd) {
+                    state[col.key] = ymd;
+                    btn.textContent = ymd || '(无)';
+                    btn.classList.toggle('empty', !ymd);
+                },
+            });
+            var pop = document.getElementById('date-popover');
+            if (pop) pop.style.zIndex = '1200';
+        });
+        return btn;
+    }
+
+    // 提交:默认 payload 打底(保证后端必填字段)+ 用户输入覆盖;一次 createRow
+    function _submitCreate(state) {
+        var title = (state.title || '').trim();
+        if (!title) { showToast('标题不能为空', 'warning'); return; }
+
+        var payload = {
+            title: title,
+            assignee: '我',
+            level: '个人',
+            freq: '一次性',
+            status: 'todo',
+            priority: 'mid',
+            progress: 0,
+        };
+        var customFields = {};
+        var hasCustom = false;
+        var cols = Work.columns();
+
+        for (var i = 0; i < cols.length; i++) {
+            var col = cols[i];
+            var key = col.key;
+            if (key === 'title') continue;
+            var raw = state[key];
+
+            if (key === 'assignee') {
+                var text = ('' + (raw || '')).trim();
+                if (!text) continue;
+                var parts = text.split(/[,，;；]\s*/).map(function(s) { return s.trim(); }).filter(Boolean);
+                var seen = {}, uniq = [];
+                parts.forEach(function(p) { if (!seen[p]) { seen[p] = 1; uniq.push(p); } });
+                payload.assignee = uniq[0] || '我';
+                if (uniq.length > 1) payload.collaborators = uniq.slice(1);
+                continue;
+            }
+            if (col.type === 'multi') {
+                if (Array.isArray(raw) && raw.length) {
+                    if (col.builtin) payload[key] = raw.slice();
+                    else { customFields[key] = raw.slice(); hasCustom = true; }
+                }
+                continue;
+            }
+            if (col.type === 'checkbox') {
+                if (raw === true) {
+                    if (col.builtin) payload[key] = true;
+                    else { customFields[key] = true; hasCustom = true; }
+                }
+                continue;
+            }
+            if (raw === undefined || raw === null) continue;
+            if (typeof raw === 'string' && raw.trim() === '') continue;
+
+            var val;
+            if (col.type === 'number' || col.type === 'percent') {
+                var n = parseInt(raw, 10);
+                if (isNaN(n)) continue;
+                if (col.type === 'percent') { if (n < 0) n = 0; if (n > 100) n = 100; }
+                val = n;
+            } else {
+                val = ('' + raw).trim();
+            }
+            if (col.builtin) payload[key] = val;
+            else { customFields[key] = val; hasCustom = true; }
+        }
+        if (hasCustom) payload.customFields = customFields;
+
+        closeCreate();
+        var p = Work.createRow(payload);   // createRow 内部乐观更新 + 静默 render()
+        if (p && typeof p.then === 'function') {
+            p.then(function() { showToast('已创建', 'success'); })
+             .catch(function(e) { console.error('[work-table]', e); showToast('创建失败', 'error'); });
+        } else {
+            showToast('已创建', 'success');
+        }
     }
 
     // ============ 列宽拖动:Excel 风格 ============
@@ -698,6 +979,7 @@ var WorkTable = (function() {
     return {
         render: render,
         addRow: addRow,
+        openCreateDialog: openCreateDialog,
         editText: editText,
         editDate: editDate,   // T-104
         editNumber: editNumber,

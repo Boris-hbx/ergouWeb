@@ -18,6 +18,9 @@ var Insight = (function() {
     var _detail = null;       // 当前详情 task(含内嵌 report)
     var _typeManual = false;  // 用户是否手动改过录入类型下拉
     var _showRaw = false;     // 详情页原文折叠状态
+    var _shares = [];         // T-126:当前详情的分享列表(active+revoked)
+    var _history = [];        // T-127:当前详情的报告版本列表(version DESC)
+    var _showHistory = false; // T-127:修订历史折叠状态
 
     function _esc(s) {
         return ('' + (s == null ? '' : s))
@@ -108,7 +111,7 @@ var Insight = (function() {
         host.innerHTML =
             '<div class="ins-list-main">'
           +   '<div class="ins-list-head">'
-          +     '<h2>📍 洞察</h2>'
+          +     '<h2>📍 候选洞察任务资源池</h2>'
           +     '<span class="ins-count-pill">' + _tasks.length + ' 个</span>'
           +     '<div class="ins-list-spacer"></div>'
           +     _statusFilterHtml()
@@ -178,7 +181,7 @@ var Insight = (function() {
               + '</div>';
         }
         return '<table class="ins-table">'
-          + '<thead><tr><th>标题</th><th>类型</th><th>状态</th><th>版本</th><th>更新</th><th></th></tr></thead>'
+          + '<thead><tr><th class="ins-th-id">ID</th><th>标题</th><th>类型</th><th>状态</th><th>版本</th><th>更新</th><th></th></tr></thead>'
           + '<tbody>' + _tasks.map(_rowHtml).join('') + '</tbody>'
           + '</table>';
     }
@@ -186,6 +189,7 @@ var Insight = (function() {
     function _rowHtml(t) {
         var ver = t.latestVersion ? 'v' + t.latestVersion : '—';
         return '<tr class="ins-row" onclick="Insight.openDetail(' + t.id + ')">'
+          + '<td class="ins-row-id">' + t.id + '</td>'
           + '<td class="ins-row-title">' + _esc(t.title || '(无标题)') + '</td>'
           + '<td><span class="ins-tag ins-tag-type">' + _typeLabel(t.inputType) + '</span></td>'
           + '<td><span class="ins-pill ins-st-' + t.status + '">' + _statusLabel(t.status) + '</span></td>'
@@ -273,6 +277,12 @@ var Insight = (function() {
             var resp = await API.insightTaskGet(_detailId);
             if (resp && resp.success) {
                 _detail = resp.item;
+                // T-126/T-127:并行拉分享状态 + 报告历史(失败各自隔离,不挡主渲染)
+                _shares = []; _history = [];
+                try { var sr = await API.insightTaskShares(_detailId);  if (sr && sr.success) _shares = sr.items || []; }
+                catch (e) { console.error('[Insight] shares', e); }
+                try { var rr = await API.insightTaskReports(_detailId); if (rr && rr.success) _history = rr.items || []; }
+                catch (e) { console.error('[Insight] reports', e); }
                 _renderDetail();
             }
         } catch (e) {
@@ -289,6 +299,7 @@ var Insight = (function() {
             '<div class="ins-det">'
           +   _detailInfoHtml(t)
           +   _detailReportHtml(t)
+          +   _detailHistoryHtml(t)
           +   _detailFeedbackHtml(t)
           + '</div>';
     }
@@ -350,8 +361,47 @@ var Insight = (function() {
           +   '<button class="ins-link-btn" onclick="Insight.reload()" title="刷新状态">↻ 刷新</button>'
           + '</div>'
           + inner
+          + ((rep && rep.contentMd) ? _detailShareHtml() : '')
           + '</section>';
     }
+
+    // 块 2.5:分享(T-126)—— 有报告时显示;active 则显链接+撤销,否则显分享按钮+含思辨勾选
+    function _detailShareHtml() {
+        var active = (_shares || []).filter(function(s) { return !s.revokedAt; })[0];
+        if (active) {
+            var url = _shareUrl(active.token);
+            return '<div class="ins-share ins-share-active">'
+              + '<span class="ins-share-label">🔗 已分享' + (active.includeNotes ? '' : '(干净版)') + '</span>'
+              + '<input class="ins-share-link" readonly value="' + _esc(url) + '" onclick="this.select()">'
+              + '<button class="ins-btn ins-btn-sm" onclick="Insight.copyShareLink(\'' + active.token + '\')">复制</button>'
+              + '<button class="ins-btn ins-btn-ghost ins-btn-sm" onclick="Insight.retractShare()">撤销</button>'
+              + '</div>';
+        }
+        return '<div class="ins-share">'
+          + '<button class="ins-btn ins-btn-sm" onclick="Insight.publishShare()">🔗 分享</button>'
+          + '<label class="ins-share-notes"><input type="checkbox" id="ins-share-notes" checked> 含思辨</label>'
+          + '</div>';
+    }
+
+    // 块 4:修订/反馈历史(T-127)—— 复用已拉的 _history(version DESC);仅 >1 版时显示折叠区
+    function _detailHistoryHtml() {
+        var reps = (_history || []).slice().sort(function(a, b) { return b.version - a.version; });
+        if (reps.length <= 1) return '';
+        var head = '<div class="ins-det-card-title ins-hist-head" onclick="Insight.toggleHistory()">'
+          + '修订历史(' + reps.length + ' 版)<span class="ins-hist-caret">' + (_showHistory ? '▲' : '▼') + '</span></div>';
+        var body = '';
+        if (_showHistory) {
+            body = '<div class="ins-hist-list">' + reps.map(function(r) {
+                var note = (r.revisionNote && r.revisionNote.trim())
+                    ? '<div class="ins-hist-note">' + _esc(r.revisionNote) + '</div>'
+                    : '<div class="ins-hist-note ins-hist-first">首次生成</div>';
+                return '<div class="ins-hist-item"><div class="ins-hist-ver">v' + r.version + ' · ' + _shortTime(r.createdAt) + '</div>' + note + '</div>';
+            }).join('') + '</div>';
+        }
+        return '<section class="ins-det-card ins-det-history">' + head + body + '</section>';
+    }
+
+    function _shareUrl(token) { return (window.location.origin || '') + '/r/' + token; }
 
     // 块 3:反馈框
     function _detailFeedbackHtml(t) {
@@ -438,6 +488,49 @@ var Insight = (function() {
         }
     }
 
+    // ---- 分享 / 历史操作(T-126 / T-127)----
+    async function publishShare() {
+        var cb = document.getElementById('ins-share-notes');
+        var includeNotes = cb ? cb.checked : true;
+        try {
+            var resp = await API.insightTaskPublish(_detailId, { includeNotes: includeNotes });
+            if (resp && resp.success) {
+                await _loadDetail();   // 重新拉分享状态并重渲
+                if (typeof showToast === 'function') showToast('已生成分享链接', 'success');
+            }
+        } catch (e) {
+            console.error('[Insight] publishShare', e);
+            if (typeof showToast === 'function') showToast((e && e.message) || '分享失败', 'error');
+        }
+    }
+
+    async function retractShare() {
+        try {
+            var resp = await API.insightTaskRetract(_detailId);
+            if (resp && resp.success) {
+                await _loadDetail();
+                if (typeof showToast === 'function') showToast('已撤销分享', 'info');
+            }
+        } catch (e) {
+            console.error('[Insight] retractShare', e);
+            if (typeof showToast === 'function') showToast((e && e.message) || '撤销失败', 'error');
+        }
+    }
+
+    function copyShareLink(token) {
+        var url = _shareUrl(token);
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(url).then(
+                function() { if (typeof showToast === 'function') showToast('链接已复制', 'success'); },
+                function() { if (typeof showToast === 'function') showToast('复制失败,请手动选中复制', 'warning'); }
+            );
+        } else if (typeof showToast === 'function') {
+            showToast('请手动选中链接复制', 'info');
+        }
+    }
+
+    function toggleHistory() { _showHistory = !_showHistory; _renderDetail(); }
+
     return {
         openHub: openHub,
         backToHub: backToHub,
@@ -454,6 +547,10 @@ var Insight = (function() {
         saveTemplate: saveTemplate,
         abort: abort,
         submitFeedback: submitFeedback,
+        publishShare: publishShare,
+        retractShare: retractShare,
+        copyShareLink: copyShareLink,
+        toggleHistory: toggleHistory,
         detectInputType: detectInputType,
     };
 })();

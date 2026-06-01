@@ -32,3 +32,5 @@ pub mod annotations;
 pub mod auth_tokens;
 // T-122 SPEC insight v0.3(单层 insight_task)
 pub mod insight_tasks;
+// T-126 SPEC insight § 十二 报告分享(v0.4)
+pub mod insight_share;

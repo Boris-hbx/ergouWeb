@@ -430,6 +430,19 @@ pub fn build_app(state: AppState) -> Router {
             "/insight-tasks/{id}/release",
             post(routes::insight_tasks::release_task),
         )
+        // T-126:报告分享(v0.4)
+        .route(
+            "/insight-tasks/{id}/publish",
+            post(routes::insight_share::publish),
+        )
+        .route(
+            "/insight-tasks/{id}/retract",
+            post(routes::insight_share::retract),
+        )
+        .route(
+            "/insight-tasks/{id}/share",
+            get(routes::insight_share::list_shares),
+        )
         // `/latest` 必须在动态 reports 之前(本组无 /{version},但保持静态优先习惯)
         .route(
             "/insight-tasks/{id}/reports/latest",
@@ -523,9 +536,10 @@ pub fn build_app(state: AppState) -> Router {
             }))
         }))
         .nest("/api", api_routes)
-        // T-105 SPEC insight:公开分享页 /r/{token}(无需 session)
-        .route("/r/{token}", get(routes::share_links::public_share_page))
-        .route("/r/{token}/data", get(routes::share_links::public_share_data))
+        // T-105/T-126 SPEC insight:公开分享页 /r/{token}(无需 session)
+        // v0.4 起指向 insight_share(单层 insight_tasks/insight_reports);v0.2 share_links 已弃
+        .route("/r/{token}", get(routes::insight_share::public_page))
+        .route("/r/{token}/data", get(routes::insight_share::public_data))
         .layer(SetResponseHeaderLayer::overriding(
             http::header::CONTENT_SECURITY_POLICY,
             HeaderValue::from_static("default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'"),
