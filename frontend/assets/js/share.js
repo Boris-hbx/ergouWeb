@@ -69,7 +69,7 @@
         return new Promise(function(resolve) {
             if (typeof InsightMd !== 'undefined') return resolve();
             var s = document.createElement('script');
-            s.src = '/assets/js/insight-markdown.js';
+            s.src = '/assets/js/insight-markdown.js?v=20260531f';
             s.onload = resolve;
             s.onerror = function() { console.warn('[share] insight-markdown.js load failed (fallback to marked)'); resolve(); };
             document.head.appendChild(s);
