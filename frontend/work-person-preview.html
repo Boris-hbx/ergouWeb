@@ -244,10 +244,20 @@
     display: flex;
     flex-direction: column;
   }
-  .person-card.highlight {
+  .person-card.highlight,
+  .person-card.active {
     border-color: var(--primary);
     box-shadow: 0 0 0 3px var(--primary-soft), var(--shadow);
   }
+  /* T-138:默认折叠第 6 条起;激活才显 */
+  .person-card:not(.active) .task-item.task-extra { display: none; }
+  .card-expand {
+    align-self: flex-start; margin: 2px 0 4px; padding: 4px 10px;
+    font-size: 12.5px; color: var(--primary);
+    background: var(--primary-soft); border: 1px solid var(--primary-soft);
+    border-radius: 999px; cursor: pointer;
+  }
+  .bubble.bubble-active { outline: 3px solid var(--primary-soft); outline-offset: 2px; }
   .person-card.dragover {
     border-color: var(--primary);
     background: var(--primary-soft);
@@ -589,7 +599,7 @@ function renderBubbles() {
       <div class="b-count">${p.tasks.length}</div>
       ${overdue ? `<div class="b-badge">⏰ ${overdue}</div>` : ''}
     `;
-    b.onclick = () => scrollToCard(p.name);
+    b.onclick = () => toggleCard(p.name, true);
     row.appendChild(b);
   });
 }
@@ -620,11 +630,14 @@ function renderCards() {
       <div class="person-stats" style="margin:-4px 0 8px 40px;">${statsHtml}</div>
     `;
 
-    const taskListHtml = p.tasks.map(t => {
+    // T-138:默认折叠,每卡最多 5 条(第 6 条起 .task-extra,未激活时隐藏)
+    const COLLAPSE = 5;
+    const taskListHtml = p.tasks.map((t, idx) => {
       const pillClass = t.overdue ? 'overdue' : (t.due === '今天' || t.due === '明天' ? 'due-soon' : '');
       const p0Pill = t.priority === 'P0' ? '<span class="pill p0">P0</span>' : '';
+      const extraCls = idx >= COLLAPSE ? ' task-extra' : '';
       return `
-        <div class="task-item" draggable="true" data-tid="${t.id}" data-from="${p.name}">
+        <div class="task-item${extraCls}" draggable="true" data-tid="${t.id}" data-from="${p.name}">
           <div class="task-checkbox"></div>
           <div class="task-title">${t.title}</div>
           <div class="task-meta">
@@ -635,7 +648,12 @@ function renderCards() {
       `;
     }).join('');
 
+    const expandHtml = p.tasks.length > COLLAPSE
+      ? `<button class="card-expand" data-person="${p.name}" data-count="${p.tasks.length}">展开全部 ${p.tasks.length} 条 ▾</button>`
+      : '';
+
     card.innerHTML = head + `<div class="task-list">${taskListHtml}</div>
+      ${expandHtml}
       <div class="card-foot">+ 添加任务</div>
     `;
     grid.appendChild(card);
@@ -650,6 +668,19 @@ function bindCardInteractions() {
     cb.onclick = (e) => {
       e.stopPropagation();
       cb.closest('.task-item').classList.toggle('done');
+    };
+  });
+
+  // T-138:展开/收起按钮(与气泡 toggle 双向同步)
+  document.querySelectorAll('.card-expand').forEach(btn => {
+    btn.onclick = (e) => { e.stopPropagation(); toggleCard(btn.dataset.person, false); };
+  });
+
+  // T-138:卡底「+ 添加任务」→ 完整新建弹窗 + 预填该卡责任人(此处 mock 用 toast 示意)
+  document.querySelectorAll('.card-foot').forEach(foot => {
+    foot.onclick = () => {
+      const name = foot.closest('.person-card').dataset.person;
+      toast(`打开新建任务弹窗(预填责任人:${name})`);
     };
   });
 
@@ -695,13 +726,18 @@ function bindCardInteractions() {
   });
 }
 
-// ── 点气泡 → 滚动到卡片并高亮 ──
-function scrollToCard(name) {
+// ── T-138:点气泡 / 点卡自带按钮 → toggle 展开全部 + 持久高亮(双向同步,多卡独立)──
+function toggleCard(name, scroll) {
   const card = document.querySelector(`.person-card[data-person="${name}"]`);
   if (!card) return;
-  card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  card.classList.add('highlight');
-  setTimeout(() => card.classList.remove('highlight'), 1400);
+  const active = !card.classList.contains('active');
+  card.classList.toggle('active', active);
+  const btn = card.querySelector('.card-expand');
+  if (btn) btn.textContent = active ? '收起 ▴' : `展开全部 ${btn.dataset.count} 条 ▾`;
+  document.querySelectorAll('.bubble').forEach(b => {
+    if (b.dataset.person === name) b.classList.toggle('bubble-active', active);
+  });
+  if (scroll) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 // ── 时间 Tab 切换（模拟） ──
