@@ -53,15 +53,25 @@
             .replace(/href\s*=\s*'javascript:[^']*'/gi, "href='#'");
     }
 
-    function loadMarked() {
+    function _loadScript(src) {
         return new Promise(function(resolve, reject) {
-            if (typeof marked !== 'undefined') return resolve();
             var s = document.createElement('script');
-            s.src = 'https://cdn.jsdelivr.net/npm/marked@15/marked.min.js';
+            s.src = src;
             s.onload = resolve;
             s.onerror = reject;
             document.head.appendChild(s);
         });
+    }
+
+    // T-133:本地自托管优先,jsdelivr 仅作兜底。CDN 在国内常加载失败 →
+    // 没拿到 marked 就退化成 <pre> 裸 markdown,所以必须本地兜底保证渲染统一。
+    function loadMarked() {
+        if (typeof marked !== 'undefined') return Promise.resolve();
+        return _loadScript('/assets/vendor/marked.min.js?v=20260601a')
+            .catch(function() {
+                console.warn('[share] 本地 marked 加载失败,回退 CDN');
+                return _loadScript('https://cdn.jsdelivr.net/npm/marked@15/marked.min.js');
+            });
     }
 
     // T-129:动态加载 insight-markdown.js,公开页复用 InsightMd 的 .ins-report 排版 + 思辨 callout

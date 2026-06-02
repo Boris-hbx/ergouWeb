@@ -434,13 +434,13 @@ const SHARE_SHELL_HTML: &str = r#"<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex,nofollow">
 <title>洞察分享</title>
-<link rel="stylesheet" href="/assets/css/share.css?v=20260531f">
+<link rel="stylesheet" href="/assets/css/share.css?v=20260601a">
 </head>
 <body>
 <div id="share-app" data-token="{TOKEN}">
   <div class="share-loading">加载中…</div>
 </div>
-<script src="/assets/js/share.js?v=20260531f"></script>
+<script src="/assets/js/share.js?v=20260601a"></script>
 </body>
 </html>"#;
 
