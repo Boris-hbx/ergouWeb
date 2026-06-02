@@ -111,13 +111,12 @@
         var cover = (typeof InsightMd !== 'undefined' && InsightMd.cover)
             ? InsightMd.cover({ title: task.title, createdAt: rep.createdAt }, true)
             : '<header class="ins-report-cover"><h1>' + esc(task.title || '(无标题)') + '</h1></header>';
-        var model = rep.modelUsed ? (' · ' + esc(rep.modelUsed)) : '';
 
+        // T-134:删除「本报告由二狗(AI)生成」页脚(Boris 要求)
         app.innerHTML = ''
             + '<article class="ins-report">'
             +   cover
             +   '<div class="ins-report-body">' + bodyHtml + '</div>'
-            +   '<footer class="ins-report-footer"><span class="ai">本报告由二狗(AI)生成,仅供参考' + model + ' · 生成于 ' + formatDate(rep.createdAt) + '</span></footer>'
             + '</article>';
 
         if (task.title) document.title = task.title + ' · 洞察';
