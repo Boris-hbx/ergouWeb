@@ -313,6 +313,11 @@ pub fn build_app(state: AppState) -> Router {
         .nest("/share", share_routes)
         .nest("/contacts", contacts_routes)
         .nest("/collaborate", collaborate_routes)
+        // T-137 报告集:公开列表(无 session,handler 不取 UserId)
+        .route(
+            "/public/insight-reports",
+            get(routes::insight_share::public_reports_list),
+        )
         // Work module (T-094 / SPEC work-task-table) — registered flat to avoid
         // an Axum 0.8 nest issue we hit when nesting another Router inside api_routes.
         .route(
@@ -547,6 +552,7 @@ pub fn build_app(state: AppState) -> Router {
         .nest("/api", api_routes)
         // T-105/T-126 SPEC insight:公开分享页 /r/{token}(无需 session)
         // v0.4 起指向 insight_share(单层 insight_tasks/insight_reports);v0.2 share_links 已弃
+        .route("/r", get(routes::insight_share::collection_page))
         .route("/r/{token}", get(routes::insight_share::public_page))
         .route("/r/{token}/data", get(routes::insight_share::public_data))
         .layer(SetResponseHeaderLayer::overriding(

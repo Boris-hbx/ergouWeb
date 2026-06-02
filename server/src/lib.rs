@@ -264,6 +264,11 @@ pub fn build_app(state: state::AppState) -> Router {
         .nest("/share", share_routes)
         .nest("/contacts", contacts_routes)
         .nest("/collaborate", collaborate_routes)
+        // T-137 报告集:公开列表(无 session,handler 不取 UserId)
+        .route(
+            "/public/insight-reports",
+            get(routes::insight_share::public_reports_list),
+        )
         .nest(
             "/soul-state",
             Router::new().route(
@@ -464,6 +469,7 @@ pub fn build_app(state: state::AppState) -> Router {
         }))
         .nest("/api", api_routes)
         // T-105/T-126 公开 /r/{token}(无 session,镜像 main.rs);v0.4 指向 insight_share
+        .route("/r", get(routes::insight_share::collection_page))
         .route("/r/{token}", get(routes::insight_share::public_page))
         .route("/r/{token}/data", get(routes::insight_share::public_data))
         .layer(SetResponseHeaderLayer::overriding(

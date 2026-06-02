@@ -1,11 +1,12 @@
-// ========== InsightMd — 洞察模块的 Markdown 渲染 + 报告排版 (T-106 / T-129) ==========
+// ========== InsightMd — 洞察模块的 Markdown 渲染 + 报告排版 (T-106 / T-129 / T-135) ==========
 //
 // 调研后:项目已通过 CDN 引入 marked@15(见 index.html),复用之即可。
 // 没引入 DOMPurify,故自带一个轻量 sanitize(strip <script>/<iframe>/on* 属性/javascript: 链接)。
 //
 // T-129 报告视觉呈现:render() 出正文 HTML;cover() 出页头(isPublic 控制徽章/版本显隐);
 //   decorate() 在 DOM 插入后把「思辨」节包成 callout。详情页(insight.js)与公开分享页(share.js)共用。
-//   脚注 [^N] popover 见 spec § 8.5 点 8 —— 留到模板产出真 [^N] 那轮,本轮不做。
+// T-135 重点强调:render 预处理 ==文字==→<mark class="ins-key">(标红加粗);
+//   decorate 识别以 🎯 开头的 blockquote → .ins-takeaway 醒目块(与思辨紫块区分)。
 
 var InsightMd = (function() {
 
@@ -14,12 +15,25 @@ var InsightMd = (function() {
             return _fallbackRender(md || '');
         }
         try {
-            var html = marked.parse(md || '', { breaks: true, gfm: true });
+            var pre = _emphasisMarks(md || '');
+            var html = marked.parse(pre, { breaks: true, gfm: true });
             return _sanitize(html);
         } catch (e) {
             console.error('[InsightMd] render error:', e);
             return _fallbackRender(md || '');
         }
+    }
+
+    // T-135:行内重点 ==文字== → <mark class="ins-key">(marked 不原生支持)。
+    // 先把 fenced ``` 与 inline `code` 抠出占位,避免误伤代码里的 ==;转换后再还原。
+    function _emphasisMarks(md) {
+        var store = [];
+        function stash(m) { store.push(m); return 'MARK' + (store.length - 1) + ''; }
+        var s = ('' + md)
+            .replace(/```[\s\S]*?```/g, stash)
+            .replace(/`[^`\n]*`/g, stash);
+        s = s.replace(/==([^=\n]+?)==/g, '<mark class="ins-key">$1</mark>');
+        return s.replace(/MARK(\d+)/g, function(_, i) { return store[+i]; });
     }
 
     function _sanitize(html) {
@@ -85,10 +99,12 @@ var InsightMd = (function() {
         return '<div class="ins-report-metabar">' + bits.join('<span class="ins-cover-dot">·</span>') + '</div>';
     }
 
-    // DOM 后处理:把「思辨」这一节(从含"思辨"的 h2 到下一个 h2 之前)包成 .ins-sibian callout。
+    // DOM 后处理:① 把「思辨」节(含"思辨"的 h2 到下一个 h2 之前)包成 .ins-sibian callout;
+    //            ② T-135:把以 🎯 开头的 blockquote 标成 .ins-takeaway 核心观点块。
     // root = 已插入 DOM 的报告正文容器(.ins-report-body)。
     function decorate(root) {
         if (!root || !root.querySelectorAll) return;
+        // ① 思辨
         var hs = root.querySelectorAll('h2');
         for (var i = 0; i < hs.length; i++) {
             var h = hs[i];
@@ -110,6 +126,12 @@ var InsightMd = (function() {
                 moved.forEach(function(x) { sec.appendChild(x); });
                 break;   // 只处理第一处「思辨」
             }
+        }
+        // ② T-135 核心观点:🎯 开头的 blockquote
+        var bqs = root.querySelectorAll('blockquote');
+        for (var j = 0; j < bqs.length; j++) {
+            var txt = (bqs[j].textContent || '').replace(/^\s+/, '');
+            if (txt.indexOf('🎯') === 0) bqs[j].classList.add('ins-takeaway');
         }
     }
 

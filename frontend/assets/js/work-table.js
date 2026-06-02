@@ -706,13 +706,17 @@ var WorkTable = (function() {
         return PRIORITY.map(function(p) { return { key: p.key, label: p.label }; });
     }
 
-    function openCreateDialog() {
+    // T-138:可选 prefill —— 目前支持 { assignee }(人员/分布视图卡底「+ 添加任务」预填该卡责任人)
+    function openCreateDialog(prefill) {
         closeCreate();
         _ensureCreateStyle();
         var cols = Work.columns();
         if (!cols || !cols.length) { showToast('列配置未加载', 'warning'); return; }
 
         var state = {};
+        if (prefill && prefill.assignee != null && ('' + prefill.assignee).trim()) {
+            state.assignee = '' + prefill.assignee;
+        }
 
         var ov = document.createElement('div');
         ov.className = 'wt-create-ov';
@@ -839,6 +843,7 @@ var WorkTable = (function() {
         var ctl;
         if (col.key === 'assignee') {
             ctl = _mkCreateInput('text', '逗号分隔,第一个为主负责人;留空=我');
+            if (state[col.key] != null) ctl.value = state[col.key];   // T-138 预填该卡责任人
             ctl.addEventListener('input', function() { state[col.key] = ctl.value; });
         } else if (col.type === 'status' || col.key === 'status') {
             ctl = _mkCreatePick(col, state, _createStatusOpts(), false);

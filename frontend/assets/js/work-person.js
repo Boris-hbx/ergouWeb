@@ -19,6 +19,7 @@
 
 var WorkPerson = (function() {
     var UNASSIGNED = '未指派';
+    var COLLAPSE_N = 5;   // T-138:每卡默认最多显示的任务数
 
     function _esc(s) {
         return ('' + (s == null ? '' : s))
@@ -188,7 +189,7 @@ var WorkPerson = (function() {
             b.innerHTML = '<div class="wt-b-name">' + _esc(g.name) + '</div>'
                 + '<div class="wt-b-count">' + g.tasks.length + '</div>'
                 + (overdue ? '<div class="wt-b-badge">⏰ ' + overdue + '</div>' : '');
-            b.onclick = function() { _scrollToCard(g.name); };
+            b.onclick = function() { _toggleCard(g.name, true); };
             row.appendChild(b);
         });
     }
@@ -220,12 +221,15 @@ var WorkPerson = (function() {
         // T-121:取消"协作"区分 UI(memory single-user-simplicity);
         //   tasks 仍是 [{task, isCollab}],但任务行视觉不再区分主+协,所有卡看着都平等
         //   保留:_groupRows 双 push(主+协卡都出现)+ 拖拽限制(协作任务不允许从协作者卡拖走)
-        var taskListHtml = g.tasks.map(function(it) {
+        // T-138:卡内排序(逾期 > P0 > 截止近 > 其余),默认只显前 5,余者折叠
+        var sorted = _sortTasks(g.tasks);
+        var taskListHtml = sorted.map(function(it, idx) {
             var t = it.task;
             var due = _dueLabel(t);
             var p0Pill = (t.priority === 'high') ? '<span class="wt-person-pill wt-person-pill-p0">P0</span>' : '';
             var doneCls = (t.status === 'done') ? ' wt-person-task-done' : '';
-            return '<div class="wt-person-task' + doneCls + '" '
+            var extraCls = (idx >= COLLAPSE_N) ? ' wt-person-task-extra' : '';
+            return '<div class="wt-person-task' + doneCls + extraCls + '" '
                 +    (it.isCollab ? '' : 'draggable="true" ')   // 协作任务不允许从此卡拖走(转交语义只走主责任人卡)
                 +    'data-tid="' + t.id + '" data-from="' + _esc(g.name) + '">'
                 +    '<div class="wt-person-check" data-tid="' + t.id + '"></div>'
@@ -237,6 +241,10 @@ var WorkPerson = (function() {
                 +  '</div>';
         }).join('');
 
+        var expandHtml = (sorted.length > COLLAPSE_N)
+            ? '<button type="button" class="wt-person-expand" data-person="' + _esc(g.name) + '" data-count="' + sorted.length + '">展开全部 ' + sorted.length + ' 条 ▾</button>'
+            : '';
+
         card.innerHTML =
             '<div class="wt-person-head">'
           +   '<div class="wt-person-avatar" style="background:' + avatarBg + '">' + _esc(initial) + '</div>'
@@ -244,6 +252,7 @@ var WorkPerson = (function() {
           + '</div>'
           + '<div class="wt-person-stats">' + statsHtml + '</div>'
           + '<div class="wt-person-task-list">' + taskListHtml + '</div>'
+          + expandHtml
           + '<div class="wt-person-foot" data-add="' + _esc(g.name) + '">+ 添加任务</div>';
         return card;
     }
@@ -281,12 +290,19 @@ var WorkPerson = (function() {
                 }
                 return;
             }
+            // T-138:展开/收起按钮(与气泡 toggle 双向同步)
+            var exp = ev.target.closest('.wt-person-expand');
+            if (exp) {
+                ev.stopPropagation();
+                _toggleCard(exp.dataset.person, false);
+                return;
+            }
             var foot = ev.target.closest('.wt-person-foot');
             if (foot) {
-                // 「+ 添加任务」:复用 WorkTable.addRow,但要绑这个 assignee
-                // 简单做法:先走通用 addRow(默认 assignee 是「我」),让用户后续手动改。
-                // 更细致的实现可以预填 assignee,这里 MVP 用通用。
-                WorkTable.addRow();
+                // T-138:「+ 添加任务」走 T-124 完整新建弹窗,预填该卡责任人(未指派卡不预填)
+                var who = foot.dataset.add;
+                if (who && who !== UNASSIGNED) WorkTable.openCreateDialog({ assignee: who });
+                else WorkTable.openCreateDialog();
                 return;
             }
         };
@@ -347,14 +363,44 @@ var WorkPerson = (function() {
         WorkTable.editProgress(id, 'progress');
     }
 
-    function _scrollToCard(name) {
-        var card = document.querySelector('.wt-person-card[data-person="' + name + '"]');
+    // ── T-138:卡内排序(逾期 > P0 > 截止近 > 其余),稳定排序 ──
+    function _sortRank(it) {
+        var t = it.task;
+        var due = _normalizeDue(t.due);
+        var today = _todayYMD();
+        if (t.status !== 'done' && due && due < today) return 0;   // 逾期
+        if (t.priority === 'high') return 1;                        // P0
+        if (due) { var we = _weekEnd(today); if (due <= we) return 2; }  // 截止近(本周内)
+        return 3;
+    }
+    function _sortTasks(items) {
+        return items.map(function(it, i) { return { it: it, i: i }; })
+            .sort(function(a, b) { var r = _sortRank(a.it) - _sortRank(b.it); return r !== 0 ? r : a.i - b.i; })
+            .map(function(x) { return x.it; });
+    }
+
+    // ── T-138:按 data-person 找卡 / 找气泡(避免 querySelector 选择器注入)──
+    function _findByPerson(sel, name) {
+        var nodes = document.querySelectorAll(sel);
+        for (var i = 0; i < nodes.length; i++) if (nodes[i].dataset.person === name) return nodes[i];
+        return null;
+    }
+
+    // ── T-138:展开/折叠 + 高亮(持久,非闪)。气泡与卡自带按钮共用此 toggle,天然双向同步。──
+    //   active=true:展开全部 + 紫框高亮 + 气泡激活;false:折叠回 5 + 取消高亮。多卡可各自独立。
+    function _setCardActive(card, name, active) {
+        card.classList.toggle('wt-person-active', active);
+        var btn = card.querySelector('.wt-person-expand');
+        if (btn) btn.textContent = active ? '收起 ▴' : ('展开全部 ' + btn.dataset.count + ' 条 ▾');
+        var bubble = _findByPerson('.wt-bubble', name);
+        if (bubble) bubble.classList.toggle('wt-bubble-active', active);
+    }
+    function _toggleCard(name, scroll) {
+        var card = _findByPerson('.wt-person-card', name);
         if (!card) return;
-        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        card.classList.add('wt-person-highlight');
-        setTimeout(function() {
-            card.classList.remove('wt-person-highlight');
-        }, 1400);
+        var active = !card.classList.contains('wt-person-active');
+        _setCardActive(card, name, active);
+        if (scroll) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 
     return {

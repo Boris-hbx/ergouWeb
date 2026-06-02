@@ -1147,6 +1147,12 @@
 .ins-sibian-head .tag { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--ins-primary); background: #fff; border: 1px solid var(--ins-primary-strong); border-radius: 999px; padding: 2px 9px; }
 .ins-sibian ul li::marker { color: var(--ins-primary); }
 
+/* T-135 重点强调:行内 ==标红加粗== + 🎯 核心观点块(琥珀金,与思辨紫块区分) */
+.ins-key { background: transparent; color: #D92D20; font-weight: 700; }
+.ins-report-body blockquote.ins-takeaway { background: linear-gradient(180deg, #FFF7ED, #FFFBF6); border: 1px solid rgba(245,158,11,.32); border-left: 4px solid #F59E0B; border-radius: 0 12px 12px 0; padding: 14px 18px; margin: 18px 0; color: #7A3E12; }
+.ins-report-body blockquote.ins-takeaway p { margin: 0; }
+.ins-report-body blockquote.ins-takeaway strong { color: #9A3412; }
+
 /* 块3 反馈 */
 .ins-fb-textarea {
   width: 100%; box-sizing: border-box; border: 1px solid var(--ins-border);

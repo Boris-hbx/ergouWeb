@@ -709,6 +709,30 @@ table.wt-table {
   border-color: var(--primary-color);
   box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.18), var(--shadow-soft);
 }
+/* T-138:卡激活态 = 持久高亮(紫框 + 轻紫光,非 1.4s 闪);人员卡 + 分布卡共用此态 */
+.wt-person-card.wt-person-active,
+.wt-tag-card.wt-person-active {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.18), var(--shadow-soft);
+}
+/* T-138:默认折叠——未激活卡隐藏第 6 条起的任务(人员视图 + 分布视图同款)*/
+.wt-person-card:not(.wt-person-active) .wt-person-task-extra,
+.wt-tag-card:not(.wt-person-active) .wt-person-task-extra { display: none; }
+/* T-138:展开/收起按钮 */
+.wt-person-expand {
+  align-self: flex-start;
+  margin: 2px 0 4px; padding: 4px 10px;
+  font-size: 12.5px; color: var(--primary-color);
+  background: rgba(var(--primary-rgb), 0.08);
+  border: 1px solid rgba(var(--primary-rgb), 0.22); border-radius: 999px;
+  cursor: pointer;
+}
+.wt-person-expand:hover { background: rgba(var(--primary-rgb), 0.14); }
+/* T-138:气泡激活态(与卡同步)*/
+.wt-bubble.wt-bubble-active {
+  outline: 3px solid rgba(var(--primary-rgb), 0.55);
+  outline-offset: 2px;
+}
 .wt-person-dragover {
   border-color: var(--primary-color);
   background: rgba(var(--primary-rgb), 0.10);

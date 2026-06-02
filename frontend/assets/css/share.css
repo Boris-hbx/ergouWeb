@@ -23,7 +23,7 @@ html, body {
 }
 
 #share-app {
-  max-width: 800px;
+  max-width: 960px;
   margin: 0 auto;
   padding: 40px 28px 80px;
 }
@@ -242,7 +242,7 @@ html, body {
 /* ===== T-129 报告排版 .ins-report(公开分享页;与详情页 insight.css 同款设计)===== */
 .ins-report { background: var(--share-bg-card); border: 1px solid var(--share-border); border-radius: 16px;
   box-shadow: 0 1px 2px rgba(20,18,40,.04), 0 10px 34px rgba(20,18,40,.06); overflow: hidden; }
-.ins-report-cover { padding: 32px 40px 24px; border-bottom: 1px solid var(--share-border);
+.ins-report-cover { padding: 32px 52px 24px; border-bottom: 1px solid var(--share-border);
   background: linear-gradient(180deg, var(--share-primary-soft), transparent); }
 .ins-report-cover h1 { font-size: 26px; line-height: 1.3; font-weight: 700; color: #17132b; letter-spacing: -.01em; }
 .ins-cover-meta { margin-top: 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13px; color: var(--share-text-mute); }
@@ -251,12 +251,12 @@ html, body {
 .ins-badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,.85); }
 .ins-badge.survey { background: #7C4DFF; } .ins-badge.decision { background: #2563EB; } .ins-badge.watch { background: #0D9488; }
 
-.ins-report-body { padding: 26px 40px 38px; font-size: 16px; line-height: 1.8; color: #2a2733; }
+.ins-report-body { padding: 26px 52px 38px; font-size: 16.5px; line-height: 1.8; color: #2a2733; }
 .ins-report-body > :first-child { margin-top: 0; }
 .ins-report-body h2 { font-size: 20px; font-weight: 700; color: #17132b; margin: 38px 0 12px; padding-top: 18px; border-top: 1px solid var(--share-border); letter-spacing: -.005em; }
 .ins-report-body h2:first-of-type { border-top: 0; padding-top: 0; margin-top: 4px; }
 .ins-report-body h2::before { content: ""; display: inline-block; width: 3px; height: 17px; background: var(--share-primary); border-radius: 2px; margin-right: 10px; vertical-align: -2px; }
-.ins-report-body h3 { font-size: 17px; font-weight: 700; color: #2a2436; margin: 22px 0 8px; }
+.ins-report-body h3 { font-size: 18px; font-weight: 700; color: #2a2436; margin: 22px 0 8px; }
 .ins-report-body p { margin: 0 0 14px; }
 .ins-report-body strong { color: #17132b; font-weight: 670; }
 .ins-report-body a { color: var(--share-primary); text-decoration: none; border-bottom: 1px solid rgba(124,77,255,.28); }
@@ -281,6 +281,18 @@ html, body {
 .ins-sibian-head { display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 700; color: #4a2fa0; margin-bottom: 8px; }
 .ins-sibian-head .tag { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--share-primary); background: #fff; border: 1px solid rgba(124,77,255,.28); border-radius: 999px; padding: 2px 9px; }
 .ins-sibian ul li::marker { color: var(--share-primary); }
+
+/* T-135 重点强调:行内 ==标红加粗== + 🎯 核心观点块(琥珀金,与思辨紫块区分) */
+.ins-key { background: transparent; color: #D92D20; font-weight: 700; }
+.ins-report-body blockquote.ins-takeaway { background: linear-gradient(180deg, #FFF7ED, #FFFBF6); border: 1px solid rgba(245,158,11,.32); border-left: 4px solid #F59E0B; border-radius: 0 12px 12px 0; padding: 14px 18px; margin: 18px 0; color: #7A3E12; }
+.ins-report-body blockquote.ins-takeaway p { margin: 0; }
+.ins-report-body blockquote.ins-takeaway strong { color: #9A3412; }
+
+/* T-137 报告页底部「查看全部洞察」回集链接(单报告页只放这个,不放署名/联系方式) */
+.ins-report-foot { padding: 20px 52px 26px; border-top: 1px solid var(--share-border); text-align: center; }
+.ins-back-collection { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; color: var(--share-primary); text-decoration: none; border: 1px solid rgba(124,77,255,.3); padding: 7px 16px; border-radius: 999px; }
+.ins-back-collection:hover { background: var(--share-primary-soft); }
+@media (max-width: 720px) { .ins-report-foot { padding: 16px 18px 22px; } }
 
 @media (max-width: 720px) {
   .ins-report-cover { padding: 24px 20px 20px; }

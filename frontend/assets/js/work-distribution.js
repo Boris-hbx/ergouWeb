@@ -17,6 +17,7 @@
 
 var WorkDistribution = (function() {
     var UNMARKED = '未标记';
+    var COLLAPSE_N = 5;  // T-138:每卡默认最多显示的任务数
     var _curDim = null;  // 当前维度的列 key
 
     function _esc(s) {
@@ -291,7 +292,7 @@ var WorkDistribution = (function() {
             b.innerHTML = '<div class="wt-b-name">' + _esc(g.name) + '</div>'
                 + '<div class="wt-b-count">' + g.tasks.length + '</div>'
                 + (overdue ? '<div class="wt-b-badge">⏰ ' + overdue + '</div>' : '');
-            b.onclick = function() { _scrollToCard(g.name); };
+            b.onclick = function() { _toggleCard(g.name, true); };
             row.appendChild(b);
         });
     }
@@ -322,17 +323,19 @@ var WorkDistribution = (function() {
           + (overdue ? '<span class="wt-tag-stats-overdue">⏰ ' + overdue + ' 逾期</span>' : '')
           + (p0      ? '<span class="wt-tag-stats-p0">⚡ ' + p0 + ' P0</span>' : '');
 
-        var taskListHtml = g.tasks.map(function(it) {
+        var sorted = _sortTasks(g.tasks);   // T-138:逾期 > P0 > 截止近 > 其余
+        var taskListHtml = sorted.map(function(it, idx) {
             var t = it.task;
             var due = _dueLabel(t);
             var p0Pill = (t.priority === 'high') ? '<span class="wt-person-pill wt-person-pill-p0">P0</span>' : '';
             var doneCls = (t.status === 'done') ? ' wt-person-task-done' : '';
+            var extraCls = (idx >= COLLAPSE_N) ? ' wt-person-task-extra' : '';
             var extraTags = (it.extra > 0)
                 ? '<span class="wt-tag-extra">+' + it.extra + '</span>'
                 : '';
             var avatarBg = Work.colorOf(t.assignee || '?');
             var initial = (t.assignee && t.assignee.trim()) ? t.assignee.slice(0, 1) : '?';
-            return '<div class="wt-person-task' + doneCls + '" data-tid="' + t.id + '">'
+            return '<div class="wt-person-task' + doneCls + extraCls + '" data-tid="' + t.id + '">'
                 +    '<div class="wt-person-check" data-tid="' + t.id + '"></div>'
                 +    '<div class="wt-person-task-title" data-tid="' + t.id + '">' + _esc(t.title || '(无标题)') + '</div>'
                 +    '<div class="wt-person-task-meta">'
@@ -344,12 +347,17 @@ var WorkDistribution = (function() {
                 +  '</div>';
         }).join('');
 
+        var expandHtml = (sorted.length > COLLAPSE_N)
+            ? '<button type="button" class="wt-person-expand" data-tag="' + _esc(g.name) + '" data-count="' + sorted.length + '">展开全部 ' + sorted.length + ' 条 ▾</button>'
+            : '';
+
         card.innerHTML =
             '<div class="wt-tag-head">'
           +   '<span class="wt-tag-chip' + chipCls + '">' + chipPrefix + _esc(g.name) + '</span>'
           +   '<div class="wt-tag-stats">' + statsHtml + '</div>'
           + '</div>'
-          + '<div class="wt-person-task-list">' + taskListHtml + '</div>';
+          + '<div class="wt-person-task-list">' + taskListHtml + '</div>'
+          + expandHtml;
         return card;
     }
 
@@ -365,6 +373,13 @@ var WorkDistribution = (function() {
                 if (typeof WorkTable !== 'undefined') {
                     WorkTable.editProgress(+check.dataset.tid, 'progress');
                 }
+                return;
+            }
+            // T-138:展开/收起按钮(与气泡 toggle 双向同步)
+            var exp = ev.target.closest('.wt-person-expand');
+            if (exp) {
+                ev.stopPropagation();
+                _toggleCard(exp.dataset.tag, false);
                 return;
             }
             var taskRow = ev.target.closest('.wt-person-task');
@@ -383,19 +398,43 @@ var WorkDistribution = (function() {
         };
     }
 
-    function _scrollToCard(name) {
-        // querySelector 对含特殊字符的 attr 要转义;CSS.escape 兼容性好
-        var sel = '';
-        try {
-            sel = '.wt-tag-card[data-tag="' + CSS.escape(name) + '"]';
-        } catch (_) {
-            sel = '.wt-tag-card[data-tag="' + name.replace(/"/g, '\\"') + '"]';
-        }
-        var card = document.querySelector(sel);
+    // ── T-138:卡内排序(逾期 > P0 > 截止近 > 其余),稳定排序 ──
+    function _sortRank(it) {
+        var t = it.task;
+        var due = _normalizeDue(t.due);
+        var today = _todayYMD();
+        if (t.status !== 'done' && due && due < today) return 0;   // 逾期
+        if (t.priority === 'high') return 1;                        // P0
+        if (due) { var we = _weekEnd(today); if (due <= we) return 2; }  // 截止近(本周内)
+        return 3;
+    }
+    function _sortTasks(items) {
+        return items.map(function(it, i) { return { it: it, i: i }; })
+            .sort(function(a, b) { var r = _sortRank(a.it) - _sortRank(b.it); return r !== 0 ? r : a.i - b.i; })
+            .map(function(x) { return x.it; });
+    }
+
+    // ── T-138:按 data-tag 找卡 / 找气泡(避免选择器注入)──
+    function _findByTag(sel, name) {
+        var nodes = document.querySelectorAll(sel);
+        for (var i = 0; i < nodes.length; i++) if (nodes[i].dataset.tag === name) return nodes[i];
+        return null;
+    }
+
+    // ── T-138:展开/折叠 + 持久高亮;气泡与卡自带按钮共用,天然双向同步;多卡可各自独立 ──
+    function _setCardActive(card, name, active) {
+        card.classList.toggle('wt-person-active', active);
+        var btn = card.querySelector('.wt-person-expand');
+        if (btn) btn.textContent = active ? '收起 ▴' : ('展开全部 ' + btn.dataset.count + ' 条 ▾');
+        var bubble = _findByTag('.wt-bubble', name);
+        if (bubble) bubble.classList.toggle('wt-bubble-active', active);
+    }
+    function _toggleCard(name, scroll) {
+        var card = _findByTag('.wt-tag-card', name);
         if (!card) return;
-        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        card.classList.add('wt-person-highlight');
-        setTimeout(function() { card.classList.remove('wt-person-highlight'); }, 1400);
+        var active = !card.classList.contains('wt-person-active');
+        _setCardActive(card, name, active);
+        if (scroll) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 
     function setDim(key) {

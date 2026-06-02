@@ -79,7 +79,7 @@
         return new Promise(function(resolve) {
             if (typeof InsightMd !== 'undefined') return resolve();
             var s = document.createElement('script');
-            s.src = '/assets/js/insight-markdown.js?v=20260531f';
+            s.src = '/assets/js/insight-markdown.js?v=20260602a';
             s.onload = resolve;
             s.onerror = function() { console.warn('[share] insight-markdown.js load failed (fallback to marked)'); resolve(); };
             document.head.appendChild(s);
@@ -112,11 +112,12 @@
             ? InsightMd.cover({ title: task.title, createdAt: rep.createdAt }, true)
             : '<header class="ins-report-cover"><h1>' + esc(task.title || '(无标题)') + '</h1></header>';
 
-        // T-134:删除「本报告由二狗(AI)生成」页脚(Boris 要求)
+        // T-134:删除「本报告由二狗(AI)生成」页脚;T-137:底部加回集链接(不放署名/联系方式)
         app.innerHTML = ''
             + '<article class="ins-report">'
             +   cover
             +   '<div class="ins-report-body">' + bodyHtml + '</div>'
+            +   '<footer class="ins-report-foot"><a class="ins-back-collection" href="/r">📚 查看全部洞察 →</a></footer>'
             + '</article>';
 
         if (task.title) document.title = task.title + ' · 洞察';

@@ -425,6 +425,83 @@ pub async fn public_data(
     )
 }
 
+// ============ 报告集(公开/全局, T-137) ============
+
+/// 从报告 markdown 提炼一句话摘要(集页卡片两行用):取首个实质文本行,剥常见 markdown 记号,截断 ~90 字。
+fn summarize(md: &str) -> String {
+    for raw in md.lines() {
+        let mut line = raw.trim();
+        if line.is_empty()
+            || line.starts_with("---")
+            || line.starts_with('|')
+            || line.starts_with('<')
+            || line.starts_with("##")
+        {
+            continue;
+        }
+        line = line.trim_start_matches('>').trim_start_matches('#').trim();
+        let cleaned = line
+            .replace("**", "")
+            .replace("==", "")
+            .replace('`', "")
+            .replace("🎯", "");
+        let cleaned = cleaned.trim();
+        if cleaned.chars().count() < 8 {
+            continue;
+        }
+        let head: String = cleaned.chars().take(90).collect();
+        return if cleaned.chars().count() > 90 {
+            format!("{head}…")
+        } else {
+            head
+        };
+    }
+    String::new()
+}
+
+/// GET /api/public/insight-reports — 公开(无 session):列出 owner 所有 active-published 报告。
+/// 数据=insight_share_links(revoked_at IS NULL) join task(未删)/report;published_at(=created_at) DESC。
+/// MVP 单用户:不跨 user 聚合(全部 active share 即 owner 的)。
+pub async fn public_reports_list(
+    State(state): State<AppState>,
+) -> (StatusCode, Json<JsonValue>) {
+    let db = state.db.lock();
+    let mut stmt = match db.prepare(
+        "SELECT sl.token, t.title, sl.created_at, r.template, r.content_md \
+         FROM insight_share_links sl \
+         JOIN insight_tasks t ON sl.task_id = t.id AND t.deleted = 0 \
+         JOIN insight_reports r ON sl.report_id = r.id \
+         WHERE sl.revoked_at IS NULL \
+         ORDER BY sl.created_at DESC",
+    ) {
+        Ok(s) => s,
+        Err(e) => return db_error("collection list prepare", e),
+    };
+    let rows = match stmt.query_map(params![], |row| {
+        let content_md: String = row.get(4)?;
+        Ok(json!({
+            "token": row.get::<_, String>(0)?,
+            "title": row.get::<_, String>(1)?,
+            "publishedAt": row.get::<_, String>(2)?,
+            "template": row.get::<_, String>(3)?,
+            "summary": summarize(&content_md),
+        }))
+    }) {
+        Ok(r) => r,
+        Err(e) => return db_error("collection list query", e),
+    };
+    let items: Vec<JsonValue> = rows.filter_map(|r| r.ok()).collect();
+    (
+        StatusCode::OK,
+        Json(json!({ "success": true, "items": items, "count": items.len() })),
+    )
+}
+
+/// GET /r — 公开:报告集 HTML 外壳(裸 /r = 集首页;数据由 collection.js 拉 /api/public/insight-reports)。
+pub async fn collection_page() -> (StatusCode, Html<String>) {
+    (StatusCode::OK, Html(COLLECTION_SHELL_HTML.to_string()))
+}
+
 // ============ Public HTML 外壳 ============
 
 const SHARE_SHELL_HTML: &str = r#"<!DOCTYPE html>
@@ -434,13 +511,13 @@ const SHARE_SHELL_HTML: &str = r#"<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex,nofollow">
 <title>洞察分享</title>
-<link rel="stylesheet" href="/assets/css/share.css?v=20260601b">
+<link rel="stylesheet" href="/assets/css/share.css?v=20260602a">
 </head>
 <body>
 <div id="share-app" data-token="{TOKEN}">
   <div class="share-loading">加载中…</div>
 </div>
-<script src="/assets/js/share.js?v=20260601b"></script>
+<script src="/assets/js/share.js?v=20260602a"></script>
 </body>
 </html>"#;
 
@@ -462,6 +539,32 @@ const SHARE_410_HTML: &str = r#"<!DOCTYPE html>
   <div class="icon">🔗</div>
   <h1>这个分享链接已经撤销</h1>
   <p>洞察作者已经把这份链接撤掉了。如果你确实需要内容,请直接找作者。</p>
+</body>
+</html>"#;
+
+// T-137 报告集外壳:静态页头/页脚(署名+联系方式 owner 写死),列表由 collection.js 拉 API 注入。
+const COLLECTION_SHELL_HTML: &str = r#"<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex,nofollow">
+<title>二狗洞察 · 报告集</title>
+<link rel="stylesheet" href="/assets/css/collection.css?v=20260602a">
+</head>
+<body>
+<div class="wrap">
+  <header class="col-head">
+    <span class="col-kicker">二狗洞察</span>
+    <h1>报告集</h1>
+    <p class="col-sub">Boris 的公开洞察报告 · 共 <b id="count">…</b> 篇 · 持续更新</p>
+  </header>
+  <main class="col-list" id="list"><div class="col-loading">加载中…</div></main>
+  <footer class="col-foot">
+    <b>Baoxing Huai</b> &nbsp;|&nbsp; <a href="mailto:baoxing2391@163.com">baoxing2391@163.com</a>
+  </footer>
+</div>
+<script src="/assets/js/collection.js?v=20260602a"></script>
 </body>
 </html>"#;
 
