@@ -340,6 +340,7 @@ var WorkDistribution = (function() {
                 +    '<div class="wt-person-task-title" data-tid="' + t.id + '">' + _esc(t.title || '(无标题)') + '</div>'
                 +    '<div class="wt-person-task-meta">'
                 +      '<span class="wt-tag-avatar" style="background:' + avatarBg + '" title="' + _esc(t.assignee || '未指派') + '">' + _esc(initial) + '</span>'
+                +      (Work.cycleChip(t) ? '<span class="wt-person-pill wt-recur-pill" title="周期任务">' + _esc(Work.cycleChip(t)) + '</span>' : '')
                 +      p0Pill
                 +      '<span class="wt-person-pill ' + due.cls + '">' + _esc(due.text) + '</span>'
                 +      extraTags

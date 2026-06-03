@@ -206,9 +206,9 @@ var WorkTable = (function() {
             case 'select': {
                 var has = v != null && v !== '';
                 var cls = (k === 'freq') ? 'wt-fq' : 'wt-lv';
-                // T-131:周期任务(freq 非「一次性」)加 🔁 标记,一眼看出会自动顺延复发
+                // T-131/T-139:周期任务(freq 非「一次性」)加周期归属 chip(🔁 6月 / 🔁 6月第2周)
                 var recur = (k === 'freq' && has && v !== '一次性')
-                    ? '<span class="wt-recur" title="周期任务:完成后自动顺延,不归档">🔁</span> ' : '';
+                    ? '<span class="wt-recur" title="周期任务:完成后自动顺延到下一期,不归档">' + Work.cycleChip(t) + '</span> ' : '';
                 return '<td>' + recur + (has
                     ? '<span class="wt-pill ' + cls + '" onclick="WorkTable.openPick(' + t.id + ',\'' + _escAttr(k) + '\',this)">' + _esc(v) + '</span>'
                     : '<span class="wt-pill wt-pill-empty" onclick="WorkTable.openPick(' + t.id + ',\'' + _escAttr(k) + '\',this)">选择</span>')

@@ -748,7 +748,7 @@ pub fn tool_definitions() -> Vec<Value> {
                     "title": {"type": "string", "description": "任务标题"},
                     "assignee": {"type": "string", "description": "责任人姓名（纯文本，如『陈老师』『王主任』）；留空 = 未指派"},
                     "level": {"type": "string", "description": "层级（自由文本，建议:院/所/组/个人）"},
-                    "freq": {"type": "string", "description": "频率（自由文本，建议:一次性/每周/每月/每季）"},
+                    "freq": {"type": "string", "description": "频率（自由文本，建议:一次性/每日/每周/每月）"},
                     "status": {"type": "string", "enum": ["todo", "doing", "blocked", "done"], "description": "状态，默认 todo"},
                     "priority": {"type": "string", "enum": ["high", "mid", "low", "P0"], "description": "优先级，默认 mid;P0 = high 别名"},
                     "due_date": {"type": "string", "description": "截止日 YYYY-MM-DD"},

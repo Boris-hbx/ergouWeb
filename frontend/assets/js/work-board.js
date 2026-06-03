@@ -111,7 +111,9 @@ var WorkBoard = (function() {
             +     '<span style="font-size:.8rem;color:var(--text-secondary)">' + esc(t.assignee || '—') + '</span>'
             +     collabHtml
             +     (t.level ? '<span class="wt-pill wt-lv">' + esc(t.level) + '</span>' : '')
-            +     (t.freq  ? '<span class="wt-pill wt-fq">' + esc(t.freq)  + '</span>' : '')
+            +     (t.freq && t.freq !== '一次性'
+                    ? '<span class="wt-pill wt-fq" title="周期任务:完成后自动顺延到下一期">' + esc(Work.cycleChip(t)) + '</span>'
+                    : (t.freq ? '<span class="wt-pill wt-fq">' + esc(t.freq) + '</span>' : ''))
             +     descIcon
             +     (t.due ? '<span class="wt-due' + overdue + '" style="font-size:.78rem;margin-left:auto">📅 ' + esc(t.due) + '</span>' : '')
             +   '</div>'

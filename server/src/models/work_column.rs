@@ -89,7 +89,6 @@ pub fn builtin_seed() -> Vec<WorkColumn> {
             "每日".into(),
             "每周".into(),
             "每月".into(),
-            "每季".into(),
         ]
     }
     let mut p = 0i32;
@@ -265,7 +264,8 @@ mod tests {
         assert_eq!(level.options.len(), 4);
         assert!(level.options.contains(&"院".to_string()));
         let freq = s.iter().find(|c| c.key == "freq").unwrap();
-        assert_eq!(freq.options.len(), 5);
+        assert_eq!(freq.options.len(), 4);   // T-139:删「每季」后剩 一次性/每日/每周/每月
+        assert!(!freq.options.contains(&"每季".to_string()));
     }
 
     #[test]

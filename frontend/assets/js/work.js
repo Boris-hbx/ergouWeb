@@ -557,9 +557,23 @@ var Work = (function() {
             + '<div class="wt-hs-axis"><span>30 天前</span><span>2 周前</span><span>今天</span></div>';
     }
 
+    // T-139:周期归属 chip。每月→「🔁 6月」(due 月份);每周→「🔁 6月第2周」(月内第几周=ceil(日/7));
+    //   其余周期(每日/每年等)→ 基础「🔁」。非周期/一次性 → 空串。due 顺延后随之自动更新。
+    function cycleChip(t) {
+        if (!t || !t.freq || t.freq === '一次性' || t.freq === '') return '';
+        var s = ('' + (t.due || '')).slice(0, 10);
+        var ok = s.length === 10 && s.charAt(4) === '-' && s.charAt(7) === '-';
+        var m = ok ? +s.slice(5, 7) : 0;
+        var d = ok ? +s.slice(8, 10) : 0;
+        if (t.freq === '每月') return m ? ('🔁 ' + m + '月') : '🔁';
+        if (t.freq === '每周') return (m && d) ? ('🔁 ' + m + '月第' + Math.ceil(d / 7) + '周') : '🔁';
+        return '🔁';
+    }
+
     return {
         init: init,
         showHub: showHub,
+        cycleChip: cycleChip,
         openFeature: openFeature,
         setView: setView,
         // T-098

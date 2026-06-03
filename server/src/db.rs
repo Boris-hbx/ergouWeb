@@ -269,6 +269,15 @@ fn run_migrations(conn: &Connection) {
     )
     .ok();
 
+    // T-139:删「每季」频率。seed_builtin 是 INSERT OR IGNORE,只影响新用户;
+    // 现有用户的 freq 内置列 options 仍含「每季」,这里幂等剥除(命中一次后 LIKE 不再匹配)。
+    conn.execute_batch(
+        "UPDATE work_columns
+            SET options = replace(replace(options, '\"每季\",', ''), ',\"每季\"', '')
+          WHERE builtin = 1 AND key = 'freq' AND options LIKE '%每季%';",
+    )
+    .ok();
+
     // T-107 v0.2:Insight 表 + Report 表新增字段
     // 用 "SELECT ... FROM ... LIMIT 1" 探测字段是否已存在,幂等。
     let has_pending_revision: bool = conn
