@@ -95,7 +95,34 @@
         return ({ survey: '综述型', decision: '决策型', watch: '追踪型' })[t] || '';
     }
 
-    function render(d) {
+    // T-140:左侧报告导航(220px 侧栏)。reports = /api/public/insight-reports 的 items(可空降级)。
+    function buildNav(reports, cur) {
+        var items = (reports && reports.length) ? reports : [];
+        var listHtml = items.map(function(r) {
+            var tpl = ({ survey: 1, decision: 1, watch: 1 })[r.template] ? r.template : 'survey';
+            var active = (r.token === cur) ? ' active' : '';
+            return '<a class="ins-nav-item' + active + '" href="/r/' + encodeURIComponent(r.token) + '">'
+                + '<span class="ins-nav-badge ' + tpl + '">' + templateLabel(tpl) + '</span>'
+                + '<span class="ins-nav-title">' + esc(r.title || '(无标题)') + '</span>'
+                + '<span class="ins-nav-date">' + esc(formatDate(r.publishedAt)) + '</span>'
+                + '</a>';
+        }).join('');
+        return '<aside class="ins-nav" id="ins-nav">'
+            + '<button type="button" class="ins-nav-toggle" id="ins-nav-toggle">📚 报告集</button>'
+            + '<div class="ins-nav-inner">'
+            +   '<div class="ins-nav-head">📚 报告集</div>'
+            +   '<div class="ins-nav-list">' + (listHtml || '<div class="ins-nav-empty">暂无其它报告</div>') + '</div>'
+            +   '<a class="ins-nav-all" href="/r">查看全部 →</a>'
+            + '</div>'
+            + '</aside>';
+    }
+    function bindNavToggle() {
+        var btn = document.getElementById('ins-nav-toggle');
+        var nav = document.getElementById('ins-nav');
+        if (btn && nav) btn.onclick = function() { nav.classList.toggle('open'); };
+    }
+
+    function render(d, reports) {
         var task = d.task || {};
         var rep = d.report || {};
         var bodyHtml;
@@ -112,13 +139,19 @@
             ? InsightMd.cover({ title: task.title, createdAt: rep.createdAt }, true)
             : '<header class="ins-report-cover"><h1>' + esc(task.title || '(无标题)') + '</h1></header>';
 
-        // T-134:删除「本报告由二狗(AI)生成」页脚;T-137:底部加回集链接(不放署名/联系方式)
+        // T-134:删页脚;T-137:底部回集链接;T-140:两栏(左 220 侧栏导航 + 右主区)
         app.innerHTML = ''
-            + '<article class="ins-report">'
-            +   cover
-            +   '<div class="ins-report-body">' + bodyHtml + '</div>'
-            +   '<footer class="ins-report-foot"><a class="ins-back-collection" href="/r">📚 查看全部洞察 →</a></footer>'
-            + '</article>';
+            + '<div class="ins-layout">'
+            +   buildNav(reports, token)
+            +   '<div class="ins-main">'
+            +     '<article class="ins-report">'
+            +       cover
+            +       '<div class="ins-report-body">' + bodyHtml + '</div>'
+            +       '<footer class="ins-report-foot"><a class="ins-back-collection" href="/r">📚 查看全部洞察 →</a></footer>'
+            +     '</article>'
+            +   '</div>'
+            + '</div>';
+        bindNavToggle();
 
         if (task.title) document.title = task.title + ' · 洞察';
         // T-129:渲染后把「思辨」节包成 callout
@@ -126,11 +159,19 @@
         if (rb && typeof InsightMd !== 'undefined' && InsightMd.decorate) InsightMd.decorate(rb);
     }
 
+    var _reports = [];
     Promise.all([
         loadMarked().catch(function(e) { console.error('[share] marked load fail', e); }),
         loadInsightMd()
     ])
-        .then(function() { return fetch('/r/' + token + '/data'); })
+        .then(function() {
+            // T-140:先拉报告集填侧栏(失败则侧栏降级为空,不挡主报告)
+            return fetch('/api/public/insight-reports')
+                .then(function(r) { return r.json(); })
+                .then(function(j) { _reports = (j && j.items) || []; })
+                .catch(function(e) { console.error('[share] nav list err', e); })
+                .then(function() { return fetch('/r/' + token + '/data'); });
+        })
         .then(function(resp) {
             if (resp.status === 410) {
                 app.innerHTML = '<div class="share-revoked">'
@@ -152,7 +193,7 @@
                 renderError(data.error || '加载失败');
                 return;
             }
-            render(data);
+            render(data, _reports);
         })
         .catch(function(e) {
             console.error('[share] fetch err', e);
