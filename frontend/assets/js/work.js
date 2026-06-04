@@ -16,7 +16,7 @@ var Work = (function() {
     var _view = 'table';
     var _feature = null;
     var _loaded = false;
-    var _timeTab = 'all';   // T-098:时间镜头 Tab(all / today / week / month)
+    var _timeTab = 'today';   // T-098 时间镜头 Tab(all/today/week/month);T-141 默认改「今日」
     var _dateFilter = null; // T-103 B.1:点心电图柱后单日过滤(YYYY-MM-DD);覆盖 _timeTab
     var _renderFrozen = false; // T-103 B.3:完成动画期间冻结 render,避免动画被打断
     var _searchQuery = '';     // T-130:全局搜索词(已 trim + lowercase),跨 5 视图;空 = 不过滤
@@ -58,8 +58,15 @@ var Work = (function() {
             _feature = 'table';
             localStorage.setItem('work_feature', 'table');
             if (tableView) tableView.style.display = '';
+            // T-141:每次进入默认「今日」镜头(不记忆上次选择);清掉单日过滤
+            _timeTab = 'today';
+            _dateFilter = null;
             _ensureLoaded().then(function() {
                 setView(_view, true);
+                document.querySelectorAll('.wt-time-tab').forEach(function(el) {
+                    el.classList.toggle('active', el.dataset.tab === 'today');
+                });
+                _updateTabIndicator();
             });
         }
     }
