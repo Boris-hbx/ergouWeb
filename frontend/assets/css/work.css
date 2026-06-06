@@ -1470,6 +1470,21 @@ table.wt-table {
 .wt-center-section {
   margin-top: 14px;
 }
+.wt-center-subsections {
+  display: grid;
+  gap: 10px;
+}
+.wt-center-sub {
+  margin-top: 0;
+  padding: 10px;
+  border: 1px solid #EEEAF6;
+  border-radius: 8px;
+  background: #FCFBFE;
+}
+.wt-center-sub .wt-center-section-head {
+  margin-bottom: 7px;
+  font-size: .92rem;
+}
 .wt-center-section-head {
   display: flex;
   align-items: center;

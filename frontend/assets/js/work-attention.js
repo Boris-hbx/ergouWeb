@@ -1,7 +1,7 @@
 // ========== WorkAttention - area pressure heat table (T-174) ==========
 
 var WorkAttention = (function() {
-    var ACTION = { decide: 1, push: 1, do: 1 };
+    var ACTION = { decide: 1, push: 1 };
     var UNSET = '未标记';
 
     function _esc(s) {
@@ -29,11 +29,14 @@ var WorkAttention = (function() {
         var d = _due(t);
         return t.status !== 'done' && d && d < _todayYMD();
     }
-    function _near(t) {
+    function _near(t, days) {
         var d = _due(t);
         if (!d || t.status === 'done') return false;
         var today = _todayYMD();
-        return d >= today && d <= _addDays(today, 3);
+        return d >= today && d <= _addDays(today, days);
+    }
+    function _staleTrack(t) {
+        return t.engage === 'track' && (_overdue(t) || (_near(t, 3) && t.status !== 'doing'));
     }
     function _bucket(n) {
         if (n <= 0) return 'zero';
@@ -52,7 +55,7 @@ var WorkAttention = (function() {
             if (ACTION[t.engage]) g.action++;
             if (_overdue(t)) g.overdue++;
             if (t.priority === 'high') g.p0++;
-            if (t.engage === 'track' && (_overdue(t) || _near(t))) g.stale++;
+            if (_staleTrack(t)) g.stale++;
         });
         return Object.keys(map).map(function(k) { return map[k]; }).sort(function(a, b) {
             var ap = a.action + a.overdue * 2 + a.p0 + a.stale;
@@ -80,7 +83,7 @@ var WorkAttention = (function() {
         }).join('');
         host.innerHTML = '<div class="wt-att-wrap">'
             + '<table class="wt-att-table">'
-            + '<thead><tr><th>领域</th><th>待我动作</th><th>逾期</th><th>P0</th><th>跟进飘了</th><th>总数</th></tr></thead>'
+            + '<thead><tr><th>领域</th><th>待我决策+推动</th><th>逾期</th><th>P0</th><th>跟进飘了</th><th>总数</th></tr></thead>'
             + '<tbody>' + (rows || '<tr><td colspan="6" class="wt-center-empty">暂无工作任务。</td></tr>') + '</tbody>'
             + '</table>'
             + '</div>';
@@ -90,7 +93,7 @@ var WorkAttention = (function() {
         WorkTable.clearAllFilters();
         if (area && area !== UNSET) WorkTable.setColumnFilter('area', [area]);
         else WorkTable.setColumnFilter('area', ['']);
-        if (metric === 'action') WorkTable.setColumnFilter('engage', ['decide', 'push', 'do']);
+        if (metric === 'action') WorkTable.setColumnFilter('engage', ['decide', 'push']);
         else if (metric === 'p0') WorkTable.setColumnFilter('priority', ['high']);
         else if (metric === 'stale') WorkTable.setColumnFilter('engage', ['track']);
         Work.setTimeTab(metric === 'overdue' ? 'today' : 'all');

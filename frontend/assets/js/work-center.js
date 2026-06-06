@@ -1,8 +1,6 @@
 // ========== WorkCenter - owner zhongshu view (T-174) ==========
 
 var WorkCenter = (function() {
-    var ACTION = { decide: 1, push: 1, do: 1 };
-
     function _esc(s) {
         return ('' + (s == null ? '' : s))
             .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -28,14 +26,20 @@ var WorkCenter = (function() {
         var due = _normDue(t);
         return t.status !== 'done' && due && due < _todayYMD();
     }
-    function _isNear(t) {
+    function _isNear(t, days) {
         var due = _normDue(t);
         if (!due || t.status === 'done') return false;
         var today = _todayYMD();
-        return due >= today && due <= _addDays(today, 3);
+        return due >= today && due <= _addDays(today, days);
     }
     function _isRisk(t) {
-        return _isOverdue(t) || _isNear(t);
+        return _isOverdue(t) || _isNear(t, 2);
+    }
+    function _isStaleTrack(t) {
+        return t.engage === 'track' && (_isOverdue(t) || (_isNear(t, 3) && t.status !== 'doing'));
+    }
+    function _isDoAction(t) {
+        return t.engage === 'do' && (t.priority === 'high' || _isRisk(t));
     }
     function _sort(a, b) {
         var ao = _isOverdue(a) ? 1 : 0, bo = _isOverdue(b) ? 1 : 0;
@@ -49,7 +53,7 @@ var WorkCenter = (function() {
     }
     function _riskLabel(t) {
         if (_isOverdue(t)) return '逾期';
-        if (_isNear(t)) return '临期';
+        if (_isRisk(t)) return '临期';
         return '';
     }
     function _open(id, ids) {
@@ -80,27 +84,41 @@ var WorkCenter = (function() {
                            : '<div class="wt-center-empty">' + _esc(empty) + '</div>')
             + '</section>';
     }
+    function _actionBlock(groups) {
+        var total = groups.decide.length + groups.push.length + groups.do.length;
+        return '<section class="wt-center-section wt-center-action">'
+            + '<div class="wt-center-section-head"><span>需要我动作</span><b>' + total + '</b></div>'
+            + '<div class="wt-center-subsections">'
+            + _section('待我决策', groups.decide, '当前无待你决策。', 'wt-center-sub wt-center-decide')
+            + _section('等我推动', groups.push, '当前无等你推动。', 'wt-center-sub wt-center-push')
+            + _section('我亲自做·临期', groups.do, '没有需你亲自处理的临期或 P0 任务。', 'wt-center-sub wt-center-do')
+            + '</div>'
+            + '</section>';
+    }
     function render() {
         var host = document.getElementById('wt-center-view');
         if (!host) return;
         var rows = Work.rows().filter(function(t) { return t.status !== 'done'; });
         var seenRisk = {};
-        var action = rows.filter(function(t) { return !!ACTION[t.engage]; });
-        action.forEach(function(t) { if (_isRisk(t)) seenRisk[t.id] = 1; });
+        var decide = rows.filter(function(t) { return t.engage === 'decide'; });
+        var push = rows.filter(function(t) { return t.engage === 'push'; });
+        var doRows = rows.filter(_isDoAction);
+        var trackVisible = rows.filter(_isStaleTrack);
+        decide.concat(push, doRows, trackVisible).forEach(function(t) { seenRisk[t.id] = 1; });
         var risk = rows.filter(function(t) { return _isRisk(t) && !seenRisk[t.id]; });
-        var trackVisible = rows.filter(function(t) { return t.engage === 'track' && _isRisk(t); });
-        var trackFolded = rows.filter(function(t) { return t.engage === 'track' && !_isRisk(t); }).length;
+        var trackFolded = rows.filter(function(t) { return t.engage === 'track' && !_isStaleTrack(t); }).length;
         var informCount = rows.filter(function(t) { return t.engage === 'inform'; }).length;
+        var actionCount = decide.length + push.length + doRows.length;
 
         host.innerHTML = '<div class="wt-center-wrap">'
             + '<div class="wt-center-summary">'
             +   '<button class="wt-primary" onclick="WorkTable.addRow()">+ 新建任务</button>'
-            +   '<span>需要动作 <b>' + action.length + '</b></span>'
-            +   '<span>风险 <b>' + (risk.length + trackVisible.length) + '</b></span>'
+            +   '<span>需要动作 <b>' + actionCount + '</b></span>'
+            +   '<span>风险 <b>' + risk.length + '</b></span>'
             +   '<span>跟进折叠 <b>' + trackFolded + '</b></span>'
             +   '<span>知会 <b>' + informCount + '</b></span>'
             + '</div>'
-            + _section('需要我动作', action, '没有需要你动作的任务。', 'wt-center-action')
+            + _actionBlock({ decide: decide, push: push, do: doRows })
             + _section('风险条', risk, '没有额外逾期或临期风险。', 'wt-center-risk')
             + _section('只需我知道', trackVisible, '跟进项已折叠；知会项只计数。', 'wt-center-info')
             + '</div>';

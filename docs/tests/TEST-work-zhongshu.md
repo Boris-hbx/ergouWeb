@@ -21,13 +21,15 @@
 - The view segment contains seven views: zhongshu, table, board, calendar, person, distribution, attention.
 - The table view still works and can edit/filter/group `area` and `engage`.
 - The create dialog includes `area` and `engage` through the column configuration.
-- Zhongshu shows action items for `decide`, `push`, and `do`.
-- Zhongshu shows overdue and near-due risk items once, even if they also appear in action items.
-- Zhongshu shows stale `track` items when overdue or near-due; other `track` items are folded.
+- The zhongshu segment is highlighted on first entry; the table segment is not highlighted until selected.
+- Zhongshu action area is split into `decide`, `push`, and `do` sub-sections.
+- Zhongshu shows all `decide` and `push` tasks, but only shows `do` tasks when they are P0 or due within 2 days.
+- Zhongshu risk means overdue or due within 2 days, and risk items are not duplicated if already visible in action/track sections.
+- Zhongshu shows stale `track` items when overdue or due within 3 days while not `doing`; other `track` items are folded.
 - Zhongshu counts `inform` items without expanding them by default.
 - Clicking a zhongshu card opens the existing T-100 detail drawer.
 - Changing `engage` from a zhongshu card moves the card to the correct section after re-render.
-- Attention view groups by `area` and shows action count, overdue count, P0 count, stale track count, and total.
+- Attention view groups by `area` and shows `decide + push` action count, overdue count, P0 count, stale track count, and total.
 - Clicking an attention row or metric drills down to table view with preset filters.
 
 ## Compatibility
