@@ -39,8 +39,8 @@ function fail(msg) {
 const branch = git(['rev-parse', '--abbrev-ref', 'HEAD']);
 if (branch !== 'main') fail(`当前在 '${branch}'，production 只从 main 发版`);
 
-// 2. 工作树干净
-if (git(['status', '--porcelain'])) fail('工作树有未提交改动');
+// 2. 工作树干净（只看已跟踪改动；忽略未跟踪文件，如有意保留的本地草稿）
+if (git(['status', '--porcelain', '--untracked-files=no'])) fail('工作树有未提交的已跟踪改动');
 
 // 3. 与 origin/main 同步
 try { execFileSync('git', ['fetch', 'origin', 'main'], { stdio: 'ignore' }); }
