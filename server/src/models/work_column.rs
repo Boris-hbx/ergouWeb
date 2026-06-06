@@ -8,8 +8,8 @@
 //!
 //! - `builtin = true`  → cannot be deleted (the 9 system fixtures).
 //! - `sys     = true`  → cannot have options edited (status/priority — options
-//!                       semantics are fixed by the app: status drives the board
-//!                       columns, priority drives the colored pills).
+//!   semantics are fixed by the app: status drives the board columns, priority
+//!   drives the colored pills).
 
 use serde::{Deserialize, Serialize};
 
@@ -84,11 +84,16 @@ pub fn builtin_seed() -> Vec<WorkColumn> {
         vec!["院".into(), "所".into(), "组".into(), "个人".into()]
     }
     fn freq_opts() -> Vec<String> {
+        vec!["一次性".into(), "每日".into(), "每周".into(), "每月".into()]
+    }
+    fn area_opts() -> Vec<String> {
         vec![
-            "一次性".into(),
-            "每日".into(),
-            "每周".into(),
-            "每月".into(),
+            "学术生态建设".into(),
+            "业务竞争力构建".into(),
+            "组织与人才".into(),
+            "平台支撑运营".into(),
+            "对外关系(总部/海外/周边)".into(),
+            "洞察战略".into(),
         ]
     }
     let mut p = 0i32;
@@ -213,6 +218,34 @@ pub fn builtin_seed() -> Vec<WorkColumn> {
             builtin: true,
             sys: false,
         },
+        WorkColumn {
+            key: "area".into(),
+            name: "领域".into(),
+            col_type: "select".into(),
+            options: area_opts(),
+            width: Some(150),
+            min_width: Some(100),
+            position: next(),
+            builtin: true,
+            sys: false,
+        },
+        WorkColumn {
+            key: "engage".into(),
+            name: "我的角色".into(),
+            col_type: "select".into(),
+            options: vec![
+                "decide".into(),
+                "push".into(),
+                "do".into(),
+                "track".into(),
+                "inform".into(),
+            ],
+            width: Some(112),
+            min_width: Some(90),
+            position: next(),
+            builtin: true,
+            sys: true,
+        },
     ]
 }
 
@@ -221,9 +254,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn seed_has_10_columns() {
+    fn seed_has_12_columns() {
         let s = builtin_seed();
-        assert_eq!(s.len(), 10);
+        assert_eq!(s.len(), 12);
     }
 
     #[test]
@@ -249,12 +282,35 @@ mod tests {
     fn status_priority_are_sys() {
         let s = builtin_seed();
         for c in &s {
-            if c.key == "status" || c.key == "priority" {
+            if c.key == "status" || c.key == "priority" || c.key == "engage" {
                 assert!(c.sys, "{} should be sys", c.key);
             } else {
                 assert!(!c.sys, "{} should not be sys", c.key);
             }
         }
+    }
+
+    #[test]
+    fn area_and_engage_columns_are_seeded_for_owner_view() {
+        let s = builtin_seed();
+        let area = s.iter().find(|c| c.key == "area").expect("area not seeded");
+        assert_eq!(area.col_type, "select");
+        assert!(area.builtin);
+        assert!(!area.sys);
+        assert_eq!(area.position, 10);
+
+        let engage = s
+            .iter()
+            .find(|c| c.key == "engage")
+            .expect("engage not seeded");
+        assert_eq!(engage.col_type, "select");
+        assert_eq!(
+            engage.options,
+            vec!["decide", "push", "do", "track", "inform"]
+        );
+        assert!(engage.builtin);
+        assert!(engage.sys);
+        assert_eq!(engage.position, 11);
     }
 
     #[test]
@@ -264,7 +320,7 @@ mod tests {
         assert_eq!(level.options.len(), 4);
         assert!(level.options.contains(&"院".to_string()));
         let freq = s.iter().find(|c| c.key == "freq").unwrap();
-        assert_eq!(freq.options.len(), 4);   // T-139:删「每季」后剩 一次性/每日/每周/每月
+        assert_eq!(freq.options.len(), 4); // T-139:删「每季」后剩 一次性/每日/每周/每月
         assert!(!freq.options.contains(&"每季".to_string()));
     }
 

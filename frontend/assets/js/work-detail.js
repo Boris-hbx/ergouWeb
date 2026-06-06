@@ -139,6 +139,8 @@ var WorkDetail = (function() {
 
         _setField('wt-d-level', t.level, '—');
         _setField('wt-d-freq', t.freq, '—');
+        _setField('wt-d-area', t.area, '—');
+        _setField('wt-d-engage', WorkTable._engageBy(t.engage).label, '—');
         _setField('wt-d-priority-field', p.label, '—');
         _setField('wt-d-due', t.due, '—');
 
@@ -153,6 +155,8 @@ var WorkDetail = (function() {
         _bindFieldClick('wt-d-field-assignee', function(ev) { WorkTable.editAssigneeCombined(t.id); });
         _bindFieldClick('wt-d-field-level',    function(ev) { WorkTable.openPick(t.id, 'level',    document.getElementById('wt-d-field-level')); });
         _bindFieldClick('wt-d-field-freq',     function(ev) { WorkTable.openPick(t.id, 'freq',     document.getElementById('wt-d-field-freq')); });
+        _bindFieldClick('wt-d-field-area',     function(ev) { WorkTable.openPick(t.id, 'area',     document.getElementById('wt-d-field-area')); });
+        _bindFieldClick('wt-d-field-engage',   function(ev) { WorkTable.openPick(t.id, 'engage',   document.getElementById('wt-d-field-engage')); });
         _bindFieldClick('wt-d-field-priority', function(ev) { WorkTable.openPick(t.id, 'priority', document.getElementById('wt-d-field-priority')); });
         _bindFieldClick('wt-d-field-due',      function(ev) { WorkTable.editDate(ev, t.id, 'due'); });
         _bindFieldClick('wt-d-progress',       function(ev) { WorkTable.editProgress(t.id, 'progress'); });

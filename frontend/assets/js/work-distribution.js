@@ -93,7 +93,7 @@ var WorkDistribution = (function() {
         }
         // 内置列读 task[key];自定义列读 task.customFields[key]
         var raw;
-        if (key === 'status' || key === 'priority' || key === 'level' || key === 'freq' || key === 'assignee') {
+        if (key === 'status' || key === 'priority' || key === 'level' || key === 'freq' || key === 'assignee' || key === 'area' || key === 'engage') {
             raw = task[key];
         } else if (key === 'tags') {
             // 内置「标签」列:可能在 task.tags 直字段(将来扩展)或 customFields.tags 中
@@ -132,6 +132,10 @@ var WorkDistribution = (function() {
         if (col.key === 'priority' && typeof WorkTable !== 'undefined') {
             var p = WorkTable._prioBy(value);
             if (p) return p.label;
+        }
+        if (col.key === 'engage' && typeof WorkTable !== 'undefined') {
+            var e = WorkTable._engageBy(value);
+            if (e) return e.label;
         }
         return value;
     }

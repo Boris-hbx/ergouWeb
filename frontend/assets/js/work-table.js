@@ -30,8 +30,16 @@ var WorkTable = (function() {
         { key: 'mid',  label: '中', cls: 'wt-p-mid'  },
         { key: 'low',  label: '低', cls: 'wt-p-low'  },
     ];
+    var ENGAGE = [
+        { key: 'decide', label: '待我决策', cls: 'wt-engage-decide' },
+        { key: 'push',   label: '等我推动', cls: 'wt-engage-push' },
+        { key: 'do',     label: '我亲自做', cls: 'wt-engage-do' },
+        { key: 'track',  label: '我跟进',   cls: 'wt-engage-track' },
+        { key: 'inform', label: '我知会',   cls: 'wt-engage-inform' },
+    ];
     function _statusBy(k) { for (var i = 0; i < STATUS.length; i++) if (STATUS[i].key === k) return STATUS[i]; return STATUS[0]; }
     function _prioBy(k)   { for (var i = 0; i < PRIORITY.length; i++) if (PRIORITY[i].key === k) return PRIORITY[i]; return PRIORITY[1]; }
+    function _engageBy(k) { for (var i = 0; i < ENGAGE.length; i++) if (ENGAGE[i].key === k) return ENGAGE[i]; return { key: '', label: '选择', cls: 'wt-pill-empty' }; }
 
     // ============ T-132:表头列筛选(Excel 风) ============
     // 结构:{ colKey: Set<选中的存储值> };存在某 key = 该列筛选生效(只显示值 ∈ Set 的行)。
@@ -47,7 +55,7 @@ var WorkTable = (function() {
     // 读某行某列的存储值数组(multi → 多个;空 → ['']  代表「(空白)」)
     function _rowColValues(t, col) {
         var key = col.key, raw;
-        if (key === 'assignee' || key === 'status' || key === 'priority' || key === 'level' || key === 'freq') {
+        if (key === 'assignee' || key === 'status' || key === 'priority' || key === 'level' || key === 'freq' || key === 'area' || key === 'engage') {
             raw = t[key];
         } else if (key === 'tags') {
             raw = (t.tags != null) ? t.tags : (t.customFields && t.customFields.tags);
@@ -66,6 +74,7 @@ var WorkTable = (function() {
         if (v === '' || v == null) return '(空白)';
         if (col.key === 'status' || col.type === 'status') return _statusBy(v).label;
         if (col.key === 'priority') return _prioBy(v).label;
+        if (col.key === 'engage') return _engageBy(v).label;
         return '' + v;
     }
 
@@ -121,6 +130,12 @@ var WorkTable = (function() {
 
     function clearAllFilters() {
         _colFilters = {};
+        Work.render();
+    }
+    function setColumnFilter(key, values) {
+        if (!key) return;
+        if (values && values.length) _colFilters[key] = new Set(values.map(String));
+        else delete _colFilters[key];
         Work.render();
     }
 
@@ -193,6 +208,12 @@ var WorkTable = (function() {
                 +    'onclick="WorkTable.openPick(' + t.id + ',\'priority\',this)">'
                 +    _esc(p.label) + '</span></td>';
         }
+        if (k === 'engage') {
+            var e = _engageBy(t.engage);
+            return '<td><span class="wt-pill ' + e.cls + '" '
+                +    'onclick="WorkTable.openPick(' + t.id + ',\'engage\',this)">'
+                +    _esc(e.label) + '</span></td>';
+        }
         if (c.type === 'status') {
             var s = _statusBy(t.status);
             return '<td><span class="wt-pill ' + s.cls + '" '
@@ -205,7 +226,7 @@ var WorkTable = (function() {
             case 'longtext': return '<td>' + _descCell(t, k) + '</td>';
             case 'select': {
                 var has = v != null && v !== '';
-                var cls = (k === 'freq') ? 'wt-fq' : 'wt-lv';
+                var cls = (k === 'freq') ? 'wt-fq' : (k === 'area' ? 'wt-area' : 'wt-lv');
                 // T-131/T-139:周期任务(freq 非「一次性」)加周期归属 chip(🔁 6月 / 🔁 6月第2周)
                 var recur = (k === 'freq' && has && v !== '一次性')
                     ? '<span class="wt-recur" title="周期任务:完成后自动顺延到下一期,不归档">' + Work.cycleChip(t) + '</span> ' : '';
@@ -576,6 +597,8 @@ var WorkTable = (function() {
             options = STATUS.map(function(s) { return { key: s.key, label: s.label }; });
         } else if (field === 'priority') {
             options = PRIORITY.map(function(p) { return { key: p.key, label: p.label }; });
+        } else if (field === 'engage') {
+            options = ENGAGE.map(function(e) { return { key: e.key, label: e.label }; });
         } else {
             options = (c && c.options || []).map(function(o) { return { key: o, label: o }; });
         }
@@ -704,6 +727,9 @@ var WorkTable = (function() {
     }
     function _createPrioOpts() {
         return PRIORITY.map(function(p) { return { key: p.key, label: p.label }; });
+    }
+    function _createEngageOpts() {
+        return ENGAGE.map(function(e) { return { key: e.key, label: e.label }; });
     }
 
     // T-138:可选 prefill —— 目前支持 { assignee }(人员/分布视图卡底「+ 添加任务」预填该卡责任人)
@@ -849,6 +875,8 @@ var WorkTable = (function() {
             ctl = _mkCreatePick(col, state, _createStatusOpts(), false);
         } else if (col.key === 'priority') {
             ctl = _mkCreatePick(col, state, _createPrioOpts(), false);
+        } else if (col.key === 'engage') {
+            ctl = _mkCreatePick(col, state, _createEngageOpts(), false);
         } else if (col.type === 'select') {
             ctl = _mkCreatePick(col, state, (col.options || []).map(function(o) { return { key: o, label: o }; }), false);
         } else if (col.type === 'multi') {
@@ -1172,12 +1200,15 @@ var WorkTable = (function() {
         // T-132:表头列筛选
         openColFilter: openColFilter,
         clearAllFilters: clearAllFilters,
+        setColumnFilter: setColumnFilter,
         // 给 thead 行内 onmousedown 用
         _resizeStart: _resizeStart,
         // 给 work-board.js 复用(头像配色 / 状态/优先级元数据)
         _avatar: _avatarHTML,
         _statusBy: _statusBy,
         _prioBy: _prioBy,
+        _engageBy: _engageBy,
+        _ENGAGE: ENGAGE,
         _STATUS: STATUS,
         _PRIORITY: PRIORITY,
         _esc: _esc,
