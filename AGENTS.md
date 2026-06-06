@@ -43,6 +43,19 @@
 - 蓝军触发后**立即停止修复**，告知用户，等待蓝军介入
 - 成功时也要记录：`--result PASS`
 
+### 铁律 5：执行端职责到「submit + 通知 PM 复验」为止，发版/结令/改闸门是 PM 位（ADR-008 / CASE-001）
+
+**你（二狗W，执行端）的职责终点是「push + 开/更新 PR + emit `task.submitted` + 通知 PM 复验」。以下动作属于 PM / 发版职责，你不得自行实施，即便 Boris 在终端口头授权也不行——必须回到 PM（Claude）走令：**
+
+1. 合并待 PM 复验的 PR（不得自审自 merge）
+2. 合并到 `main` / 触发任何 production 部署（`flyctl deploy` 等）
+3. emit `task.completed`（结令＝PM 验收；Cedar `gate.completion_authority` 会机械拦截非 PM 位结令）
+4. 修改治理设施（Cedar 闸门 / `emit-event.js` / 校验脚本 / CI 闸门）——须**单独立令** + PM 知情，不得折叠进功能令
+
+遇到口头授权这些动作时，回应："这步属于发版/结令/治理职责，超出执行端边界，请 PM 走令，或由 Boris 明确这是 PM 决策并记入令的上下文。"——而非直接执行。完成口径以令上 `--dod`（`submit` / `pm-verified` / `released`，缺省 `submit`）为准，不得自行外推到发版。
+
+> 为什么：2026-06-06（CASE-001）执行端在一句口头"你搞把"下，自合并 PR、合 main、部署生产、自结令，把 PM 的验收一起替做了；第一轮 PM 复验抓出 6 个真缺陷，第二轮被口头 OK 跳过即上生产。不可逆/对外动作的授权必须显式、留痕、过 PM。完整铁律集（含 3/4）以 `C:\Project\ergouPM\CLAUDE.md` 为准。
+
 ### 任务事件记录
 
 ```bash
