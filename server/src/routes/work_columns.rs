@@ -287,9 +287,9 @@ pub async fn create_column(
 fn next_custom_key(db: &Connection, user_id: &str) -> Option<String> {
     // Pull all keys matching c\d+, find max suffix
     let mut max_n: i64 = 0;
-    if let Ok(mut stmt) = db.prepare(
-        "SELECT key FROM work_columns WHERE user_id = ?1 AND key GLOB 'c[0-9]*'",
-    ) {
+    if let Ok(mut stmt) =
+        db.prepare("SELECT key FROM work_columns WHERE user_id = ?1 AND key GLOB 'c[0-9]*'")
+    {
         if let Ok(rows) = stmt.query_map(params![user_id], |r| r.get::<_, String>(0)) {
             for key in rows.flatten() {
                 if let Some(rest) = key.strip_prefix('c') {
@@ -395,7 +395,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn list_seeds_10_builtin_cols_on_first_access() {
+    async fn list_seeds_12_builtin_cols_on_first_access() {
         let state = test_state();
         let (_uid, token) = create_test_user(&state, "alice", "Pa55word1");
         let cookie = auth_cookie(&token);
@@ -413,7 +413,7 @@ mod tests {
             .unwrap();
         let j = body_json(resp).await;
         let items = j["items"].as_array().unwrap();
-        assert_eq!(items.len(), 10);
+        assert_eq!(items.len(), 12);
         // First seeded col is "title" by position
         assert_eq!(items[0]["key"], "title");
         assert_eq!(items[0]["name"], "任务");
@@ -421,6 +421,12 @@ mod tests {
         // status + priority are sys
         let status_col = items.iter().find(|c| c["key"] == "status").unwrap();
         assert_eq!(status_col["sys"], true);
+        let engage_col = items.iter().find(|c| c["key"] == "engage").unwrap();
+        assert_eq!(engage_col["type"], "select");
+        assert_eq!(engage_col["sys"], true);
+        let area_col = items.iter().find(|c| c["key"] == "area").unwrap();
+        assert_eq!(area_col["type"], "select");
+        assert_eq!(area_col["sys"], false);
         // T-108: tags column is seeded (multi type, empty options)
         let tags_col = items.iter().find(|c| c["key"] == "tags").unwrap();
         assert_eq!(tags_col["name"], "标签");
@@ -434,7 +440,7 @@ mod tests {
     /// T-108: 模拟"老用户"场景 — 数据库里已经有 9 个旧版内置列,
     /// 不该重复 seed,但应该自动把缺失的 tags 列补上。
     #[tokio::test]
-    async fn list_backfills_tags_for_existing_users_idempotently() {
+    async fn list_backfills_new_builtin_columns_for_existing_users_idempotently() {
         let state = test_state();
         let (uid, token) = create_test_user(&state, "old_user", "Pa55word1");
         let cookie = auth_cookie(&token);
@@ -485,10 +491,14 @@ mod tests {
             .unwrap();
         let j = body_json(resp).await;
         let items = j["items"].as_array().unwrap();
-        assert_eq!(items.len(), 10, "tags should be backfilled");
+        assert_eq!(items.len(), 12, "new builtin columns should be backfilled");
         let tags = items.iter().find(|c| c["key"] == "tags").unwrap();
         assert_eq!(tags["type"], "multi");
         assert_eq!(tags["builtin"], true);
+        assert!(items.iter().any(|c| c["key"] == "area"));
+        assert!(items
+            .iter()
+            .any(|c| c["key"] == "engage" && c["sys"] == true));
 
         // 第二次访问:幂等,仍是 10 列(不重复插入)
         let resp = app
@@ -503,7 +513,7 @@ mod tests {
             .unwrap();
         let j = body_json(resp).await;
         let items = j["items"].as_array().unwrap();
-        assert_eq!(items.len(), 10, "second access should be idempotent");
+        assert_eq!(items.len(), 12, "second access should be idempotent");
     }
 
     #[tokio::test]
@@ -544,7 +554,7 @@ mod tests {
         assert_eq!(j["createdKey"], "c1");
         let items = j["items"].as_array().unwrap();
         // 10 builtin (incl. T-108 tags) + 1 custom = 11
-        assert_eq!(items.len(), 11);
+        assert_eq!(items.len(), 13);
         let new_col = items.iter().find(|c| c["key"] == "c1").unwrap();
         assert_eq!(new_col["name"], "涉及部门");
         assert_eq!(new_col["type"], "multi");
@@ -670,6 +680,10 @@ mod tests {
         let j = body_json(resp).await;
         let task = &j["items"][0];
         let cf = task["customFields"].as_object().unwrap();
-        assert!(!cf.contains_key("c1"), "c1 should be stripped, got {:?}", cf);
+        assert!(
+            !cf.contains_key("c1"),
+            "c1 should be stripped, got {:?}",
+            cf
+        );
     }
 }

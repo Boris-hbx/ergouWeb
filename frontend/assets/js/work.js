@@ -13,7 +13,7 @@
 var Work = (function() {
     var _columns = [];
     var _rows = [];
-    var _view = 'table';
+    var _view = 'center';
     var _feature = null;
     var _loaded = false;
     var _timeTab = 'today';   // T-098 时间镜头 Tab(all/today/week/month);T-141 默认改「今日」
@@ -79,30 +79,38 @@ var Work = (function() {
         }
         _view = v;
         if (!skipBtnSync) {
+            var cc = document.getElementById('wt-seg-center');
             var t = document.getElementById('wt-seg-table');
             var b = document.getElementById('wt-seg-board');
             var c = document.getElementById('wt-seg-cal');
             var pp = document.getElementById('wt-seg-person');  // T-099
             var dd = document.getElementById('wt-seg-distribution');  // T-108
+            var aa = document.getElementById('wt-seg-attention');
+            if (cc) cc.classList.toggle('active', v === 'center');
             if (t)  t.classList.toggle('active', v === 'table');
             if (b)  b.classList.toggle('active', v === 'board');
             if (c)  c.classList.toggle('active', v === 'cal');
             if (pp) pp.classList.toggle('active', v === 'person');
             if (dd) dd.classList.toggle('active', v === 'distribution');
+            if (aa) aa.classList.toggle('active', v === 'attention');
         }
         var t  = document.getElementById('wt-table-view');
+        var zv = document.getElementById('wt-center-view');
         var bv = document.getElementById('wt-board-view');
         var cv = document.getElementById('wt-cal-view');
         var pv = document.getElementById('wt-person-view');  // T-099
         var dv = document.getElementById('wt-distribution-view');  // T-108
+        var av = document.getElementById('wt-attention-view');
+        if (zv) zv.classList.toggle('wt-hidden', v !== 'center');
         if (t)  t.classList.toggle('wt-hidden',  v !== 'table');
         if (bv) bv.classList.toggle('wt-hidden', v !== 'board');
         if (cv) cv.classList.toggle('wt-hidden', v !== 'cal');
         if (pv) pv.classList.toggle('wt-hidden', v !== 'person');
         if (dv) dv.classList.toggle('wt-hidden', v !== 'distribution');
+        if (av) av.classList.toggle('wt-hidden', v !== 'attention');
         // T-098:日历视图下时间镜头 Tab 自动隐藏(日历本身按 due_date 排,叠加筛选语义重复)
         var tabBar = document.getElementById('wt-time-tabs');
-        if (tabBar) tabBar.style.display = (v === 'cal') ? 'none' : '';
+        if (tabBar) tabBar.style.display = (v === 'cal' || v === 'center' || v === 'attention') ? 'none' : '';
         // T-109:切视图属于"允许 stagger"路径
         render({ stagger: true });
     }
@@ -361,11 +369,13 @@ var Work = (function() {
         _updateTabCounts();   // T-098:每次重渲都刷 Tab 计数(任务新增/编辑/删除自动联动)
         _renderHeartStrip();  // T-103 B.1:心电图也跟着数据刷
         _applyHeartStripState();  // T-118:每次 render 都同步折叠态(首次进入也生效)
-        if (_view === 'table') WorkTable.render(opts);
+        if (_view === 'center') WorkCenter.render(opts);
+        else if (_view === 'table') WorkTable.render(opts);
         else if (_view === 'board') WorkBoard.render();
         else if (_view === 'cal') WorkCalendar.render();
         else if (_view === 'person') WorkPerson.render();   // T-099
         else if (_view === 'distribution') WorkDistribution.render();   // T-108
+        else if (_view === 'attention') WorkAttention.render();
         // T-103 B.2:渲完才能拿到 active tab 的几何位置,延迟一帧再放指示条
         requestAnimationFrame(_updateTabIndicator);
         // T-100:抽屉打开时,数据改完同步刷新抽屉里的字段

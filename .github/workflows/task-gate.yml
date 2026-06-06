@@ -1,0 +1,23 @@
+name: task-gate
+on:
+  pull_request:
+    branches: [dev]
+  workflow_dispatch:
+jobs:
+  task-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Fetch ergouPM ledger (private, via token)
+        run: git clone --depth 1 "https://x-access-token:${{ secrets.ERGOUPM_TOKEN }}@github.com/Boris-hbx/ergouPM.git" _ergoupm
+      - name: Validate commit -> task
+        run: |
+          MSG="$(git log -1 --pretty=%B)"
+          echo "Commit message: $MSG"
+          node _ergoupm/scripts/validate-commit-task.js --message "$MSG" --end W

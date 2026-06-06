@@ -35,6 +35,12 @@ pub struct WorkTask {
     /// `high` / `mid` / `low` — drives the priority pill color.
     #[serde(default = "default_priority")]
     pub priority: String,
+    /// Owner-view area dimension. User-editable select options live in work_columns.
+    #[serde(default)]
+    pub area: String,
+    /// Owner engagement role: decide / push / do / track / inform.
+    #[serde(default)]
+    pub engage: String,
     /// Date as `YYYY-MM-DD` or `MM-DD`. Exposed as `due` in JSON to match HTML preview.
     #[serde(rename = "due", default, skip_serializing_if = "Option::is_none")]
     pub due_date: Option<String>,
@@ -81,6 +87,10 @@ pub struct CreateWorkTaskRequest {
     pub status: String,
     #[serde(default = "default_priority")]
     pub priority: String,
+    #[serde(default)]
+    pub area: String,
+    #[serde(default)]
+    pub engage: String,
     #[serde(rename = "due", default)]
     pub due_date: Option<String>,
     #[serde(default)]
@@ -106,6 +116,8 @@ pub struct UpdateWorkTaskRequest {
     pub freq: Option<String>,
     pub status: Option<String>,
     pub priority: Option<String>,
+    pub area: Option<String>,
+    pub engage: Option<String>,
     #[serde(rename = "due")]
     pub due_date: Option<String>,
     pub progress: Option<i32>,
@@ -149,6 +161,8 @@ mod tests {
             freq: String::new(),
             status: "todo".into(),
             priority: "mid".into(),
+            area: String::new(),
+            engage: String::new(),
             due_date: Some("05-25".into()),
             progress: 0,
             tags: Vec::new(),

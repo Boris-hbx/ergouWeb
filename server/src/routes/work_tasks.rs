@@ -36,6 +36,8 @@ pub struct QueryFilters {
     pub status: Option<String>,
     pub status_not: Option<String>,
     pub priority: Option<String>,
+    pub area: Option<String>,
+    pub engage: Option<String>,
     pub due_before: Option<String>,
     pub due_after: Option<String>,
     /// `true` = due_date < today AND status ≠ done
@@ -95,10 +97,10 @@ fn parse_custom_fields(raw: &str) -> Map<String, JsonValue> {
 
 /// Map a SELECT row to a `WorkTask`. Column order MUST match `SELECT_COLS`.
 fn row_to_task(row: &rusqlite::Row) -> rusqlite::Result<WorkTask> {
-    let custom_raw: String = row.get(11)?;
-    let tags_raw: String = row.get(14)?;
+    let custom_raw: String = row.get(13)?;
+    let tags_raw: String = row.get(16)?;
     let tags: Vec<String> = serde_json::from_str(&tags_raw).unwrap_or_default();
-    let collab_raw: String = row.get(15)?;
+    let collab_raw: String = row.get(17)?;
     let collaborators: Vec<String> = serde_json::from_str(&collab_raw).unwrap_or_default();
     Ok(WorkTask {
         id: row.get(0)?,
@@ -109,12 +111,14 @@ fn row_to_task(row: &rusqlite::Row) -> rusqlite::Result<WorkTask> {
         freq: row.get(5)?,
         status: row.get(6)?,
         priority: row.get(7)?,
-        due_date: row.get(8)?,
-        progress: row.get(9)?,
-        sort_order: row.get(10)?,
+        area: row.get(8)?,
+        engage: row.get(9)?,
+        due_date: row.get(10)?,
+        progress: row.get(11)?,
+        sort_order: row.get(12)?,
         custom_fields: parse_custom_fields(&custom_raw),
-        created_at: row.get(12)?,
-        updated_at: row.get(13)?,
+        created_at: row.get(14)?,
+        updated_at: row.get(15)?,
         tags,
         collaborators,
     })
@@ -122,7 +126,7 @@ fn row_to_task(row: &rusqlite::Row) -> rusqlite::Result<WorkTask> {
 
 // T-110:SELECT_COLS 末尾追加 tags;T-119:再追加 collaborators(末尾保持向前兼容)
 const SELECT_COLS: &str =
-    "id, title, desc, assignee, level, freq, status, priority, due_date, progress, sort_order, custom_fields, created_at, updated_at, tags, collaborators";
+    "id, title, desc, assignee, level, freq, status, priority, area, engage, due_date, progress, sort_order, custom_fields, created_at, updated_at, tags, collaborators";
 
 // ============ impl 函数(给 HTTP + 工具复用) ============
 
@@ -132,8 +136,7 @@ pub fn query_tasks_impl(
     user_id: &str,
     f: &QueryFilters,
 ) -> Result<(Vec<WorkTask>, QuerySummary), String> {
-    let mut conditions: Vec<String> =
-        vec!["user_id = ?1".to_string(), "deleted = 0".to_string()];
+    let mut conditions: Vec<String> = vec!["user_id = ?1".to_string(), "deleted = 0".to_string()];
     let mut params_v: Vec<Box<dyn rusqlite::ToSql>> = vec![Box::new(user_id.to_string())];
     let mut idx: usize = 2;
 
@@ -165,6 +168,16 @@ pub fn query_tasks_impl(
     if let Some(v) = f.priority.as_deref().filter(|s| !s.is_empty()) {
         conditions.push(format!("priority = ?{idx}"));
         params_v.push(Box::new(normalize_priority(v)));
+        idx += 1;
+    }
+    if let Some(v) = f.area.as_deref().filter(|s| !s.is_empty()) {
+        conditions.push(format!("area = ?{idx}"));
+        params_v.push(Box::new(v.to_string()));
+        idx += 1;
+    }
+    if let Some(v) = f.engage.as_deref().filter(|s| !s.is_empty()) {
+        conditions.push(format!("engage = ?{idx}"));
+        params_v.push(Box::new(v.to_string()));
         idx += 1;
     }
     if let Some(v) = f.due_before.as_deref().filter(|s| !s.is_empty()) {
@@ -282,9 +295,9 @@ pub fn create_task_impl(
 
     db.execute(
         "INSERT INTO work_tasks
-           (user_id, title, desc, assignee, level, freq, status, priority,
+           (user_id, title, desc, assignee, level, freq, status, priority, area, engage,
             due_date, progress, custom_fields, tags, collaborators, sort_order, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?15)",
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?17)",
         params![
             user_id,
             &req.title,
@@ -294,6 +307,8 @@ pub fn create_task_impl(
             &req.freq,
             &req.status,
             &priority,
+            &req.area,
+            &req.engage,
             &req.due_date,
             req.progress,
             &custom_str,
@@ -380,6 +395,8 @@ pub fn update_task_impl(
     push_str!("assignee", patch.assignee);
     push_str!("level", patch.level);
     push_str!("freq", patch.freq);
+    push_str!("area", patch.area);
+    push_str!("engage", patch.engage);
 
     let new_status = patch.status.clone();
     if let Some(s) = patch.status {
@@ -693,7 +710,7 @@ pub async fn delete_task(
         params![&now, id, &user_id.0],
     );
     match res {
-        Ok(n) if n == 0 => (
+        Ok(0) => (
             StatusCode::NOT_FOUND,
             Json(json!({ "success": false, "error": "未找到任务" })),
         ),
@@ -715,8 +732,9 @@ mod tests {
         let status = resp.status();
         let body = to_bytes(resp.into_body(), 1_000_000).await.unwrap();
         let body_str = String::from_utf8_lossy(&body);
-        serde_json::from_slice(&body)
-            .unwrap_or_else(|e| panic!("parse fail status={} body={:?} err={}", status, body_str, e))
+        serde_json::from_slice(&body).unwrap_or_else(|e| {
+            panic!("parse fail status={} body={:?} err={}", status, body_str, e)
+        })
     }
 
     #[tokio::test]
@@ -1151,7 +1169,9 @@ mod tests {
                     .uri("/api/work/tasks")
                     .header("Cookie", &cookie)
                     .header("Content-Type", "application/json")
-                    .body(Body::from(r#"{"title":"x","assignee":"陈","collaborators":["a","b","c"]}"#))
+                    .body(Body::from(
+                        r#"{"title":"x","assignee":"陈","collaborators":["a","b","c"]}"#,
+                    ))
                     .unwrap(),
             )
             .await
@@ -1192,7 +1212,9 @@ mod tests {
                     .uri("/api/work/tasks")
                     .header("Cookie", &cookie)
                     .header("Content-Type", "application/json")
-                    .body(Body::from(r#"{"title":"x","assignee":"陈","collaborators":["陈","王"]}"#))
+                    .body(Body::from(
+                        r#"{"title":"x","assignee":"陈","collaborators":["陈","王"]}"#,
+                    ))
                     .unwrap(),
             )
             .await
@@ -1219,7 +1241,9 @@ mod tests {
                     .uri("/api/work/tasks")
                     .header("Cookie", &cookie)
                     .header("Content-Type", "application/json")
-                    .body(Body::from(r#"{"title":"x","assignee":"陈","collaborators":["王","李"]}"#))
+                    .body(Body::from(
+                        r#"{"title":"x","assignee":"陈","collaborators":["王","李"]}"#,
+                    ))
                     .unwrap(),
             )
             .await
@@ -1234,7 +1258,9 @@ mod tests {
                     .uri(format!("/api/work/tasks/{id}"))
                     .header("Cookie", &cookie)
                     .header("Content-Type", "application/json")
-                    .body(Body::from(r#"{"assignee":"王","collaborators":["王","李","陈"]}"#))
+                    .body(Body::from(
+                        r#"{"assignee":"王","collaborators":["王","李","陈"]}"#,
+                    ))
                     .unwrap(),
             )
             .await
@@ -1261,7 +1287,8 @@ mod tests {
             r#"{"title":"b","assignee":"赵","collaborators":["王主任"]}"#,
             r#"{"title":"c","assignee":"孙","collaborators":["李秘书"]}"#,
         ] {
-            let _ = app.clone()
+            let _ = app
+                .clone()
                 .oneshot(
                     Request::builder()
                         .method("POST")
@@ -1517,7 +1544,9 @@ mod tests {
                     .uri("/api/work/tasks")
                     .header("Cookie", &cookie)
                     .header("Content-Type", "application/json")
-                    .body(Body::from(r#"{"title":"月报","freq":"每月","due":"2026-05-25"}"#))
+                    .body(Body::from(
+                        r#"{"title":"月报","freq":"每月","due":"2026-05-25"}"#,
+                    ))
                     .unwrap(),
             )
             .await

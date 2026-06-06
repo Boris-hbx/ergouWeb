@@ -101,11 +101,9 @@ fn run_migrations(conn: &Connection) {
     }
     // Migrate: ensure exactly one owner exists (promote first admin by created_at)
     let has_owner: bool = conn
-        .query_row(
-            "SELECT COUNT(*) FROM users WHERE role = 'owner'",
-            [],
-            |r| r.get::<_, i64>(0),
-        )
+        .query_row("SELECT COUNT(*) FROM users WHERE role = 'owner'", [], |r| {
+            r.get::<_, i64>(0)
+        })
         .unwrap_or(0)
         > 0;
     if !has_owner {
@@ -181,10 +179,8 @@ fn run_migrations(conn: &Connection) {
         .prepare("SELECT importance FROM ergou_memories LIMIT 1")
         .is_ok();
     if !has_importance {
-        conn.execute_batch(
-            "ALTER TABLE ergou_memories ADD COLUMN importance INTEGER DEFAULT 3;",
-        )
-        .ok();
+        conn.execute_batch("ALTER TABLE ergou_memories ADD COLUMN importance INTEGER DEFAULT 3;")
+            .ok();
     }
     // Add additional indexes for memories
     conn.execute_batch(
@@ -289,17 +285,23 @@ fn run_migrations(conn: &Connection) {
         )
         .ok();
     }
-    let has_published_at: bool = conn.prepare("SELECT published_at FROM reports LIMIT 1").is_ok();
+    let has_published_at: bool = conn
+        .prepare("SELECT published_at FROM reports LIMIT 1")
+        .is_ok();
     if !has_published_at {
         conn.execute_batch("ALTER TABLE reports ADD COLUMN published_at TEXT;")
             .ok();
     }
-    let has_retracted_at: bool = conn.prepare("SELECT retracted_at FROM reports LIMIT 1").is_ok();
+    let has_retracted_at: bool = conn
+        .prepare("SELECT retracted_at FROM reports LIMIT 1")
+        .is_ok();
     if !has_retracted_at {
         conn.execute_batch("ALTER TABLE reports ADD COLUMN retracted_at TEXT;")
             .ok();
     }
-    let has_revision_note: bool = conn.prepare("SELECT revision_note FROM reports LIMIT 1").is_ok();
+    let has_revision_note: bool = conn
+        .prepare("SELECT revision_note FROM reports LIMIT 1")
+        .is_ok();
     if !has_revision_note {
         conn.execute_batch(
             "ALTER TABLE reports ADD COLUMN revision_note TEXT NOT NULL DEFAULT '';",
@@ -315,26 +317,22 @@ fn run_migrations(conn: &Connection) {
     }
 
     // T-106 P3 / spec v0.2.1: reports.citations 字段(CC 输出的引用条目,前端 popover 用)
-    let has_citations: bool = conn.prepare("SELECT citations FROM reports LIMIT 1").is_ok();
+    let has_citations: bool = conn
+        .prepare("SELECT citations FROM reports LIMIT 1")
+        .is_ok();
     if !has_citations {
-        conn.execute_batch(
-            "ALTER TABLE reports ADD COLUMN citations TEXT NOT NULL DEFAULT '[]';",
-        )
-        .ok();
+        conn.execute_batch("ALTER TABLE reports ADD COLUMN citations TEXT NOT NULL DEFAULT '[]';")
+            .ok();
     }
 
     // T-110:work_tasks.tags 字段(内置「标签」列对应的独立 schema 字段)。
     // 根因:T-108 把内置「标签」列种成 builtin=true(前端走 t.tags 顶层路径),
     //       但当时漏加 work_tasks.tags 字段 + UpdateWorkTaskRequest.tags 字段,
     //       导致 PATCH 顶层的 tags=[...] 被 serde 静默丢弃。本 migration 补 schema 字段。
-    let has_work_tags: bool = conn
-        .prepare("SELECT tags FROM work_tasks LIMIT 1")
-        .is_ok();
+    let has_work_tags: bool = conn.prepare("SELECT tags FROM work_tasks LIMIT 1").is_ok();
     if !has_work_tags {
-        conn.execute_batch(
-            "ALTER TABLE work_tasks ADD COLUMN tags TEXT NOT NULL DEFAULT '[]';",
-        )
-        .ok();
+        conn.execute_batch("ALTER TABLE work_tasks ADD COLUMN tags TEXT NOT NULL DEFAULT '[]';")
+            .ok();
     }
 
     // T-119:work_tasks.collaborators 字段(Linear 风格"主+协")
@@ -346,6 +344,20 @@ fn run_migrations(conn: &Connection) {
             "ALTER TABLE work_tasks ADD COLUMN collaborators TEXT NOT NULL DEFAULT '[]';",
         )
         .ok();
+    }
+
+    // T-174:owner-view dimensions for the work task table.
+    let has_work_area: bool = conn.prepare("SELECT area FROM work_tasks LIMIT 1").is_ok();
+    if !has_work_area {
+        conn.execute_batch("ALTER TABLE work_tasks ADD COLUMN area TEXT NOT NULL DEFAULT '';")
+            .ok();
+    }
+    let has_work_engage: bool = conn
+        .prepare("SELECT engage FROM work_tasks LIMIT 1")
+        .is_ok();
+    if !has_work_engage {
+        conn.execute_batch("ALTER TABLE work_tasks ADD COLUMN engage TEXT NOT NULL DEFAULT '';")
+            .ok();
     }
 
     // T-107 v0.2:status enum 迁移 'drafting' → 'collecting'(无报告) / 'editing'(有报告)。
@@ -904,9 +916,11 @@ fn create_tables(conn: &Connection) {
             assignee      TEXT    NOT NULL DEFAULT '',
             level         TEXT    NOT NULL DEFAULT '',
             freq          TEXT    NOT NULL DEFAULT '',
-            status        TEXT    NOT NULL DEFAULT 'todo',
-            priority      TEXT    NOT NULL DEFAULT 'mid',
-            due_date      TEXT,
+              status        TEXT    NOT NULL DEFAULT 'todo',
+              priority      TEXT    NOT NULL DEFAULT 'mid',
+              area          TEXT    NOT NULL DEFAULT '',
+              engage        TEXT    NOT NULL DEFAULT '',
+              due_date      TEXT,
             progress      INTEGER NOT NULL DEFAULT 0,
             tags          TEXT    NOT NULL DEFAULT '[]',
             collaborators TEXT    NOT NULL DEFAULT '[]',
