@@ -43,6 +43,25 @@
 - 蓝军触发后**立即停止修复**，告知用户，等待蓝军介入
 - 成功时也要记录：`--result PASS`
 
+### 铁律 3：接令三步曲——查依赖 → emit started → 再动手
+
+**接到任务令后，严格按序，不得跳步：**
+1. **查依赖**：读 `C:\Project\ergouPM\docs\task-board.md` 该令「依赖」字段；依赖未全部 🟢 不得开工。
+2. **emit started**：`node C:/Project/ergouPM/scripts/emit-event.js task.started --task {T-xxx} --by AgentW`，确认状态变 🟡。
+3. **再动手**：状态确认 🟡 后才写代码。
+
+**完工时**：先写复盘 `C:\Project\ergouPM\retro\{T-xxx}.W-codex.md`（ADR-010 硬闸门，缺则结令被拒）→ submit 交回 PM 复验（结令是 PM 的事，见铁律 5）。
+> 为什么：多 Agent 并行在不同 terminal；不 emit started，task-board 停 🔴，会被另一 Agent 重复接令、撞 git。
+
+### 铁律 4：下"空闲/无令可接"结论前，必须现读最新 task-board
+
+**不得凭上下文里旧快照判定"没活了"。下此结论前必须当场现查：**
+```
+node C:/Project/ergouPM/scripts/list-open-tasks.js --agent W --waiting
+```
+它读 `events/ledger.jsonl`（唯一可靠源）；别用 awk/grep 手解析 task-board.md（板子有数字子标题，手解析会**静默漏令**）。
+> 为什么：PM 在别的 terminal 随时加令、不推送通知；你上次读的"待接令"很可能已过期。
+
 ### 铁律 5：执行端职责到「submit + 通知 PM 复验」为止，发版/结令/改闸门是 PM 位（ADR-008 / CASE-001）
 
 **你（二狗W，执行端）的职责终点是「push + 开/更新 PR + emit `task.submitted` + 通知 PM 复验」。以下动作属于 PM / 发版职责，你不得自行实施，即便 Boris 在终端口头授权也不行——必须回到 PM（Claude）走令：**
