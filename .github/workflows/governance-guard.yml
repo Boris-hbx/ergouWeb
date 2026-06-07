@@ -1,0 +1,44 @@
+name: governance-guard
+# RED-004 根治(部分)：改治理文件(.github/**、AGENTS.md)的 PR 必须挂"治理令"
+# (target=PM 或 adr=ADR-008)，挡"把闸门/CI 改动折进功能令"。每个 PR 都跑(无 paths 过滤)，
+# 未触及治理文件时直接放行——这样它可作为必需 check 而不会锁死普通 PR。
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  governance-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Detect governance-file changes
+        id: chk
+        run: |
+          BASE="${{ github.event.pull_request.base.sha }}"
+          CHANGED="$(git diff --name-only "$BASE"...HEAD)"
+          echo "Changed files:"; echo "$CHANGED"
+          if echo "$CHANGED" | grep -qE '^[.]github/|^AGENTS[.]md$'; then
+            echo "gov=1" >> "$GITHUB_OUTPUT"
+            echo "::notice::触及治理文件，需治理令校验"
+          else
+            echo "gov=0" >> "$GITHUB_OUTPUT"
+          fi
+      - name: No governance files -> pass
+        if: steps.chk.outputs.gov == '0'
+        run: echo "✅ 未触及治理文件(.github/**, AGENTS.md)，放行"
+      - uses: actions/setup-node@v4
+        if: steps.chk.outputs.gov == '1'
+        with:
+          node-version: '20'
+      - name: Fetch ergouPM ledger (private, via token)
+        if: steps.chk.outputs.gov == '1'
+        run: git clone --depth 1 "https://x-access-token:${{ secrets.ERGOUPM_TOKEN }}@github.com/Boris-hbx/ergouPM.git" _ergoupm
+      - name: Require governance task
+        if: steps.chk.outputs.gov == '1'
+        run: |
+          MSG="$(git log -1 --pretty=%B)"
+          echo "Commit message: $MSG"
+          node _ergoupm/scripts/validate-commit-task.js --message "$MSG" --end W --require-governance
