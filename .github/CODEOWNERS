@@ -1,0 +1,6 @@
+# 治理文件改动需 code owner(Boris-hbx 人工)复核 —— 真二方评审
+# 设计见 ergouPM/proposals/PROP-pm-bot-identity.md (RED-004 根治)。
+# agent 以 bot 身份(borisbaoxinghuai-dot)提交，治理文件改动须 @Boris-hbx 批准。
+/.github/             @Boris-hbx
+/AGENTS.md            @Boris-hbx
+/.github/CODEOWNERS   @Boris-hbx
