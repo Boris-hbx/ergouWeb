@@ -1196,3 +1196,156 @@
 .ins-hist-ver { font-size: 12px; font-weight: 600; color: var(--ins-text); margin-bottom: 3px; }
 .ins-hist-note { font-size: 12.5px; line-height: 1.55; color: var(--ins-text-mute); white-space: pre-wrap; }
 .ins-hist-first { color: var(--ins-text-faint); font-style: italic; }
+
+/* ===================================================================
+ * Insight Factory (T-205): Web shell for `/api/insight-factory/*`
+ * Uses .inf- prefix and reuses .ins-report-body typography.
+ * =================================================================== */
+
+#work-insight-factory-view {
+  padding: 18px 28px 50px;
+}
+
+.inf-list-main {
+  display: block;
+}
+
+.inf-capture {
+  max-width: 920px;
+  background: #fff;
+  border: 1px solid var(--ins-border);
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 16px;
+  box-shadow: var(--ins-shadow);
+}
+
+.inf-table {
+  max-width: 920px;
+}
+
+.inf-health {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 10px;
+  border: 1px solid var(--ins-border);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ins-text-mute);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+.inf-health-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ins-text-faint);
+}
+
+.inf-health-ok {
+  border-color: rgba(16, 185, 129, 0.35);
+  background: var(--ins-ok-soft);
+  color: #047857;
+}
+.inf-health-ok .inf-health-dot { background: var(--ins-ok); }
+
+.inf-health-warn {
+  border-color: rgba(245, 158, 11, 0.38);
+  background: var(--ins-warn-soft);
+  color: #8B5A00;
+}
+.inf-health-warn .inf-health-dot { background: var(--ins-warn); }
+
+.inf-health-muted .inf-health-dot { background: var(--ins-text-faint); }
+
+.inf-st-idle { background: #F3F4F6; color: #4B5563; }
+.inf-st-pending { background: var(--ins-warn-soft); color: #8B5A00; }
+.inf-st-running { background: rgba(59, 130, 246, 0.12); color: #1D4ED8; }
+.inf-st-done { background: var(--ins-ok-soft); color: #047857; }
+.inf-st-failed { background: var(--ins-danger-soft); color: var(--ins-danger); }
+
+.inf-det {
+  max-width: 960px;
+}
+
+.inf-job-card .ins-btn {
+  margin-top: 10px;
+}
+
+.inf-job-active,
+.inf-job-empty,
+.inf-job-error {
+  padding: 12px 14px;
+  background: var(--ins-bg-elev);
+  border: 1px solid var(--ins-border);
+  border-radius: 8px;
+  color: var(--ins-text-mute);
+  font-size: 13px;
+}
+
+.inf-job-active {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.inf-job-note {
+  flex-basis: 100%;
+  padding-top: 8px;
+  border-top: 1px dashed var(--ins-border);
+  white-space: pre-wrap;
+  color: var(--ins-text);
+}
+
+.inf-job-error {
+  background: var(--ins-danger-soft);
+  border-color: rgba(225, 29, 72, 0.28);
+  color: var(--ins-danger);
+}
+
+.inf-job-error-title {
+  font-weight: 650;
+  margin-bottom: 5px;
+}
+
+.inf-job-error-msg {
+  white-space: pre-wrap;
+  color: #9F1239;
+}
+
+.inf-job-pending { background: var(--ins-warn-soft); color: #8B5A00; }
+.inf-job-running { background: rgba(59, 130, 246, 0.12); color: #1D4ED8; }
+.inf-job-done { background: var(--ins-ok-soft); color: #047857; }
+.inf-job-failed,
+.inf-job-blocked { background: var(--ins-danger-soft); color: var(--ins-danger); }
+
+.inf-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.inf-history-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.inf-history-report {
+  margin-top: 10px;
+  padding: 14px 16px;
+  background: #fff;
+  border: 1px solid var(--ins-border);
+  border-radius: 8px;
+}
+
+.inf-history-report .ins-report-body {
+  font-size: 14px;
+  line-height: 1.72;
+}
