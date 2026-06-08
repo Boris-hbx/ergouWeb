@@ -14,7 +14,7 @@ WORKDIR /app/server
 RUN cargo build --release
 
 # Stage 2: Runtime image
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 
 RUN apt-get update && apt-get install -y ca-certificates tzdata gosu && rm -rf /var/lib/apt/lists/*
 
