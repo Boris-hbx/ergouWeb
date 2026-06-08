@@ -506,7 +506,13 @@ fn load_memory_context(db: &Connection, user_id: &str) -> Result<String, String>
             "SELECT type, title, body
              FROM factory_memories
              WHERE user_id = ?1 AND enabled = 1
-             ORDER BY importance DESC, updated_at DESC
+             ORDER BY CASE type
+                WHEN 'project_fact' THEN 1
+                WHEN 'boris_profile' THEN 2
+                WHEN 'report_preference' THEN 3
+                WHEN 'insight_summary' THEN 4
+                ELSE 9
+             END, importance DESC, updated_at DESC
              LIMIT 40",
         )
         .map_err(|e| e.to_string())?;
@@ -912,5 +918,37 @@ mod tests {
         assert_eq!(status, "blocked");
         assert_eq!(task_status, "blocked");
         assert_eq!(reports, 0);
+    }
+
+    #[test]
+    fn memory_context_uses_spec_order_and_skips_disabled_items() {
+        let state = test_state();
+        let (user_id, _) = create_test_user(&state, "factory-memory-order", "Pa55word1");
+        let db = state.db.lock();
+        let now = now_rfc3339();
+        let rows = [
+            ("insight_summary", "S", "summary", 5, 1),
+            ("report_preference", "R", "preference", 1, 1),
+            ("project_fact", "P", "fact", 1, 1),
+            ("boris_profile", "B", "profile", 1, 1),
+            ("project_fact", "P-off", "disabled fact", 5, 0),
+        ];
+        for (kind, title, body, importance, enabled) in rows {
+            db.execute(
+                "INSERT INTO factory_memories
+                    (user_id, type, title, body, source, importance, enabled, created_at, updated_at)
+                 VALUES (?1, ?2, ?3, ?4, 'test', ?5, ?6, ?7, ?7)",
+                params![user_id, kind, title, body, importance, enabled, now],
+            )
+            .unwrap();
+        }
+
+        let ctx = load_memory_context(&db, &user_id).unwrap();
+        let p = ctx.find("[project_fact]").unwrap();
+        let b = ctx.find("[boris_profile]").unwrap();
+        let r = ctx.find("[report_preference]").unwrap();
+        let s = ctx.find("[insight_summary]").unwrap();
+        assert!(p < b && b < r && r < s, "unexpected context order: {ctx}");
+        assert!(!ctx.contains("disabled fact"));
     }
 }
