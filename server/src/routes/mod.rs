@@ -34,3 +34,5 @@ pub mod auth_tokens;
 pub mod insight_tasks;
 // T-126 SPEC insight § 十二 报告分享(v0.4)
 pub mod insight_share;
+// T-204 SPEC insight-factory P0
+pub mod insight_factory;
