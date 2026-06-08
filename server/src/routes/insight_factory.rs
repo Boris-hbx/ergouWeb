@@ -767,14 +767,21 @@ pub async fn retry_job(
 
 pub async fn worker_health(user_id: UserId) -> (StatusCode, Json<JsonValue>) {
     let _ = user_id;
+    let health = crate::services::insight_factory_worker::codex_health().await;
+    let health_value = serde_json::to_value(&health).unwrap_or(JsonValue::Null);
     (
         StatusCode::OK,
         Json(json!({
             "success": true,
-            "provider": "codex",
-            "status": "placeholder",
-            "quotaGate": "not_checked",
-            "apiKeyFallback": false
+            "provider": health.provider,
+            "status": health.status,
+            "quotaGate": health.quota_gate,
+            "apiKeyFallback": health.api_key_fallback,
+            "apiKeyDetected": health.api_key_detected,
+            "cliAvailable": health.cli_available,
+            "versionSummary": health.version_summary,
+            "error": health.error,
+            "item": health_value
         })),
     )
 }
