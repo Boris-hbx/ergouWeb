@@ -700,6 +700,10 @@ async fn main() {
     // Spawn reminder poller (checks every 30s for due reminders)
     services::reminder_poller::spawn_poller(state.db.clone());
 
+    // T-209: Insight Factory Codex worker. The worker fails closed when
+    // OPENAI_API_KEY is present and never falls back to API billing.
+    services::insight_factory_worker::spawn_worker(state.db.clone());
+
     // Schedule daily backup
     let backup_state = state.clone();
     let backup_db_path = db_path.clone();
