@@ -682,6 +682,21 @@ var API = (function() {
         factoryWorkerHealth: async function() {
             return await request('GET', '/insight-factory/worker/health');
         },
+        factoryMemoryList: async function(params) {
+            var q = '';
+            if (params && params.type) q += (q ? '&' : '?') + 'type=' + encodeURIComponent(params.type);
+            if (params && params.enabled !== undefined) q += (q ? '&' : '?') + 'enabled=' + encodeURIComponent(params.enabled);
+            return await request('GET', '/insight-factory/memories' + q);
+        },
+        factoryMemoryCreate: async function(data) {
+            return await request('POST', '/insight-factory/memories', data);
+        },
+        factoryMemoryUpdate: async function(id, patch) {
+            return await request('PATCH', '/insight-factory/memories/' + encodeURIComponent(id), patch);
+        },
+        factoryMemoryDelete: async function(id) {
+            return await request('DELETE', '/insight-factory/memories/' + encodeURIComponent(id));
+        },
 
         patList:   async function()       { return await request('GET',    '/auth/tokens'); },
         patCreate: async function(data)   { return await request('POST',   '/auth/tokens', data); },

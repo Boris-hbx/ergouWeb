@@ -12,6 +12,9 @@ var InsightFactory = (function() {
     var _jobs = [];
     var _reports = [];
     var _health = null;
+    var _memories = [];
+    var _memoryFilter = '';
+    var _memoryEditingId = null;
     var _typeManual = false;
     var _showRaw = false;
     var _expandedReports = {};
@@ -52,6 +55,15 @@ var InsightFactory = (function() {
 
     function _templateLabel(t) {
         return ({ survey: '综述型', decision: '决策型', watch: '追踪型' })[t] || (t || '自动');
+    }
+
+    function _memoryTypeLabel(t) {
+        return ({
+            project_fact: '工程事实',
+            boris_profile: 'Boris 画像',
+            report_preference: '报告偏好',
+            insight_summary: '历史洞察'
+        })[t] || t || '';
     }
 
     function _shortTime(iso) {
@@ -121,6 +133,7 @@ var InsightFactory = (function() {
         _renderList();
         refreshList();
         refreshHealth();
+        refreshMemories();
     }
 
     function backToHub() {
@@ -153,7 +166,7 @@ var InsightFactory = (function() {
         var h = _health || {};
         var status = h.status || 'unknown';
         var gate = h.quotaGate || 'unknown';
-        var cls = status === 'ok' ? 'ok' : (status === 'placeholder' ? 'warn' : 'muted');
+        var cls = (status === 'ok' || status === 'ready') ? 'ok' : (status === 'placeholder' || status === 'blocked') ? 'warn' : 'muted';
         return '<div class="inf-health inf-health-' + cls + '">'
             + '<span class="inf-health-dot"></span>'
             + '<span>provider ' + _esc(h.provider || 'codex') + '</span>'
@@ -197,9 +210,62 @@ var InsightFactory = (function() {
             + _statusFilterHtml()
             + '</div>'
             + _captureHtml()
+            + _memoryPanelHtml()
             + '<div class="ins-list-table">' + _tableHtml() + '</div>'
             + '</div>';
         _syncDetectedType();
+    }
+
+    function _memoryPanelHtml() {
+        var types = ['', 'project_fact', 'boris_profile', 'report_preference', 'insight_summary'];
+        var filterOptions = types.map(function(t) {
+            return '<option value="' + t + '"' + (_memoryFilter === t ? ' selected' : '') + '>'
+                + (t ? _memoryTypeLabel(t) : '全部记忆') + '</option>';
+        }).join('');
+        var editing = _memories.filter(function(m) { return m.id === _memoryEditingId; })[0] || null;
+        var type = editing ? editing.type : 'report_preference';
+        var typeOptions = ['project_fact', 'boris_profile', 'report_preference', 'insight_summary'].map(function(t) {
+            return '<option value="' + t + '"' + (type === t ? ' selected' : '') + '>' + _memoryTypeLabel(t) + '</option>';
+        }).join('');
+        var rows = _memories.length
+            ? _memories.map(_memoryItemHtml).join('')
+            : '<div class="inf-memory-empty">暂无工厂记忆。新增后会在下一次生成/修订时注入 worker 上下文。</div>';
+        return '<section class="inf-memory-panel">'
+            + '<div class="inf-memory-head">'
+            + '<div><h3>工厂记忆</h3><div class="inf-memory-sub">仅用于洞察工厂，不写入二狗通用记忆。</div></div>'
+            + '<select class="ins-filter" onchange="InsightFactory.setMemoryFilter(this.value)">' + filterOptions + '</select>'
+            + '</div>'
+            + '<div class="inf-memory-editor">'
+            + '<select id="inf-mem-type" class="ins-cap-type">' + typeOptions + '</select>'
+            + '<input id="inf-mem-title" class="inf-memory-title" value="' + _esc(editing ? editing.title : '') + '" placeholder="标题">'
+            + '<input id="inf-mem-importance" class="inf-memory-importance" type="number" min="1" max="5" value="' + _esc(editing ? editing.importance : 3) + '" title="重要度">'
+            + '<textarea id="inf-mem-body" class="inf-memory-body" rows="2" placeholder="记忆内容：工程事实、Boris 偏好、报告风格约束或历史洞察摘要。">' + _esc(editing ? editing.body : '') + '</textarea>'
+            + '<div class="inf-memory-actions">'
+            + '<label class="inf-memory-enabled"><input id="inf-mem-enabled" type="checkbox"' + (!editing || editing.enabled ? ' checked' : '') + '>启用</label>'
+            + '<button class="ins-btn ins-btn-primary" onclick="InsightFactory.saveMemory()">' + (editing ? '保存记忆' : '新增记忆') + '</button>'
+            + (editing ? '<button class="ins-btn ins-btn-secondary" onclick="InsightFactory.cancelMemoryEdit()">取消</button>' : '')
+            + '</div>'
+            + '</div>'
+            + '<div class="inf-memory-list">' + rows + '</div>'
+            + '</section>';
+    }
+
+    function _memoryItemHtml(m) {
+        return '<div class="inf-memory-item' + (m.enabled ? '' : ' inf-memory-off') + '">'
+            + '<div class="inf-memory-item-main">'
+            + '<div class="inf-memory-item-top">'
+            + '<span class="ins-tag ins-tag-type">' + _memoryTypeLabel(m.type) + '</span>'
+            + '<strong>' + _esc(m.title) + '</strong>'
+            + '<span class="inf-memory-score">★' + _esc(m.importance) + '</span>'
+            + '</div>'
+            + '<div class="inf-memory-text">' + _esc(m.body) + '</div>'
+            + '</div>'
+            + '<div class="inf-memory-row-actions">'
+            + '<button class="ins-link-btn" onclick="InsightFactory.toggleMemory(' + m.id + ', ' + (!m.enabled) + ')">' + (m.enabled ? '禁用' : '启用') + '</button>'
+            + '<button class="ins-link-btn" onclick="InsightFactory.editMemory(' + m.id + ')">编辑</button>'
+            + '<button class="ins-link-btn ins-danger-link" onclick="InsightFactory.deleteMemory(' + m.id + ')">删除</button>'
+            + '</div>'
+            + '</div>';
     }
 
     function _tableHtml() {
@@ -255,9 +321,96 @@ var InsightFactory = (function() {
         }
     }
 
+    async function refreshMemories() {
+        try {
+            var params = {};
+            if (_memoryFilter) params.type = _memoryFilter;
+            var resp = await API.factoryMemoryList(params);
+            _memories = (resp && resp.items) || [];
+            _renderList();
+        } catch (e) {
+            console.error('[InsightFactory] memories', e);
+            if (typeof showToast === 'function') showToast('加载工厂记忆失败', 'error');
+        }
+    }
+
     function setFilter(v) {
         _statusFilter = v || '';
         refreshList();
+    }
+
+    function setMemoryFilter(v) {
+        _memoryFilter = v || '';
+        _memoryEditingId = null;
+        refreshMemories();
+    }
+
+    function editMemory(id) {
+        _memoryEditingId = Number(id);
+        _renderList();
+    }
+
+    function cancelMemoryEdit() {
+        _memoryEditingId = null;
+        _renderList();
+    }
+
+    async function saveMemory() {
+        var typeEl = document.getElementById('inf-mem-type');
+        var titleEl = document.getElementById('inf-mem-title');
+        var bodyEl = document.getElementById('inf-mem-body');
+        var impEl = document.getElementById('inf-mem-importance');
+        var enEl = document.getElementById('inf-mem-enabled');
+        var title = titleEl ? (titleEl.value || '').trim() : '';
+        var body = bodyEl ? (bodyEl.value || '').trim() : '';
+        if (!title || !body) {
+            if (typeof showToast === 'function') showToast('记忆标题和内容不能为空', 'warning');
+            return;
+        }
+        var payload = {
+            type: typeEl ? typeEl.value : 'report_preference',
+            title: title,
+            body: body,
+            importance: Math.max(1, Math.min(5, Number(impEl && impEl.value ? impEl.value : 3))),
+            enabled: !!(enEl && enEl.checked),
+            source: 'manual'
+        };
+        try {
+            if (_memoryEditingId) {
+                await API.factoryMemoryUpdate(_memoryEditingId, payload);
+            } else {
+                await API.factoryMemoryCreate(payload);
+            }
+            _memoryEditingId = null;
+            await refreshMemories();
+            if (typeof showToast === 'function') showToast('工厂记忆已保存', 'success');
+        } catch (e) {
+            console.error('[InsightFactory] saveMemory', e);
+            if (typeof showToast === 'function') showToast('保存工厂记忆失败', 'error');
+        }
+    }
+
+    async function toggleMemory(id, enabled) {
+        try {
+            await API.factoryMemoryUpdate(id, { enabled: !!enabled });
+            await refreshMemories();
+        } catch (e) {
+            console.error('[InsightFactory] toggleMemory', e);
+            if (typeof showToast === 'function') showToast('更新记忆状态失败', 'error');
+        }
+    }
+
+    async function deleteMemory(id) {
+        if (!confirm('删除这条工厂记忆?')) return;
+        try {
+            await API.factoryMemoryDelete(id);
+            if (_memoryEditingId === id) _memoryEditingId = null;
+            await refreshMemories();
+            if (typeof showToast === 'function') showToast('已删除工厂记忆', 'info');
+        } catch (e) {
+            console.error('[InsightFactory] deleteMemory', e);
+            if (typeof showToast === 'function') showToast('删除工厂记忆失败', 'error');
+        }
     }
 
     function onCaptureInput() {
@@ -637,7 +790,14 @@ var InsightFactory = (function() {
         backToHub: backToHub,
         refreshList: refreshList,
         refreshHealth: refreshHealth,
+        refreshMemories: refreshMemories,
         setFilter: setFilter,
+        setMemoryFilter: setMemoryFilter,
+        editMemory: editMemory,
+        cancelMemoryEdit: cancelMemoryEdit,
+        saveMemory: saveMemory,
+        toggleMemory: toggleMemory,
+        deleteMemory: deleteMemory,
         onCaptureInput: onCaptureInput,
         onTypeManual: onTypeManual,
         submitNew: submitNew,

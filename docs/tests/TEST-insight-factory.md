@@ -36,3 +36,11 @@
 - running 期间重复点击生成/反馈仍受 active job 唯一约束保护，返回 409，不创建并发 job。
 - failed/blocked job retry 会创建新的 pending job；dispatcher 处理 retry 时沿用原 job 的语义上下文，成功后写入新版本。
 - dispatcher 单轮处理结果可测试：无 pending 返回 `processed=0`；处理成功返回 `processed>=1`，失败不会 panic。
+
+## P1 专属记忆层与面板
+
+- 工厂记忆面板支持按 type 筛选、新增、编辑、启用/禁用和删除，且只调用 `/api/insight-factory/memories*`。
+- 手动新增 `report_preference` 后，下次 worker 上下文包含该 enabled 记忆。
+- 禁用某条 factory memory 后，下次 worker 上下文不再包含该记忆。
+- worker 注入顺序固定为 `project_fact -> boris_profile -> report_preference -> insight_summary`，同类内部按 importance DESC、updated_at DESC。
+- factory memories 不同写、不污染 `/api/memories` 通用记忆。

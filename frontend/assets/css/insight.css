@@ -1224,6 +1224,135 @@
   max-width: 920px;
 }
 
+.inf-memory-panel {
+  max-width: 920px;
+  margin: 0 0 16px;
+  padding: 12px;
+  background: #fff;
+  border: 1px solid var(--ins-border);
+  border-radius: 8px;
+  box-shadow: var(--ins-shadow);
+}
+
+.inf-memory-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.inf-memory-head h3 {
+  margin: 0 0 3px;
+  font-size: 15px;
+  color: var(--ins-text);
+}
+
+.inf-memory-sub {
+  font-size: 12px;
+  color: var(--ins-text-mute);
+}
+
+.inf-memory-editor {
+  display: grid;
+  grid-template-columns: minmax(130px, 170px) minmax(180px, 1fr) 64px;
+  gap: 8px;
+  align-items: start;
+}
+
+.inf-memory-title,
+.inf-memory-importance,
+.inf-memory-body {
+  border: 1px solid var(--ins-border);
+  border-radius: 7px;
+  padding: 8px 10px;
+  font: inherit;
+  color: var(--ins-text);
+  background: #fff;
+}
+
+.inf-memory-body {
+  grid-column: 1 / 4;
+  resize: vertical;
+  min-height: 58px;
+}
+
+.inf-memory-actions {
+  grid-column: 1 / 4;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.inf-memory-enabled {
+  margin-right: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--ins-text-mute);
+}
+
+.inf-memory-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.inf-memory-empty {
+  padding: 10px 12px;
+  border: 1px dashed var(--ins-border);
+  border-radius: 7px;
+  color: var(--ins-text-mute);
+  font-size: 13px;
+}
+
+.inf-memory-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  padding: 10px 11px;
+  border: 1px solid var(--ins-border);
+  border-radius: 7px;
+  background: var(--ins-bg-elev);
+}
+
+.inf-memory-off {
+  opacity: .62;
+}
+
+.inf-memory-item-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 5px;
+}
+
+.inf-memory-score {
+  color: var(--ins-text-faint);
+  font-size: 12px;
+}
+
+.inf-memory-text {
+  color: var(--ins-text-mute);
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.inf-memory-row-actions {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.ins-danger-link {
+  color: var(--ins-danger);
+}
+
 .inf-health {
   display: inline-flex;
   align-items: center;
