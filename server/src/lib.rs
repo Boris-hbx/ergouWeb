@@ -457,6 +457,56 @@ pub fn build_app(state: state::AppState) -> Router {
         .route(
             "/insight-tasks/{id}/reports",
             get(routes::insight_tasks::list_reports).post(routes::insight_tasks::create_report),
+        )
+        // Insight Factory(T-204):镜像 main.rs。
+        .route(
+            "/insight-factory/tasks",
+            get(routes::insight_factory::list_tasks).post(routes::insight_factory::create_task),
+        )
+        .route(
+            "/insight-factory/tasks/{id}",
+            get(routes::insight_factory::get_task)
+                .patch(routes::insight_factory::update_task)
+                .delete(routes::insight_factory::delete_task),
+        )
+        .route(
+            "/insight-factory/tasks/{id}/generate",
+            post(routes::insight_factory::generate_task),
+        )
+        .route(
+            "/insight-factory/tasks/{id}/feedback",
+            post(routes::insight_factory::feedback_task),
+        )
+        .route(
+            "/insight-factory/tasks/{id}/jobs",
+            get(routes::insight_factory::list_jobs),
+        )
+        .route(
+            "/insight-factory/tasks/{id}/reports/latest",
+            get(routes::insight_factory::latest_report),
+        )
+        .route(
+            "/insight-factory/tasks/{id}/reports",
+            get(routes::insight_factory::list_reports)
+                .post(routes::insight_factory::create_report),
+        )
+        .route(
+            "/insight-factory/jobs/{id}/retry",
+            post(routes::insight_factory::retry_job),
+        )
+        .route(
+            "/insight-factory/worker/health",
+            get(routes::insight_factory::worker_health),
+        )
+        .route(
+            "/insight-factory/memories",
+            get(routes::insight_factory::list_memories)
+                .post(routes::insight_factory::create_memory),
+        )
+        .route(
+            "/insight-factory/memories/{id}",
+            axum::routing::patch(routes::insight_factory::update_memory)
+                .delete(routes::insight_factory::delete_memory),
         );
 
     Router::new()

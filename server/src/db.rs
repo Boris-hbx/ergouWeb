@@ -1114,6 +1114,79 @@ fn create_tables(conn: &Connection) {
             revoked_at    TEXT
         );
         CREATE INDEX IF NOT EXISTS idx_insight_share_task ON insight_share_links(task_id);
+
+        -- ============ Insight Factory (T-204 / P0) ============
+        -- 与现行 insight_tasks / insight_reports 完全隔离。Web 录入、后端托管
+        -- worker 通过 factory_jobs 生成和修订 factory_reports。
+        CREATE TABLE IF NOT EXISTS factory_tasks (
+            id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id            TEXT    NOT NULL REFERENCES users(id),
+            title              TEXT    NOT NULL DEFAULT '',
+            input_type         TEXT    NOT NULL,
+            input_content      TEXT    NOT NULL,
+            template           TEXT,
+            status             TEXT    NOT NULL DEFAULT 'idle',
+            current_report_id  INTEGER,
+            source_snapshot    TEXT    NOT NULL DEFAULT '',
+            created_at         TEXT    NOT NULL,
+            updated_at         TEXT    NOT NULL,
+            deleted            INTEGER NOT NULL DEFAULT 0,
+            deleted_at         TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_factory_tasks_user ON factory_tasks(user_id, deleted, status);
+
+        CREATE TABLE IF NOT EXISTS factory_jobs (
+            id                INTEGER PRIMARY KEY AUTOINCREMENT,
+            task_id           INTEGER NOT NULL REFERENCES factory_tasks(id),
+            user_id           TEXT    NOT NULL,
+            mode              TEXT    NOT NULL,
+            status            TEXT    NOT NULL DEFAULT 'pending',
+            provider          TEXT    NOT NULL,
+            template          TEXT,
+            feedback_note     TEXT    NOT NULL DEFAULT '',
+            parent_report_id  INTEGER,
+            retry_of_job_id   INTEGER,
+            error_message     TEXT    NOT NULL DEFAULT '',
+            started_at        TEXT,
+            finished_at       TEXT,
+            created_at        TEXT    NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_factory_jobs_task ON factory_jobs(task_id, created_at DESC);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_factory_jobs_one_active
+            ON factory_jobs(task_id)
+            WHERE status IN ('pending', 'running');
+
+        CREATE TABLE IF NOT EXISTS factory_reports (
+            id                INTEGER PRIMARY KEY AUTOINCREMENT,
+            task_id           INTEGER NOT NULL REFERENCES factory_tasks(id),
+            job_id            INTEGER NOT NULL REFERENCES factory_jobs(id),
+            user_id           TEXT    NOT NULL,
+            version           INTEGER NOT NULL,
+            template          TEXT    NOT NULL,
+            content_md        TEXT    NOT NULL,
+            parent_report_id  INTEGER,
+            revision_note     TEXT    NOT NULL DEFAULT '',
+            generated_by      TEXT    NOT NULL,
+            provider          TEXT    NOT NULL,
+            model_used        TEXT    NOT NULL,
+            created_at        TEXT    NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_factory_reports_task ON factory_reports(task_id, version DESC);
+
+        CREATE TABLE IF NOT EXISTS factory_memories (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id     TEXT    NOT NULL REFERENCES users(id),
+            type        TEXT    NOT NULL,
+            title       TEXT    NOT NULL,
+            body        TEXT    NOT NULL,
+            source      TEXT    NOT NULL DEFAULT '',
+            source_ref  TEXT    NOT NULL DEFAULT '',
+            importance  INTEGER NOT NULL DEFAULT 3,
+            enabled     INTEGER NOT NULL DEFAULT 1,
+            created_at  TEXT    NOT NULL,
+            updated_at  TEXT    NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_factory_memories_user ON factory_memories(user_id, type, enabled);
         ",
     )
     .expect("Failed to create tables");
