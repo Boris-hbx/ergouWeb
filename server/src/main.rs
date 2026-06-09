@@ -466,6 +466,56 @@ pub fn build_app(state: AppState) -> Router {
             "/insight-tasks/{id}/reports",
             get(routes::insight_tasks::list_reports).post(routes::insight_tasks::create_report),
         )
+        // Insight Factory(T-204):独立 `/api/insight-factory/*` + factory_* 表。
+        .route(
+            "/insight-factory/tasks",
+            get(routes::insight_factory::list_tasks).post(routes::insight_factory::create_task),
+        )
+        .route(
+            "/insight-factory/tasks/{id}",
+            get(routes::insight_factory::get_task)
+                .patch(routes::insight_factory::update_task)
+                .delete(routes::insight_factory::delete_task),
+        )
+        .route(
+            "/insight-factory/tasks/{id}/generate",
+            post(routes::insight_factory::generate_task),
+        )
+        .route(
+            "/insight-factory/tasks/{id}/feedback",
+            post(routes::insight_factory::feedback_task),
+        )
+        .route(
+            "/insight-factory/tasks/{id}/jobs",
+            get(routes::insight_factory::list_jobs),
+        )
+        .route(
+            "/insight-factory/tasks/{id}/reports/latest",
+            get(routes::insight_factory::latest_report),
+        )
+        .route(
+            "/insight-factory/tasks/{id}/reports",
+            get(routes::insight_factory::list_reports)
+                .post(routes::insight_factory::create_report),
+        )
+        .route(
+            "/insight-factory/jobs/{id}/retry",
+            post(routes::insight_factory::retry_job),
+        )
+        .route(
+            "/insight-factory/worker/health",
+            get(routes::insight_factory::worker_health),
+        )
+        .route(
+            "/insight-factory/memories",
+            get(routes::insight_factory::list_memories)
+                .post(routes::insight_factory::create_memory),
+        )
+        .route(
+            "/insight-factory/memories/{id}",
+            axum::routing::patch(routes::insight_factory::update_memory)
+                .delete(routes::insight_factory::delete_memory),
+        )
         .nest(
             "/soul-state",
             Router::new()
@@ -650,6 +700,10 @@ async fn main() {
     // Spawn reminder poller (checks every 30s for due reminders)
     services::reminder_poller::spawn_poller(state.db.clone());
 
+    // T-209: Insight Factory Codex worker. The worker fails closed when
+    // OPENAI_API_KEY is present and never falls back to API billing.
+    services::insight_factory_worker::spawn_worker(state.db.clone());
+
     // Schedule daily backup
     let backup_state = state.clone();
     let backup_db_path = db_path.clone();
@@ -724,6 +778,8 @@ async fn main() {
     let sw_dir = frontend_dir.clone();
     let index_dir = frontend_dir.clone();
     let index_dir2 = frontend_dir.clone();
+    let insight_factory_dir = frontend_dir.clone();
+    let insight_factory_detail_dir = frontend_dir.clone();
     let login_dir = frontend_dir.clone();
 
     let app = build_app(state)
@@ -761,6 +817,24 @@ async fn main() {
             "/index.html",
             get(move || async move {
                 match tokio::fs::read_to_string(format!("{}/index.html", index_dir2)).await {
+                    Ok(body) => axum::response::Html(body).into_response(),
+                    Err(_) => StatusCode::NOT_FOUND.into_response(),
+                }
+            }),
+        )
+        .route(
+            "/insight-factory",
+            get(move || async move {
+                match tokio::fs::read_to_string(format!("{}/index.html", insight_factory_dir)).await {
+                    Ok(body) => axum::response::Html(body).into_response(),
+                    Err(_) => StatusCode::NOT_FOUND.into_response(),
+                }
+            }),
+        )
+        .route(
+            "/insight-factory/{id}",
+            get(move || async move {
+                match tokio::fs::read_to_string(format!("{}/index.html", insight_factory_detail_dir)).await {
                     Ok(body) => axum::response::Html(body).into_response(),
                     Err(_) => StatusCode::NOT_FOUND.into_response(),
                 }
