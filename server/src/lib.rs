@@ -34,7 +34,10 @@ pub fn build_app(state: state::AppState) -> Router {
             "/tokens",
             get(routes::auth_tokens::list_tokens).post(routes::auth_tokens::create_token),
         )
-        .route("/tokens/{id}", axum::routing::delete(routes::auth_tokens::revoke_token));
+        .route(
+            "/tokens/{id}",
+            axum::routing::delete(routes::auth_tokens::revoke_token),
+        );
 
     let todo_routes = Router::new()
         .route(
@@ -273,8 +276,7 @@ pub fn build_app(state: state::AppState) -> Router {
             "/soul-state",
             Router::new().route(
                 "/",
-                get(routes::soul_state::get_soul_state)
-                    .put(routes::soul_state::update_soul_state),
+                get(routes::soul_state::get_soul_state).put(routes::soul_state::update_soul_state),
             ),
         )
         .nest(
@@ -297,13 +299,25 @@ pub fn build_app(state: state::AppState) -> Router {
                 .route("/pending-users", get(routes::admin::pending_users))
                 .route("/users/{id}/approve", post(routes::admin::approve_user))
                 .route("/users/{id}/reject", post(routes::admin::reject_user))
-                .route("/conversations/users", get(routes::admin::conversation_user_summary))
+                .route(
+                    "/conversations/users",
+                    get(routes::admin::conversation_user_summary),
+                )
                 .route("/conversations", get(routes::admin::list_conversations))
-                .route("/conversations/{id}/messages", get(routes::admin::get_conversation_messages))
+                .route(
+                    "/conversations/{id}/messages",
+                    get(routes::admin::get_conversation_messages),
+                )
                 // T-115:一次性回补 todo.content → work_task.desc
-                .route("/migrate-todo-content", post(routes::admin::migrate_todo_content))
+                .route(
+                    "/migrate-todo-content",
+                    post(routes::admin::migrate_todo_content),
+                )
                 // T-122:洞察 v0.3 数据迁移(insights → insight_tasks)
-                .route("/migrate-insight-v0.3", post(routes::admin::migrate_insight_v0_3))
+                .route(
+                    "/migrate-insight-v0.3",
+                    post(routes::admin::migrate_insight_v0_3),
+                )
                 // T-089 块2:30 req/min/user 限流(必须双写 main.rs + lib.rs)
                 .route_layer(axum::middleware::from_fn_with_state(
                     state.clone(),
@@ -374,8 +388,7 @@ pub fn build_app(state: state::AppState) -> Router {
         )
         .route(
             "/insights/{id}/reports/{version}",
-            get(routes::reports::get_report_by_version)
-                .patch(routes::reports::update_report),
+            get(routes::reports::get_report_by_version).patch(routes::reports::update_report),
         )
         .route(
             "/insights/{id}/regenerate",
@@ -410,8 +423,7 @@ pub fn build_app(state: state::AppState) -> Router {
         // T-107 v0.2:Annotations(镜像 main.rs)
         .route(
             "/insights/{id}/annotations",
-            get(routes::annotations::list_annotations)
-                .post(routes::annotations::create_annotation),
+            get(routes::annotations::list_annotations).post(routes::annotations::create_annotation),
         )
         .route(
             "/annotations/{id}",
@@ -457,6 +469,55 @@ pub fn build_app(state: state::AppState) -> Router {
         .route(
             "/insight-tasks/{id}/reports",
             get(routes::insight_tasks::list_reports).post(routes::insight_tasks::create_report),
+        )
+        // Insight Factory(T-204):镜像 main.rs。
+        .route(
+            "/insight-factory/tasks",
+            get(routes::insight_factory::list_tasks).post(routes::insight_factory::create_task),
+        )
+        .route(
+            "/insight-factory/tasks/{id}",
+            get(routes::insight_factory::get_task)
+                .patch(routes::insight_factory::update_task)
+                .delete(routes::insight_factory::delete_task),
+        )
+        .route(
+            "/insight-factory/tasks/{id}/generate",
+            post(routes::insight_factory::generate_task),
+        )
+        .route(
+            "/insight-factory/tasks/{id}/feedback",
+            post(routes::insight_factory::feedback_task),
+        )
+        .route(
+            "/insight-factory/tasks/{id}/jobs",
+            get(routes::insight_factory::list_jobs),
+        )
+        .route(
+            "/insight-factory/tasks/{id}/reports/latest",
+            get(routes::insight_factory::latest_report),
+        )
+        .route(
+            "/insight-factory/tasks/{id}/reports",
+            get(routes::insight_factory::list_reports).post(routes::insight_factory::create_report),
+        )
+        .route(
+            "/insight-factory/jobs/{id}/retry",
+            post(routes::insight_factory::retry_job),
+        )
+        .route(
+            "/insight-factory/worker/health",
+            get(routes::insight_factory::worker_health),
+        )
+        .route(
+            "/insight-factory/memories",
+            get(routes::insight_factory::list_memories)
+                .post(routes::insight_factory::create_memory),
+        )
+        .route(
+            "/insight-factory/memories/{id}",
+            axum::routing::patch(routes::insight_factory::update_memory)
+                .delete(routes::insight_factory::delete_memory),
         );
 
     Router::new()

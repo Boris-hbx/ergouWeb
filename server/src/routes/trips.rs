@@ -1006,10 +1006,7 @@ pub async fn remove_collaborator(
 }
 
 // ===== Shared xlsx builder =====
-fn build_xlsx_buffer(
-    db: &rusqlite::Connection,
-    trip_id: &str,
-) -> Result<Vec<u8>, String> {
+fn build_xlsx_buffer(db: &rusqlite::Connection, trip_id: &str) -> Result<Vec<u8>, String> {
     use rust_xlsxwriter::{Format, Workbook};
 
     let rows: Vec<(String, String, String, f64, String, String, String)> = db
@@ -1478,7 +1475,9 @@ pub async fn analyze_item(
         .collect();
 
     let result = if has_images {
-        client.vision_generate(system, images, &user_message, 4096).await
+        client
+            .vision_generate(system, images, &user_message, 4096)
+            .await
     } else {
         client.simple_generate(system, &user_message, 4096).await
     };

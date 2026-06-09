@@ -43,7 +43,10 @@ pub fn build_app(state: AppState) -> Router {
             "/tokens",
             get(routes::auth_tokens::list_tokens).post(routes::auth_tokens::create_token),
         )
-        .route("/tokens/{id}", axum::routing::delete(routes::auth_tokens::revoke_token));
+        .route(
+            "/tokens/{id}",
+            axum::routing::delete(routes::auth_tokens::revoke_token),
+        );
 
     // Todo routes (session required via UserId extractor)
     let todo_routes = Router::new()
@@ -277,18 +280,12 @@ pub fn build_app(state: AppState) -> Router {
 
     // Settings routes (user preferences)
     let settings_routes = Router::new()
-        .route(
-            "/timezone",
-            get(auth::get_timezone).put(auth::set_timezone),
-        )
+        .route("/timezone", get(auth::get_timezone).put(auth::set_timezone))
         .route(
             "/memories",
             get(auth::list_memories).delete(auth::delete_all_memories),
         )
-        .route(
-            "/memories/{id}",
-            delete(auth::delete_memory_by_id),
-        );
+        .route("/memories/{id}", delete(auth::delete_memory_by_id));
 
     // Health check
     let start_time = std::time::Instant::now();
@@ -379,8 +376,7 @@ pub fn build_app(state: AppState) -> Router {
         )
         .route(
             "/insights/{id}/reports/{version}",
-            get(routes::reports::get_report_by_version)
-                .patch(routes::reports::update_report),
+            get(routes::reports::get_report_by_version).patch(routes::reports::update_report),
         )
         .route(
             "/insights/{id}/regenerate",
@@ -416,8 +412,7 @@ pub fn build_app(state: AppState) -> Router {
         // T-107 v0.2:Annotations
         .route(
             "/insights/{id}/annotations",
-            get(routes::annotations::list_annotations)
-                .post(routes::annotations::create_annotation),
+            get(routes::annotations::list_annotations).post(routes::annotations::create_annotation),
         )
         .route(
             "/annotations/{id}",
@@ -466,6 +461,55 @@ pub fn build_app(state: AppState) -> Router {
             "/insight-tasks/{id}/reports",
             get(routes::insight_tasks::list_reports).post(routes::insight_tasks::create_report),
         )
+        // Insight Factory(T-204):独立 `/api/insight-factory/*` + factory_* 表。
+        .route(
+            "/insight-factory/tasks",
+            get(routes::insight_factory::list_tasks).post(routes::insight_factory::create_task),
+        )
+        .route(
+            "/insight-factory/tasks/{id}",
+            get(routes::insight_factory::get_task)
+                .patch(routes::insight_factory::update_task)
+                .delete(routes::insight_factory::delete_task),
+        )
+        .route(
+            "/insight-factory/tasks/{id}/generate",
+            post(routes::insight_factory::generate_task),
+        )
+        .route(
+            "/insight-factory/tasks/{id}/feedback",
+            post(routes::insight_factory::feedback_task),
+        )
+        .route(
+            "/insight-factory/tasks/{id}/jobs",
+            get(routes::insight_factory::list_jobs),
+        )
+        .route(
+            "/insight-factory/tasks/{id}/reports/latest",
+            get(routes::insight_factory::latest_report),
+        )
+        .route(
+            "/insight-factory/tasks/{id}/reports",
+            get(routes::insight_factory::list_reports).post(routes::insight_factory::create_report),
+        )
+        .route(
+            "/insight-factory/jobs/{id}/retry",
+            post(routes::insight_factory::retry_job),
+        )
+        .route(
+            "/insight-factory/worker/health",
+            get(routes::insight_factory::worker_health),
+        )
+        .route(
+            "/insight-factory/memories",
+            get(routes::insight_factory::list_memories)
+                .post(routes::insight_factory::create_memory),
+        )
+        .route(
+            "/insight-factory/memories/{id}",
+            axum::routing::patch(routes::insight_factory::update_memory)
+                .delete(routes::insight_factory::delete_memory),
+        )
         .nest(
             "/soul-state",
             Router::new()
@@ -489,8 +533,7 @@ pub fn build_app(state: AppState) -> Router {
                 .route("/search", get(routes::memories::search_memories))
                 .route(
                     "/{id}",
-                    put(routes::memories::update_memory)
-                        .delete(routes::memories::delete_memory),
+                    put(routes::memories::update_memory).delete(routes::memories::delete_memory),
                 ),
         )
         .nest(
@@ -506,27 +549,54 @@ pub fn build_app(state: AppState) -> Router {
                 // New endpoints: User Management
                 .route("/users", get(routes::admin::list_users))
                 .route("/users/{id}/role", put(routes::admin::change_role))
-                .route("/users/{id}/force-logout", post(routes::admin::force_logout))
+                .route(
+                    "/users/{id}/force-logout",
+                    post(routes::admin::force_logout),
+                )
                 .route("/users/{id}/suspend", post(routes::admin::suspend_user))
                 // New endpoints: Conversation Monitor
-                .route("/conversations/users", get(routes::admin::conversation_user_summary))
+                .route(
+                    "/conversations/users",
+                    get(routes::admin::conversation_user_summary),
+                )
                 .route("/conversations", get(routes::admin::list_conversations))
-                .route("/conversations/{id}/messages", get(routes::admin::get_conversation_messages))
+                .route(
+                    "/conversations/{id}/messages",
+                    get(routes::admin::get_conversation_messages),
+                )
                 // New endpoints: AI Dashboard
                 .route("/ai-usage", get(routes::admin::ai_usage))
                 .route("/ai-usage/providers", get(routes::admin::ai_providers))
                 // New endpoints: Risk & System
-                .route("/security-events-v2", get(routes::admin::security_events_v2))
-                .route("/security-events/{id}/review", post(routes::admin::review_security_event))
+                .route(
+                    "/security-events-v2",
+                    get(routes::admin::security_events_v2),
+                )
+                .route(
+                    "/security-events/{id}/review",
+                    post(routes::admin::review_security_event),
+                )
                 .route("/system-status", get(routes::admin::system_status))
                 .route("/audit-log", get(routes::admin::audit_log))
                 // People (人物档案)
-                .route("/people", get(routes::admin::list_people).post(routes::admin::create_person))
-                .route("/people/{id}", put(routes::admin::update_person).delete(routes::admin::delete_person))
+                .route(
+                    "/people",
+                    get(routes::admin::list_people).post(routes::admin::create_person),
+                )
+                .route(
+                    "/people/{id}",
+                    put(routes::admin::update_person).delete(routes::admin::delete_person),
+                )
                 // T-115:一次性回补 todo.content → work_task.desc
-                .route("/migrate-todo-content", post(routes::admin::migrate_todo_content))
+                .route(
+                    "/migrate-todo-content",
+                    post(routes::admin::migrate_todo_content),
+                )
                 // T-122:洞察 v0.3 数据迁移(insights → insight_tasks)
-                .route("/migrate-insight-v0.3", post(routes::admin::migrate_insight_v0_3))
+                .route(
+                    "/migrate-insight-v0.3",
+                    post(routes::admin::migrate_insight_v0_3),
+                )
                 // T-089 块2:30 req/min/user 限流 —— 防暴力枚举 / DoS。
                 // route_layer 比 layer 更紧凑;仅作用于 admin 路由子树。
                 .route_layer(axum::middleware::from_fn_with_state(
@@ -539,7 +609,10 @@ pub fn build_app(state: AppState) -> Router {
             "/uploads/{user_id}/{filename}",
             get(routes::expenses::serve_photo),
         )
-        .route("/client-errors", post(routes::observability::report_client_error));
+        .route(
+            "/client-errors",
+            post(routes::observability::report_client_error),
+        );
 
     Router::new()
         .route("/health", get(move || async move {
@@ -650,6 +723,10 @@ async fn main() {
     // Spawn reminder poller (checks every 30s for due reminders)
     services::reminder_poller::spawn_poller(state.db.clone());
 
+    // T-209: Insight Factory Codex worker. The worker fails closed when
+    // OPENAI_API_KEY is present and never falls back to API billing.
+    services::insight_factory_worker::spawn_worker(state.db.clone());
+
     // Schedule daily backup
     let backup_state = state.clone();
     let backup_db_path = db_path.clone();
@@ -724,6 +801,8 @@ async fn main() {
     let sw_dir = frontend_dir.clone();
     let index_dir = frontend_dir.clone();
     let index_dir2 = frontend_dir.clone();
+    let insight_factory_dir = frontend_dir.clone();
+    let insight_factory_detail_dir = frontend_dir.clone();
     let login_dir = frontend_dir.clone();
 
     let app = build_app(state)
@@ -733,7 +812,10 @@ async fn main() {
                 match tokio::fs::read_to_string(format!("{}/sw.js", sw_dir)).await {
                     Ok(body) => (
                         [
-                            (http::header::CONTENT_TYPE, "application/javascript; charset=utf-8"),
+                            (
+                                http::header::CONTENT_TYPE,
+                                "application/javascript; charset=utf-8",
+                            ),
                             (
                                 http::header::CACHE_CONTROL,
                                 "no-cache, no-store, must-revalidate",
@@ -767,6 +849,30 @@ async fn main() {
             }),
         )
         .route(
+            "/insight-factory",
+            get(move || async move {
+                match tokio::fs::read_to_string(format!("{}/index.html", insight_factory_dir)).await
+                {
+                    Ok(body) => axum::response::Html(body).into_response(),
+                    Err(_) => StatusCode::NOT_FOUND.into_response(),
+                }
+            }),
+        )
+        .route(
+            "/insight-factory/{id}",
+            get(move || async move {
+                match tokio::fs::read_to_string(format!(
+                    "{}/index.html",
+                    insight_factory_detail_dir
+                ))
+                .await
+                {
+                    Ok(body) => axum::response::Html(body).into_response(),
+                    Err(_) => StatusCode::NOT_FOUND.into_response(),
+                }
+            }),
+        )
+        .route(
             "/login.html",
             get(move || async move {
                 match tokio::fs::read_to_string(format!("{}/login.html", login_dir)).await {
@@ -779,18 +885,20 @@ async fn main() {
             tower_http::services::ServeDir::new(&frontend_dir)
                 .append_index_html_on_directories(true),
         )
-        .layer(axum::middleware::map_response(|mut response: axum::response::Response| async move {
-            if let Some(ct) = response.headers().get(http::header::CONTENT_TYPE).cloned() {
-                if let Ok(s) = ct.to_str() {
-                    if s.starts_with("text/") && !s.contains("charset") {
-                        if let Ok(v) = HeaderValue::from_str(&format!("{}; charset=utf-8", s)) {
-                            response.headers_mut().insert(http::header::CONTENT_TYPE, v);
+        .layer(axum::middleware::map_response(
+            |mut response: axum::response::Response| async move {
+                if let Some(ct) = response.headers().get(http::header::CONTENT_TYPE).cloned() {
+                    if let Ok(s) = ct.to_str() {
+                        if s.starts_with("text/") && !s.contains("charset") {
+                            if let Ok(v) = HeaderValue::from_str(&format!("{}; charset=utf-8", s)) {
+                                response.headers_mut().insert(http::header::CONTENT_TYPE, v);
+                            }
                         }
                     }
                 }
-            }
-            response
-        }));
+                response
+            },
+        ));
 
     let addr = format!("0.0.0.0:{}", port);
     println!("Next server listening on {}", addr);

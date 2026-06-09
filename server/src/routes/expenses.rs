@@ -598,8 +598,7 @@ pub async fn get_stats(
     // Query all entries in range
     let mut tag_map: std::collections::HashMap<String, (f64, i64)> =
         std::collections::HashMap::new();
-    let mut cat_map: std::collections::HashMap<&str, (f64, i64)> =
-        std::collections::HashMap::new();
+    let mut cat_map: std::collections::HashMap<&str, (f64, i64)> = std::collections::HashMap::new();
     let mut day_map: std::collections::HashMap<String, f64> = std::collections::HashMap::new();
     let mut total_amount: f64 = 0.0;
     let mut entry_count: i64 = 0;
@@ -700,9 +699,8 @@ pub async fn get_stats(
         _ => {
             // month: previous month
             let prev_end = from_date - chrono::Duration::days(1);
-            let prev_start =
-                chrono::NaiveDate::from_ymd_opt(prev_end.year(), prev_end.month(), 1)
-                    .unwrap_or(prev_end);
+            let prev_start = chrono::NaiveDate::from_ymd_opt(prev_end.year(), prev_end.month(), 1)
+                .unwrap_or(prev_end);
             (prev_start, prev_end)
         }
     };
@@ -738,7 +736,10 @@ pub async fn get_stats(
         },
     };
 
-    (StatusCode::OK, Json(json!({ "success": true, "stats": stats })))
+    (
+        StatusCode::OK,
+        Json(json!({ "success": true, "stats": stats })),
+    )
 }
 
 // ===== List tags =====
@@ -827,7 +828,10 @@ pub async fn upload_photos(
         let ext = filename.rsplit('.').next().unwrap_or("").to_lowercase();
         let allowed_exts = ["jpg", "jpeg", "png", "webp", "heic"];
         if !allowed_exts.contains(&ext.as_str()) {
-            eprintln!("[expenses upload] rejected filename={:?} ext={:?} (extension not in whitelist)", filename, ext);
+            eprintln!(
+                "[expenses upload] rejected filename={:?} ext={:?} (extension not in whitelist)",
+                filename, ext
+            );
             continue;
         }
 
@@ -1025,7 +1029,12 @@ pub async fn parse_receipts(
         let entry_info = db.query_row(
             "SELECT notes, amount FROM expense_entries WHERE id = ?1 AND user_id = ?2",
             rusqlite::params![entry_id, user_id.0],
-            |row| Ok((row.get::<_, String>(0).unwrap_or_default(), row.get::<_, f64>(1).unwrap_or(0.0))),
+            |row| {
+                Ok((
+                    row.get::<_, String>(0).unwrap_or_default(),
+                    row.get::<_, f64>(1).unwrap_or(0.0),
+                ))
+            },
         );
 
         match entry_info {
@@ -1087,10 +1096,14 @@ pub async fn parse_receipts(
 
     let ai_result = if images.is_empty() {
         // Text-only: use simple_generate
-        client.simple_generate(RECEIPT_PARSE_PROMPT, &user_msg, 8192).await
+        client
+            .simple_generate(RECEIPT_PARSE_PROMPT, &user_msg, 8192)
+            .await
     } else {
         // Has images (possibly with text): use vision_generate
-        client.vision_generate(RECEIPT_PARSE_PROMPT, images, &user_msg, 8192).await
+        client
+            .vision_generate(RECEIPT_PARSE_PROMPT, images, &user_msg, 8192)
+            .await
     };
 
     match ai_result {
@@ -1227,10 +1240,14 @@ pub async fn parse_preview(
 
     let ai_result = if images.is_empty() {
         // Text-only: use simple_generate
-        client.simple_generate(RECEIPT_PARSE_PROMPT, &user_msg, 8192).await
+        client
+            .simple_generate(RECEIPT_PARSE_PROMPT, &user_msg, 8192)
+            .await
     } else {
         // Has images (possibly with text): use vision_generate
-        client.vision_generate(RECEIPT_PARSE_PROMPT, images, &user_msg, 8192).await
+        client
+            .vision_generate(RECEIPT_PARSE_PROMPT, images, &user_msg, 8192)
+            .await
     };
 
     match ai_result {
@@ -1312,7 +1329,10 @@ fn build_user_message(text_context: &str, images: &[(String, String)]) -> String
             } else {
                 ""
             };
-            format!("{}\n\n请综合分析照片和文字信息，提取消费详情。{}", text_context, img_hint)
+            format!(
+                "{}\n\n请综合分析照片和文字信息，提取消费详情。{}",
+                text_context, img_hint
+            )
         }
         (false, true) => {
             if images.len() > 1 {
@@ -1322,7 +1342,10 @@ fn build_user_message(text_context: &str, images: &[(String, String)]) -> String
             }
         }
         (true, false) => {
-            format!("{}\n\n请根据以上信息分析这笔消费，提取商家、金额、标签等。", text_context)
+            format!(
+                "{}\n\n请根据以上信息分析这笔消费，提取商家、金额、标签等。",
+                text_context
+            )
         }
         (false, false) => "请分析这笔消费。".into(),
     }
