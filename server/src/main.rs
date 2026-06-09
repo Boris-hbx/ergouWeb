@@ -774,6 +774,8 @@ async fn main() {
     let sw_dir = frontend_dir.clone();
     let index_dir = frontend_dir.clone();
     let index_dir2 = frontend_dir.clone();
+    let insight_factory_dir = frontend_dir.clone();
+    let insight_factory_detail_dir = frontend_dir.clone();
     let login_dir = frontend_dir.clone();
 
     let app = build_app(state)
@@ -811,6 +813,24 @@ async fn main() {
             "/index.html",
             get(move || async move {
                 match tokio::fs::read_to_string(format!("{}/index.html", index_dir2)).await {
+                    Ok(body) => axum::response::Html(body).into_response(),
+                    Err(_) => StatusCode::NOT_FOUND.into_response(),
+                }
+            }),
+        )
+        .route(
+            "/insight-factory",
+            get(move || async move {
+                match tokio::fs::read_to_string(format!("{}/index.html", insight_factory_dir)).await {
+                    Ok(body) => axum::response::Html(body).into_response(),
+                    Err(_) => StatusCode::NOT_FOUND.into_response(),
+                }
+            }),
+        )
+        .route(
+            "/insight-factory/{id}",
+            get(move || async move {
+                match tokio::fs::read_to_string(format!("{}/index.html", insight_factory_detail_dir)).await {
                     Ok(body) => axum::response::Html(body).into_response(),
                     Err(_) => StatusCode::NOT_FOUND.into_response(),
                 }
