@@ -691,7 +691,7 @@ fn api_key_detected() -> bool {
 }
 
 fn sanitize_error(raw: &str) -> String {
-    let mut s = raw.replace('\n', " ").replace('\r', " ");
+    let mut s = raw.replace(['\n', '\r'], " ");
     for marker in ["OPENAI_API_KEY", "sk-", "session", "token", "api key"] {
         s = s.replace(marker, "[redacted]");
     }

@@ -389,10 +389,8 @@ impl LlmClient {
                             let idx = parsed["index"].as_u64().unwrap_or(0) as usize;
                             let block = &parsed["content_block"];
                             if block["type"].as_str() == Some("tool_use") {
-                                let id =
-                                    block["id"].as_str().unwrap_or_default().to_string();
-                                let name =
-                                    block["name"].as_str().unwrap_or_default().to_string();
+                                let id = block["id"].as_str().unwrap_or_default().to_string();
+                                let name = block["name"].as_str().unwrap_or_default().to_string();
                                 tool_blocks.insert(idx, (id, name.clone(), String::new()));
                                 let _ = tx.send(SseEvent::ToolStart { name }).await;
                             }
@@ -447,13 +445,9 @@ impl LlmClient {
                                 total_output += usage["output_tokens"].as_i64().unwrap_or(0);
                             }
                         }
-                        "message_stop" | "error" => {
-                            if event_type == "error" {
-                                tracing::error!(
-                                    "[Claude stream] API error event: {}",
-                                    data
-                                );
-                            }
+                        "message_stop" => {}
+                        "error" => {
+                            tracing::error!("[Claude stream] API error event: {}", data);
                         }
                         _ => {}
                     }

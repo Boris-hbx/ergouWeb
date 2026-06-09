@@ -73,7 +73,11 @@ pub async fn list_insights(
 ) -> (StatusCode, Json<JsonValue>) {
     let db = state.db.lock();
     let limit = f.limit.unwrap_or(0).clamp(0, 200);
-    let limit_sql = if limit > 0 { format!(" LIMIT {limit}") } else { String::new() };
+    let limit_sql = if limit > 0 {
+        format!(" LIMIT {limit}")
+    } else {
+        String::new()
+    };
     let (sql, params_v): (String, Vec<Box<dyn rusqlite::ToSql>>) = match f.status.as_deref() {
         Some(s) if !s.is_empty() => (
             format!(
@@ -117,7 +121,9 @@ pub async fn create_insight(
     if !is_valid_template(&req.template) {
         return (
             StatusCode::BAD_REQUEST,
-            Json(json!({ "success": false, "error": format!("invalid template: {}", req.template) })),
+            Json(
+                json!({ "success": false, "error": format!("invalid template: {}", req.template) }),
+            ),
         );
     }
     let db = state.db.lock();
@@ -156,7 +162,11 @@ pub async fn get_insight(
     }
     let mut body = resp.1 .0;
     // ?include=sources 时附带 source 全量
-    if p.include.as_deref().map(|s| s.contains("sources")).unwrap_or(false) {
+    if p.include
+        .as_deref()
+        .map(|s| s.contains("sources"))
+        .unwrap_or(false)
+    {
         match crate::routes::sources::list_for_insight(&db, &user_id.0, Some(id), false) {
             Ok(items) => {
                 if let Some(item) = body.get_mut("item") {
@@ -404,10 +414,7 @@ pub fn fetch_insight(db: &Connection, user_id: &str, id: i64) -> (StatusCode, Js
         "SELECT {SELECT_COLS} FROM insights WHERE id = ?1 AND user_id = ?2 AND deleted = 0"
     );
     match db.query_row(&sql, params![id, user_id], row_to_insight) {
-        Ok(t) => (
-            StatusCode::OK,
-            Json(json!({ "success": true, "item": t })),
-        ),
+        Ok(t) => (StatusCode::OK, Json(json!({ "success": true, "item": t }))),
         Err(rusqlite::Error::QueryReturnedNoRows) => (
             StatusCode::NOT_FOUND,
             Json(json!({ "success": false, "error": "未找到洞察" })),
@@ -448,7 +455,9 @@ mod tests {
                     .uri("/api/insights")
                     .header("Cookie", &cookie)
                     .header("Content-Type", "application/json")
-                    .body(Body::from(r#"{"title":"Rust async","topic":"评估 runtime 选型"}"#))
+                    .body(Body::from(
+                        r#"{"title":"Rust async","topic":"评估 runtime 选型"}"#,
+                    ))
                     .unwrap(),
             )
             .await

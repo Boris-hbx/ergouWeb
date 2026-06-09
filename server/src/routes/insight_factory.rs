@@ -157,6 +157,7 @@ fn fetch_active_job(db: &Connection, task_id: i64) -> Option<FactoryJob> {
     db.query_row(&sql, params![task_id], row_to_job).ok()
 }
 
+#[allow(clippy::too_many_arguments)]
 fn insert_job(
     db: &Connection,
     user_id: &str,

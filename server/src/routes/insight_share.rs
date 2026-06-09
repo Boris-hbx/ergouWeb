@@ -462,9 +462,7 @@ fn summarize(md: &str) -> String {
 /// GET /api/public/insight-reports — 公开(无 session):列出 owner 所有 active-published 报告。
 /// 数据=insight_share_links(revoked_at IS NULL) join task(未删)/report;published_at(=created_at) DESC。
 /// MVP 单用户:不跨 user 聚合(全部 active share 即 owner 的)。
-pub async fn public_reports_list(
-    State(state): State<AppState>,
-) -> (StatusCode, Json<JsonValue>) {
+pub async fn public_reports_list(State(state): State<AppState>) -> (StatusCode, Json<JsonValue>) {
     let db = state.db.lock();
     let mut stmt = match db.prepare(
         "SELECT sl.token, t.title, sl.created_at, r.template, r.content_md \
