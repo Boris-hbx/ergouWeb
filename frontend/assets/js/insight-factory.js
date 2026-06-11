@@ -57,6 +57,11 @@ var InsightFactory = (function() {
         return ({ survey: '综述型', decision: '决策型', watch: '追踪型' })[t] || (t || '自动');
     }
 
+    function _apiError(resp, fallback) {
+        if (resp && resp.error) return resp.error;
+        return fallback || 'operation failed';
+    }
+
     function _memoryTypeLabel(t) {
         return ({
             project_fact: '工程事实',
@@ -713,10 +718,13 @@ var InsightFactory = (function() {
             if (resp && resp.success) {
                 if (typeof showToast === 'function') showToast('已创建生成 job', 'success');
                 await _loadDetail();
+            } else {
+                throw new Error(_apiError(resp, '创建生成 job 失败'));
             }
         } catch (e) {
             console.error('[InsightFactory] generate', e);
-            if (typeof showToast === 'function') showToast('创建生成 job 失败', 'error');
+            if (typeof showToast === 'function') showToast(e.message || '创建生成 job 失败', 'error');
+            await _loadDetail();
         }
     }
 
@@ -734,10 +742,13 @@ var InsightFactory = (function() {
             if (resp && resp.success) {
                 if (typeof showToast === 'function') showToast('已创建修订 job', 'success');
                 await _loadDetail();
+            } else {
+                throw new Error(_apiError(resp, '提交反馈失败'));
             }
         } catch (e) {
             console.error('[InsightFactory] feedback', e);
-            if (typeof showToast === 'function') showToast('提交反馈失败', 'error');
+            if (typeof showToast === 'function') showToast(e.message || '提交反馈失败', 'error');
+            await _loadDetail();
         }
     }
 
@@ -747,10 +758,13 @@ var InsightFactory = (function() {
             if (resp && resp.success) {
                 if (typeof showToast === 'function') showToast('已创建重试 job', 'success');
                 await _loadDetail();
+            } else {
+                throw new Error(_apiError(resp, '重试失败'));
             }
         } catch (e) {
             console.error('[InsightFactory] retry', e);
-            if (typeof showToast === 'function') showToast('重试失败', 'error');
+            if (typeof showToast === 'function') showToast(e.message || '重试失败', 'error');
+            await _loadDetail();
         }
     }
 
