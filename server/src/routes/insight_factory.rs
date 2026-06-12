@@ -1135,6 +1135,32 @@ mod tests {
         assert_eq!(j["item"]["mode"], "retry");
         assert_eq!(j["item"]["retryOfJobId"], job_id);
         assert_ne!(j["item"]["id"], job_id);
+        let retry_id = j["item"]["id"].as_i64().unwrap();
+        let db = state.db.lock();
+        let original_status: String = db
+            .query_row(
+                "SELECT status FROM factory_jobs WHERE id = ?1",
+                params![job_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        let retry_status: String = db
+            .query_row(
+                "SELECT status FROM factory_jobs WHERE id = ?1",
+                params![retry_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        let task_status: String = db
+            .query_row(
+                "SELECT status FROM factory_tasks WHERE id = ?1",
+                params![task_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(original_status, "failed");
+        assert_eq!(retry_status, "pending");
+        assert_eq!(task_status, "pending");
     }
 
     #[tokio::test]

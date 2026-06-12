@@ -18,6 +18,7 @@ var InsightFactory = (function() {
     var _typeManual = false;
     var _showRaw = false;
     var _expandedReports = {};
+    var _retryingJobIds = {};
 
     function _esc(s) {
         return ('' + (s == null ? '' : s))
@@ -55,6 +56,14 @@ var InsightFactory = (function() {
 
     function _templateLabel(t) {
         return ({ survey: '综述型', decision: '决策型', watch: '追踪型' })[t] || (t || '自动');
+    }
+
+    function _apiError(resp, fallback) {
+        return (resp && resp.error) || fallback || '操作失败';
+    }
+
+    function _asError(resp, fallback) {
+        return new Error(_apiError(resp, fallback));
     }
 
     function _memoryTypeLabel(t) {
@@ -585,10 +594,14 @@ var InsightFactory = (function() {
                 + '<button class="ins-btn ins-btn-primary" onclick="InsightFactory.generate()">生成 v1</button>';
         } else if (t.status === 'failed' || latestBad) {
             var bad = latestBad || {};
+            var retryBusy = !!(bad.id && _retryingJobIds[bad.id]);
             body = '<div class="inf-job-error">'
                 + '<div class="inf-job-error-title">最近一次 job 失败</div>'
                 + '<div class="inf-job-error-msg">' + _esc(bad.errorMessage || '无错误摘要') + '</div>'
-                + (bad.id ? '<button class="ins-btn ins-btn-danger ins-btn-sm" onclick="InsightFactory.retry(' + bad.id + ')">重试</button>' : '')
+                + (bad.id ? '<button class="ins-btn ins-btn-danger ins-btn-sm" '
+                    + (retryBusy ? 'disabled ' : '')
+                    + 'onclick="InsightFactory.retry(' + bad.id + ')">'
+                    + (retryBusy ? '重试中...' : '重试') + '</button>' : '')
                 + '</div>';
         } else {
             body = '<div class="inf-job-empty">没有 active job。</div>';
@@ -713,10 +726,13 @@ var InsightFactory = (function() {
             if (resp && resp.success) {
                 if (typeof showToast === 'function') showToast('已创建生成 job', 'success');
                 await _loadDetail();
+                await refreshList();
+            } else {
+                throw _asError(resp, '创建生成 job 失败');
             }
         } catch (e) {
             console.error('[InsightFactory] generate', e);
-            if (typeof showToast === 'function') showToast('创建生成 job 失败', 'error');
+            if (typeof showToast === 'function') showToast(e.message || '创建生成 job 失败', 'error');
         }
     }
 
@@ -734,23 +750,39 @@ var InsightFactory = (function() {
             if (resp && resp.success) {
                 if (typeof showToast === 'function') showToast('已创建修订 job', 'success');
                 await _loadDetail();
+                await refreshList();
+            } else {
+                throw _asError(resp, '提交反馈失败');
             }
         } catch (e) {
             console.error('[InsightFactory] feedback', e);
-            if (typeof showToast === 'function') showToast('提交反馈失败', 'error');
+            if (typeof showToast === 'function') showToast(e.message || '提交反馈失败', 'error');
         }
     }
 
     async function retry(id) {
+        if (!id || _retryingJobIds[id]) {
+            if (typeof showToast === 'function') showToast('重试请求处理中', 'warning');
+            return;
+        }
+        _retryingJobIds[id] = true;
+        _renderDetail();
         try {
             var resp = await API.factoryJobRetry(id);
             if (resp && resp.success) {
                 if (typeof showToast === 'function') showToast('已创建重试 job', 'success');
                 await _loadDetail();
+                await refreshList();
+            } else {
+                throw _asError(resp, '重试失败');
             }
         } catch (e) {
             console.error('[InsightFactory] retry', e);
-            if (typeof showToast === 'function') showToast('重试失败', 'error');
+            if (typeof showToast === 'function') showToast(e.message || '重试失败', 'error');
+            await _loadDetail();
+        } finally {
+            delete _retryingJobIds[id];
+            _renderDetail();
         }
     }
 
