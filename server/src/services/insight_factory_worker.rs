@@ -32,6 +32,7 @@ pub struct InsightJobContext {
     pub previous_report_md: String,
     pub feedback_note: String,
     pub parent_report_id: Option<i64>,
+    pub retry_of_job_id: Option<i64>,
     pub report_contract_md: String,
 }
 
@@ -430,7 +431,7 @@ fn load_context(db: &Connection, job_id: i64) -> Result<InsightJobContext, Strin
     let row = db
         .query_row(
             "SELECT j.id, j.task_id, j.user_id, j.mode, j.template, j.feedback_note,
-                    j.parent_report_id,
+                    j.parent_report_id, j.retry_of_job_id,
                     t.input_type, t.input_content, t.source_snapshot, t.template
              FROM factory_jobs j
              JOIN factory_tasks t ON t.id = j.task_id AND t.user_id = j.user_id
@@ -445,10 +446,11 @@ fn load_context(db: &Connection, job_id: i64) -> Result<InsightJobContext, Strin
                     r.get::<_, Option<String>>(4)?,
                     r.get::<_, String>(5)?,
                     r.get::<_, Option<i64>>(6)?,
-                    r.get::<_, String>(7)?,
+                    r.get::<_, Option<i64>>(7)?,
                     r.get::<_, String>(8)?,
                     r.get::<_, String>(9)?,
-                    r.get::<_, Option<String>>(10)?,
+                    r.get::<_, String>(10)?,
+                    r.get::<_, Option<String>>(11)?,
                 ))
             },
         )
@@ -462,6 +464,7 @@ fn load_context(db: &Connection, job_id: i64) -> Result<InsightJobContext, Strin
         job_template,
         feedback_note,
         parent_report_id,
+        retry_of_job_id,
         input_type,
         input_content,
         source_snapshot,
@@ -496,6 +499,7 @@ fn load_context(db: &Connection, job_id: i64) -> Result<InsightJobContext, Strin
         previous_report_md,
         feedback_note,
         parent_report_id,
+        retry_of_job_id,
         report_contract_md: report_contract_md(),
     })
 }
@@ -609,6 +613,8 @@ fn mark_job_terminal(
 }
 
 fn build_prompt(ctx: &InsightJobContext) -> String {
+    let effective_mode = effective_job_mode(ctx);
+    let retry_note = retry_instruction(ctx, effective_mode);
     format!(
         r#"你是洞察工厂的报告生成 worker。只输出一份完整 Markdown 报告，不要输出解释、diff、JSON 或代码块围栏。
 
@@ -618,8 +624,11 @@ fn build_prompt(ctx: &InsightJobContext) -> String {
 - task_id: {task_id}
 - job_id: {job_id}
 - mode: {mode}
+- stored_mode: {stored_mode}
+- retry_of_job_id: {retry_of_job_id}
 - template: {template}
 - input_type: {input_type}
+{retry_note}
 
 ## Input
 {input}
@@ -639,15 +648,41 @@ fn build_prompt(ctx: &InsightJobContext) -> String {
         contract = ctx.report_contract_md,
         task_id = ctx.task_id,
         job_id = ctx.job_id,
-        mode = ctx.mode,
+        mode = effective_mode,
+        stored_mode = ctx.mode,
+        retry_of_job_id = ctx
+            .retry_of_job_id
+            .map(|id| id.to_string())
+            .unwrap_or_else(|| "(none)".to_string()),
         template = ctx.template,
         input_type = ctx.input_type,
+        retry_note = retry_note,
         input = ctx.input_content,
         source_snapshot = empty_marker(&ctx.source_snapshot),
         memories = empty_marker(&ctx.memory_context_md),
         previous_report = empty_marker(&ctx.previous_report_md),
         feedback = empty_marker(&ctx.feedback_note),
     )
+}
+
+fn effective_job_mode(ctx: &InsightJobContext) -> &'static str {
+    match ctx.mode.as_str() {
+        "retry" if ctx.parent_report_id.is_some() || !ctx.feedback_note.trim().is_empty() => {
+            "revise"
+        }
+        "retry" => "generate",
+        "revise" => "revise",
+        _ => "generate",
+    }
+}
+
+fn retry_instruction(ctx: &InsightJobContext, effective_mode: &str) -> String {
+    match ctx.retry_of_job_id {
+        Some(id) => format!(
+            "- retry_note: retrying failed job #{id}; execute it as a {effective_mode} job using the copied context below."
+        ),
+        None => String::new(),
+    }
 }
 
 fn report_contract_md() -> String {
@@ -918,6 +953,58 @@ mod tests {
         assert_eq!(status, "blocked");
         assert_eq!(task_status, "blocked");
         assert_eq!(reports, 0);
+    }
+
+    #[test]
+    fn retry_prompt_preserves_effective_generate_semantics() {
+        let ctx = InsightJobContext {
+            task_id: 1,
+            job_id: 4,
+            user_id: "u".to_string(),
+            mode: "retry".to_string(),
+            input_type: "topic".to_string(),
+            input_content: "AI search".to_string(),
+            source_snapshot: String::new(),
+            template: "survey".to_string(),
+            memory_context_md: String::new(),
+            previous_report_md: String::new(),
+            feedback_note: String::new(),
+            parent_report_id: None,
+            retry_of_job_id: Some(3),
+            report_contract_md: report_contract_md(),
+        };
+
+        let prompt = build_prompt(&ctx);
+        assert!(prompt.contains("- mode: generate"), "{prompt}");
+        assert!(prompt.contains("- stored_mode: retry"), "{prompt}");
+        assert!(prompt.contains("- retry_of_job_id: 3"), "{prompt}");
+        assert!(prompt.contains("execute it as a generate job"), "{prompt}");
+    }
+
+    #[test]
+    fn retry_prompt_preserves_effective_revise_semantics() {
+        let ctx = InsightJobContext {
+            task_id: 1,
+            job_id: 5,
+            user_id: "u".to_string(),
+            mode: "retry".to_string(),
+            input_type: "topic".to_string(),
+            input_content: "AI search".to_string(),
+            source_snapshot: String::new(),
+            template: "survey".to_string(),
+            memory_context_md: String::new(),
+            previous_report_md: "# Previous\n\nBody".to_string(),
+            feedback_note: "make it sharper".to_string(),
+            parent_report_id: Some(2),
+            retry_of_job_id: Some(4),
+            report_contract_md: report_contract_md(),
+        };
+
+        let prompt = build_prompt(&ctx);
+        assert!(prompt.contains("- mode: revise"), "{prompt}");
+        assert!(prompt.contains("- stored_mode: retry"), "{prompt}");
+        assert!(prompt.contains("- retry_of_job_id: 4"), "{prompt}");
+        assert!(prompt.contains("execute it as a revise job"), "{prompt}");
     }
 
     #[test]
