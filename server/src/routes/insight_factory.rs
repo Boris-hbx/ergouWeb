@@ -781,6 +781,8 @@ pub async fn worker_health(user_id: UserId) -> (StatusCode, Json<JsonValue>) {
             "apiKeyDetected": health.api_key_detected,
             "cliAvailable": health.cli_available,
             "versionSummary": health.version_summary,
+            "authPresent": health.auth_present,
+            "lastRefresh": health.last_refresh,
             "error": health.error,
             "item": health_value
         })),

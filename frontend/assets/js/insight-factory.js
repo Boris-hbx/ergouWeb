@@ -19,6 +19,7 @@ var InsightFactory = (function() {
     var _showRaw = false;
     var _expandedReports = {};
     var _retryingJobIds = {};
+    var _pollTimer = null;
 
     function _esc(s) {
         return ('' + (s == null ? '' : s))
@@ -134,6 +135,7 @@ var InsightFactory = (function() {
 
     function openHub(opts) {
         opts = opts || {};
+        _stopPoll();
         _detailId = null;
         _detail = null;
         _showShell();
@@ -146,6 +148,7 @@ var InsightFactory = (function() {
     }
 
     function backToHub() {
+        _stopPoll();
         var detEl = document.getElementById('insight-factory-detail-view');
         if (detEl && !detEl.classList.contains('ins-hidden')) {
             _detailId = null;
@@ -175,12 +178,15 @@ var InsightFactory = (function() {
         var h = _health || {};
         var status = h.status || 'unknown';
         var gate = h.quotaGate || 'unknown';
-        var cls = (status === 'ok' || status === 'ready') ? 'ok' : (status === 'placeholder' || status === 'blocked') ? 'warn' : 'muted';
-        return '<div class="inf-health inf-health-' + cls + '">'
+        var ready = (status === 'ok' || status === 'ready');
+        var cls = ready ? 'ok' : (status === 'placeholder' || status === 'blocked') ? 'warn' : 'muted';
+        var reason = !ready ? (h.error || gate) : '';
+        return '<div class="inf-health inf-health-' + cls + '" title="' + _esc(reason) + '">'
             + '<span class="inf-health-dot"></span>'
             + '<span>provider ' + _esc(h.provider || 'codex') + '</span>'
             + '<span>gate ' + _esc(gate) + '</span>'
             + '<span>API fallback ' + (h.apiKeyFallback ? 'on' : 'off') + '</span>'
+            + (reason ? '<span class="inf-health-reason">' + _esc(reason) + '</span>' : '')
             + '</div>';
     }
 
@@ -489,6 +495,7 @@ var InsightFactory = (function() {
         try {
             await API.factoryTaskDelete(id);
             if (_detailId === id) {
+                _stopPoll();
                 _detailId = null;
                 _detail = null;
                 _showDetail(false);
@@ -504,6 +511,7 @@ var InsightFactory = (function() {
 
     async function openDetail(id, opts) {
         opts = opts || {};
+        _stopPoll();
         _detailId = Number(id);
         _showRaw = false;
         _showShell();
@@ -534,10 +542,29 @@ var InsightFactory = (function() {
                 console.error('[InsightFactory] reports', e2);
             }
             _renderDetail();
+            _schedulePoll();
         } catch (e) {
             console.error('[InsightFactory] detail', e);
             if (typeof showToast === 'function') showToast('加载详情失败', 'error');
         }
+    }
+
+    // While a job is pending/running, poll so the detail moves from "等待 worker"
+    // to the report or the failure state on its own (no manual 刷新 needed).
+    function _stopPoll() {
+        if (_pollTimer) { clearTimeout(_pollTimer); _pollTimer = null; }
+    }
+
+    function _schedulePoll() {
+        _stopPoll();
+        if (_detailId == null || !_detail || !_detail.activeJob) return;
+        _pollTimer = setTimeout(function() {
+            _pollTimer = null;
+            var detEl = document.getElementById('insight-factory-detail-view');
+            if (_detailId != null && detEl && !detEl.classList.contains('ins-hidden')) {
+                _loadDetail();
+            }
+        }, 6000);
     }
 
     function _renderDetail() {
@@ -634,7 +661,21 @@ var InsightFactory = (function() {
         } else if (active) {
             inner = '<div class="ins-det-pending"><span class="ins-spin">⏳</span> 等待 worker 写回报告...</div>';
         } else {
-            inner = '<div class="ins-det-pending">暂无报告。可创建生成 job，或等待 worker 处理。</div>';
+            var bad = _latestFailedJob();
+            if (bad) {
+                var retryBusy = !!(bad.id && _retryingJobIds[bad.id]);
+                inner = '<div class="inf-job-error">'
+                    + '<div class="inf-job-error-title">最近一次 job ' + _jobStatusLabel(bad.status) + '，未生成报告</div>'
+                    + '<div class="inf-job-error-msg">' + _esc(bad.errorMessage || '无错误摘要') + '</div>'
+                    + (bad.id ? '<button class="ins-btn ins-btn-danger ins-btn-sm" '
+                        + (retryBusy ? 'disabled ' : '')
+                        + 'onclick="InsightFactory.retry(' + bad.id + ')">'
+                        + (retryBusy ? '重试中...' : '重试生成') + '</button>' : '')
+                    + '<div class="inf-job-error-hint">codex worker 未就绪时会持续失败，可在「Worker 状态」查看 health 判断原因。</div>'
+                    + '</div>';
+            } else {
+                inner = '<div class="ins-det-pending">暂无报告。可创建生成 job，或等待 worker 处理。</div>';
+            }
         }
         return '<section class="ins-det-card ins-det-report">'
             + '<div class="ins-det-card-title">最新报告 <button class="ins-link-btn" onclick="InsightFactory.reload()">↻ 刷新</button></div>'

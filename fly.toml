@@ -8,6 +8,11 @@ primary_region = "nrt"
   DATABASE_PATH = "/data/next.db"
   FRONTEND_DIR = "/app/frontend"
   TZ = "Asia/Shanghai"
+  # Insight Factory worker (T-217): Codex subscription identity lives on the
+  # persistent volume so it survives restarts. auth.json is injected by start.sh
+  # from the Fly secret CODEX_AUTH_JSON_B64. Do NOT set OPENAI_API_KEY here — the
+  # worker blocks the API-billing path on purpose.
+  CODEX_HOME = "/data/.codex"
 
 [http_service]
   internal_port = 8080
