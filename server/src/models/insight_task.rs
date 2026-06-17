@@ -120,8 +120,10 @@ pub fn is_valid_template(s: &str) -> bool {
     VALID_TEMPLATES.contains(&s)
 }
 
+#[allow(dead_code)]
 pub const VALID_STATUSES: &[&str] = &["ready", "processing", "done"];
 
+#[allow(dead_code)]
 pub fn is_valid_status(s: &str) -> bool {
     VALID_STATUSES.contains(&s)
 }

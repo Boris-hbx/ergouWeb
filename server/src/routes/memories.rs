@@ -82,12 +82,25 @@ const MAX_MEMORIES_PER_USER: i64 = 100;
 fn is_sensitive_content(content: &str) -> bool {
     let lower = content.to_lowercase();
     let patterns = [
-        "密码", "password", "passwd",
-        "银行卡", "信用卡", "借记卡", "card number",
-        "身份证", "护照", "passport",
-        "社保号", "ssn", "social security",
-        "pin码", "pin code", "验证码",
-        "私钥", "private key", "secret key",
+        "密码",
+        "password",
+        "passwd",
+        "银行卡",
+        "信用卡",
+        "借记卡",
+        "card number",
+        "身份证",
+        "护照",
+        "passport",
+        "社保号",
+        "ssn",
+        "social security",
+        "pin码",
+        "pin code",
+        "验证码",
+        "私钥",
+        "private key",
+        "secret key",
     ];
     patterns.iter().any(|p| lower.contains(p))
 }
@@ -131,7 +144,9 @@ pub async fn create_memory(
     if is_sensitive_content(content) {
         return (
             StatusCode::BAD_REQUEST,
-            Json(json!({ "error": "cannot store sensitive information (passwords, card numbers, IDs, etc.)" })),
+            Json(
+                json!({ "error": "cannot store sensitive information (passwords, card numbers, IDs, etc.)" }),
+            ),
         );
     }
 
@@ -305,9 +320,10 @@ pub async fn list_memories(
 
     let db = state.db.lock();
 
-    let (sql, params_vec): (String, Vec<Box<dyn rusqlite::types::ToSql>>) =
-        if let Some(ref cat) = query.category {
-            (
+    let (sql, params_vec): (String, Vec<Box<dyn rusqlite::types::ToSql>>) = if let Some(ref cat) =
+        query.category
+    {
+        (
                 format!(
                     "SELECT id, category, content, importance, created_at, last_accessed_at, access_count FROM ergou_memories WHERE user_id=?1 AND category=?2 ORDER BY {} LIMIT ?3",
                     order
@@ -318,17 +334,18 @@ pub async fn list_memories(
                     Box::new(limit),
                 ],
             )
-        } else {
-            (
+    } else {
+        (
                 format!(
                     "SELECT id, category, content, importance, created_at, last_accessed_at, access_count FROM ergou_memories WHERE user_id=?1 ORDER BY {} LIMIT ?2",
                     order
                 ),
                 vec![Box::new(user_id.0.clone()), Box::new(limit)],
             )
-        };
+    };
 
-    let params_refs: Vec<&dyn rusqlite::types::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
+    let params_refs: Vec<&dyn rusqlite::types::ToSql> =
+        params_vec.iter().map(|p| p.as_ref()).collect();
 
     let mut memories: Vec<Memory> = Vec::new();
     if let Ok(mut stmt) = db.prepare(&sql) {
@@ -481,7 +498,9 @@ pub async fn update_memory(
         if is_sensitive_content(content) {
             return (
                 StatusCode::BAD_REQUEST,
-                Json(json!({ "error": "cannot store sensitive information (passwords, card numbers, IDs, etc.)" })),
+                Json(
+                    json!({ "error": "cannot store sensitive information (passwords, card numbers, IDs, etc.)" }),
+                ),
             );
         }
     }
@@ -500,7 +519,9 @@ pub async fn update_memory(
     if req.category.is_none() && req.content.is_none() && req.importance.is_none() {
         return (
             StatusCode::BAD_REQUEST,
-            Json(json!({ "error": "at least one field (category, content, importance) must be provided" })),
+            Json(
+                json!({ "error": "at least one field (category, content, importance) must be provided" }),
+            ),
         );
     }
 
@@ -574,8 +595,7 @@ pub async fn update_memory(
     params.push(Box::new(id.clone()));
     params.push(Box::new(user_id.0.clone()));
 
-    let params_refs: Vec<&dyn rusqlite::types::ToSql> =
-        params.iter().map(|p| p.as_ref()).collect();
+    let params_refs: Vec<&dyn rusqlite::types::ToSql> = params.iter().map(|p| p.as_ref()).collect();
 
     match db.execute(&sql, params_refs.as_slice()) {
         Ok(0) => (
@@ -647,10 +667,7 @@ pub async fn clear_memories(
 ) -> (StatusCode, Json<serde_json::Value>) {
     let db = state.db.lock();
 
-    match db.execute(
-        "DELETE FROM ergou_memories WHERE user_id=?1",
-        [&user_id.0],
-    ) {
+    match db.execute("DELETE FROM ergou_memories WHERE user_id=?1", [&user_id.0]) {
         Ok(count) => (
             StatusCode::OK,
             Json(json!({ "success": true, "deleted_count": count })),

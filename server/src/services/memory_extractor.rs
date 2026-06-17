@@ -60,7 +60,15 @@ pub async fn extract_after_chat(
         return;
     }
 
-    match run_extraction(state, user_id, conversation_id, user_message, assistant_reply).await {
+    match run_extraction(
+        state,
+        user_id,
+        conversation_id,
+        user_message,
+        assistant_reply,
+    )
+    .await
+    {
         Ok(count) => {
             if count > 0 {
                 info!(
@@ -70,7 +78,10 @@ pub async fn extract_after_chat(
             }
         }
         Err(e) => {
-            warn!("[memory-extractor] extraction failed for user {}: {}", user_id, e);
+            warn!(
+                "[memory-extractor] extraction failed for user {}: {}",
+                user_id, e
+            );
         }
     }
 }

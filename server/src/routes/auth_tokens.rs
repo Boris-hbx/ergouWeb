@@ -99,7 +99,9 @@ pub async fn create_token(
     if label.chars().count() > 64 {
         return (
             StatusCode::BAD_REQUEST,
-            Json(json!({ "success": false, "error": "LABEL_TOO_LONG", "message": "label 最多 64 字符" })),
+            Json(
+                json!({ "success": false, "error": "LABEL_TOO_LONG", "message": "label 最多 64 字符" }),
+            ),
         );
     }
 
@@ -108,7 +110,9 @@ pub async fn create_token(
         if !exp.is_empty() && chrono::DateTime::parse_from_rfc3339(exp).is_err() {
             return (
                 StatusCode::BAD_REQUEST,
-                Json(json!({ "success": false, "error": "INVALID_EXPIRES_AT", "message": "expiresAt 必须 RFC3339" })),
+                Json(
+                    json!({ "success": false, "error": "INVALID_EXPIRES_AT", "message": "expiresAt 必须 RFC3339" }),
+                ),
             );
         }
     }
@@ -281,7 +285,11 @@ mod tests {
     }
 
     /// 用 /api/auth/me 验证鉴权是否通过(Bearer 或 cookie)
-    async fn call_me(app: &axum::Router, cookie: Option<&str>, bearer: Option<&str>) -> (StatusCode, serde_json::Value) {
+    async fn call_me(
+        app: &axum::Router,
+        cookie: Option<&str>,
+        bearer: Option<&str>,
+    ) -> (StatusCode, serde_json::Value) {
         let mut req = Request::builder().method("GET").uri("/api/auth/me");
         if let Some(c) = cookie {
             req = req.header("Cookie", c);
@@ -289,7 +297,11 @@ mod tests {
         if let Some(b) = bearer {
             req = req.header("Authorization", format!("Bearer {}", b));
         }
-        let resp = app.clone().oneshot(req.body(Body::empty()).unwrap()).await.unwrap();
+        let resp = app
+            .clone()
+            .oneshot(req.body(Body::empty()).unwrap())
+            .await
+            .unwrap();
         let status = resp.status();
         (status, body_json(resp).await)
     }
@@ -333,7 +345,11 @@ mod tests {
         let j = body_json(resp).await;
         assert_eq!(j["success"], true);
         let item = &j["items"][0];
-        assert!(item.get("token").is_none(), "list 不应返回明文 token,got {:?}", item.get("token"));
+        assert!(
+            item.get("token").is_none(),
+            "list 不应返回明文 token,got {:?}",
+            item.get("token")
+        );
         assert!(item["tokenPrefix"].as_str().is_some());
     }
 
@@ -463,8 +479,11 @@ mod tests {
         // 把账户挂起(直接 SQL)
         {
             let db = state.db.lock();
-            db.execute("UPDATE users SET status = 'suspended' WHERE id = ?1", rusqlite::params![uid])
-                .unwrap();
+            db.execute(
+                "UPDATE users SET status = 'suspended' WHERE id = ?1",
+                rusqlite::params![uid],
+            )
+            .unwrap();
         }
 
         // POST /api/routines 用 ActiveUserId;suspended 应在 extractor 就被 403,先于 body 校验
@@ -513,4 +532,3 @@ mod tests {
         assert_eq!(j["error"], "EMPTY_LABEL");
     }
 }
-

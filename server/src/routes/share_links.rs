@@ -310,10 +310,7 @@ pub async fn public_share_page(
             StatusCode::NOT_FOUND,
             Html("<!doctype html><html><body><h1>404 — 链接不存在</h1></body></html>".into()),
         ),
-        Some((Some(_),)) => (
-            StatusCode::GONE,
-            Html(SHARE_410_HTML.to_string()),
-        ),
+        Some((Some(_),)) => (StatusCode::GONE, Html(SHARE_410_HTML.to_string())),
         Some((None,)) => (
             StatusCode::OK,
             // 实际渲染由前端 share.html / share.js 完成(T-106 实现);
@@ -403,18 +400,19 @@ pub async fn public_share_data(
             },
         )
         .ok();
-    let (version, content_md, source_ids_raw, generated_by, report_created, citations_raw) = match report {
-        Some(v) => v,
-        None => {
-            return (
-                StatusCode::GONE,
-                Json(json!({ "success": false, "error": "报告已删除" })),
-            );
-        }
-    };
+    let (version, content_md, source_ids_raw, generated_by, report_created, citations_raw) =
+        match report {
+            Some(v) => v,
+            None => {
+                return (
+                    StatusCode::GONE,
+                    Json(json!({ "success": false, "error": "报告已删除" })),
+                );
+            }
+        };
     let source_ids: Vec<i64> = serde_json::from_str(&source_ids_raw).unwrap_or_default();
-    let citations: serde_json::Value = serde_json::from_str(&citations_raw)
-        .unwrap_or_else(|_| serde_json::Value::Array(vec![]));
+    let citations: serde_json::Value =
+        serde_json::from_str(&citations_raw).unwrap_or_else(|_| serde_json::Value::Array(vec![]));
 
     // 拉引用的 sources(标题、url、author)
     let show_notes = show_notes_int != 0;
@@ -577,7 +575,10 @@ mod tests {
             )
             .await
             .unwrap();
-        let token = body_json(resp).await["item"]["token"].as_str().unwrap().to_string();
+        let token = body_json(resp).await["item"]["token"]
+            .as_str()
+            .unwrap()
+            .to_string();
         (iid, rid, token)
     }
 
@@ -775,7 +776,10 @@ mod tests {
             )
             .await
             .unwrap();
-        let t1 = body_json(resp).await["item"]["token"].as_str().unwrap().to_string();
+        let t1 = body_json(resp).await["item"]["token"]
+            .as_str()
+            .unwrap()
+            .to_string();
 
         // v2
         let resp = app
@@ -806,7 +810,10 @@ mod tests {
             )
             .await
             .unwrap();
-        let t2 = body_json(resp).await["item"]["token"].as_str().unwrap().to_string();
+        let t2 = body_json(resp).await["item"]["token"]
+            .as_str()
+            .unwrap()
+            .to_string();
         assert_ne!(t1, t2);
 
         // t1 应该已撤回 → 410
@@ -841,7 +848,9 @@ mod tests {
         let t2 = generate_token();
         assert_ne!(t1, t2);
         assert!(t1.len() >= 40); // 32 bytes base64url ≈ 43 chars
-        assert!(t1.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_'));
+        assert!(t1
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_'));
     }
 
     #[tokio::test]

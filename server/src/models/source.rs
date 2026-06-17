@@ -69,10 +69,10 @@ where
 }
 
 /// 根据 URL 推断 kind(spec § 4)
-pub fn infer_kind(url: Option<&str>, has_content: bool) -> &'static str {
+pub fn infer_kind(url: Option<&str>, _has_content: bool) -> &'static str {
     let url = match url {
         Some(u) if !u.trim().is_empty() => u.trim(),
-        _ => return if has_content { "text" } else { "text" },
+        _ => return "text",
     };
     let lower = url.to_ascii_lowercase();
     if lower.contains("youtube.com/watch") || lower.contains("youtu.be/") {
@@ -96,7 +96,9 @@ pub fn infer_kind(url: Option<&str>, has_content: bool) -> &'static str {
     "blog"
 }
 
+#[allow(dead_code)]
 pub const VALID_KINDS: &[&str] = &["blog", "x", "github", "youtube", "pdf", "text"];
+#[allow(dead_code)]
 pub const VALID_FETCH_STATUSES: &[&str] = &["pending", "ok", "failed", "manual"];
 
 #[cfg(test)]
@@ -105,24 +107,39 @@ mod tests {
 
     #[test]
     fn infer_kind_youtube() {
-        assert_eq!(infer_kind(Some("https://www.youtube.com/watch?v=abc"), false), "youtube");
+        assert_eq!(
+            infer_kind(Some("https://www.youtube.com/watch?v=abc"), false),
+            "youtube"
+        );
         assert_eq!(infer_kind(Some("https://youtu.be/abc"), false), "youtube");
     }
 
     #[test]
     fn infer_kind_x() {
-        assert_eq!(infer_kind(Some("https://twitter.com/user/status/123"), false), "x");
-        assert_eq!(infer_kind(Some("https://x.com/user/status/123"), false), "x");
+        assert_eq!(
+            infer_kind(Some("https://twitter.com/user/status/123"), false),
+            "x"
+        );
+        assert_eq!(
+            infer_kind(Some("https://x.com/user/status/123"), false),
+            "x"
+        );
     }
 
     #[test]
     fn infer_kind_github() {
-        assert_eq!(infer_kind(Some("https://github.com/rust-lang/rust"), false), "github");
+        assert_eq!(
+            infer_kind(Some("https://github.com/rust-lang/rust"), false),
+            "github"
+        );
     }
 
     #[test]
     fn infer_kind_pdf() {
-        assert_eq!(infer_kind(Some("https://example.com/paper.pdf"), false), "pdf");
+        assert_eq!(
+            infer_kind(Some("https://example.com/paper.pdf"), false),
+            "pdf"
+        );
     }
 
     #[test]

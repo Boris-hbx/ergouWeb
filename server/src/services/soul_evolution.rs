@@ -42,7 +42,10 @@ pub async fn evolve_after_chat(state: &AppState, user_id: &str, messages: &[Valu
     // Step 3: If under limit, run LLM evolution analysis
     if daily_count < MAX_DAILY_EVOLUTIONS {
         if let Err(e) = run_evolution_analysis(state, user_id, messages).await {
-            eprintln!("[soul-evolution] LLM analysis failed for {}: {}", user_id, e);
+            eprintln!(
+                "[soul-evolution] LLM analysis failed for {}: {}",
+                user_id, e
+            );
         }
     }
 
@@ -101,7 +104,11 @@ async fn run_evolution_analysis(
         .filter_map(|m| {
             let role = m.get("role")?.as_str()?;
             let content = m.get("content")?.as_str()?;
-            Some(format!("{}: {}", role, content.chars().take(200).collect::<String>()))
+            Some(format!(
+                "{}: {}",
+                role,
+                content.chars().take(200).collect::<String>()
+            ))
         })
         .collect();
 

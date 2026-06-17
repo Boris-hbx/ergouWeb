@@ -17,10 +17,10 @@ const USER_LOCKOUT_SECS: u64 = 900; // 15 minutes
 
 // ─── Owner recovery (T-096 / ADR-006) constants ───
 // 独立的限流体系,避免和普通 login 共享攻击面;详见 decisions/006-password-recovery.md。
-const RECOVERY_IP_WINDOW_SECS: u64 = 600;   // 10 分钟一个 IP 限流窗口
-const RECOVERY_IP_MAX_ATTEMPTS: u32 = 1;    // 每窗口仅 1 次请求(强力降速)
-const RECOVERY_LOCKOUT_FAILURES: u32 = 5;   // 累计 5 次失败(错 key/用户不存在)→ 拉黑
-const RECOVERY_LOCKOUT_SECS: u64 = 3600;    // 拉黑 1 小时
+const RECOVERY_IP_WINDOW_SECS: u64 = 600; // 10 分钟一个 IP 限流窗口
+const RECOVERY_IP_MAX_ATTEMPTS: u32 = 1; // 每窗口仅 1 次请求(强力降速)
+const RECOVERY_LOCKOUT_FAILURES: u32 = 5; // 累计 5 次失败(错 key/用户不存在)→ 拉黑
+const RECOVERY_LOCKOUT_SECS: u64 = 3600; // 拉黑 1 小时
 
 // ─── T-089 安全加固常量 ───
 /// 管理员操作每用户每分钟上限(防暴力枚举 / DoS)
@@ -99,7 +99,11 @@ pub struct UpdateAvatarRequest {
 // 检查 Authorization: Bearer 头,有效 token 返回 user_id;否则 None(由 caller fallback 到 cookie)。
 // 同时更新 last_used_at(尽力而为,不阻塞鉴权)。
 fn try_bearer_user_id(parts: &Parts, state: &AppState) -> Option<String> {
-    let auth = parts.headers.get(http::header::AUTHORIZATION)?.to_str().ok()?;
+    let auth = parts
+        .headers
+        .get(http::header::AUTHORIZATION)?
+        .to_str()
+        .ok()?;
     let token = auth.strip_prefix("Bearer ")?.trim();
     if token.is_empty() {
         return None;
@@ -189,20 +193,27 @@ impl FromRequestParts<AppState> for ActiveUserId {
     ) -> Result<Self, Self::Rejection> {
         // T-116:Bearer 优先;命中后仍需走 status 校验(suspended 用户即使 PAT 有效也拒)
         if let Some(uid) = try_bearer_user_id(parts, state) {
-            let (_, status) = fetch_role_and_status(state, &uid).unwrap_or_else(|| ("user".into(), "active".into()));
+            let (_, status) = fetch_role_and_status(state, &uid)
+                .unwrap_or_else(|| ("user".into(), "active".into()));
             return match status.as_str() {
                 "active" | "guest" => Ok(ActiveUserId(uid)),
                 "pending" => Err((
                     StatusCode::FORBIDDEN,
-                    Json(serde_json::json!({"success": false, "error": "ACCOUNT_PENDING", "message": "账户审核中,暂时无法操作"})),
+                    Json(
+                        serde_json::json!({"success": false, "error": "ACCOUNT_PENDING", "message": "账户审核中,暂时无法操作"}),
+                    ),
                 )),
                 "suspended" => Err((
                     StatusCode::FORBIDDEN,
-                    Json(serde_json::json!({"success": false, "error": "ACCOUNT_SUSPENDED", "message": "账户已临时挂起,请联系管理员"})),
+                    Json(
+                        serde_json::json!({"success": false, "error": "ACCOUNT_SUSPENDED", "message": "账户已临时挂起,请联系管理员"}),
+                    ),
                 )),
                 _ => Err((
                     StatusCode::FORBIDDEN,
-                    Json(serde_json::json!({"success": false, "error": "ACCOUNT_REJECTED", "message": "账户已被拒绝"})),
+                    Json(
+                        serde_json::json!({"success": false, "error": "ACCOUNT_REJECTED", "message": "账户已被拒绝"}),
+                    ),
                 )),
             };
         }
@@ -282,7 +293,9 @@ impl FromRequestParts<AppState> for AdminUserId {
             } else {
                 Err((
                     StatusCode::FORBIDDEN,
-                    Json(serde_json::json!({"success": false, "error": "PERMISSION_DENIED", "message": "权限不足"})),
+                    Json(
+                        serde_json::json!({"success": false, "error": "PERMISSION_DENIED", "message": "权限不足"}),
+                    ),
                 ))
             };
         }
@@ -342,7 +355,9 @@ impl FromRequestParts<AppState> for OwnerUserId {
             } else {
                 Err((
                     StatusCode::FORBIDDEN,
-                    Json(serde_json::json!({"success": false, "error": "PERMISSION_DENIED", "message": "仅系统所有者可执行此操作"})),
+                    Json(
+                        serde_json::json!({"success": false, "error": "PERMISSION_DENIED", "message": "仅系统所有者可执行此操作"}),
+                    ),
                 ))
             };
         }
@@ -479,7 +494,9 @@ fn check_recovery_ip_rate(state: &AppState, ip: &str) -> bool {
 
 fn record_recovery_ip_attempt(state: &AppState, ip: &str) {
     let mut attempts = state.recovery_ip_attempts.lock();
-    let entry = attempts.entry(ip.to_string()).or_insert((0, Instant::now()));
+    let entry = attempts
+        .entry(ip.to_string())
+        .or_insert((0, Instant::now()));
     if entry.1.elapsed().as_secs() >= RECOVERY_IP_WINDOW_SECS {
         *entry = (1, Instant::now());
     } else {
@@ -502,7 +519,9 @@ fn check_recovery_lockout(state: &AppState, ip: &str) -> Option<u64> {
 
 fn record_recovery_failure(state: &AppState, ip: &str) {
     let mut lockouts = state.recovery_ip_lockouts.lock();
-    let entry = lockouts.entry(ip.to_string()).or_insert((0, Instant::now()));
+    let entry = lockouts
+        .entry(ip.to_string())
+        .or_insert((0, Instant::now()));
     if entry.1.elapsed().as_secs() >= RECOVERY_LOCKOUT_SECS {
         *entry = (1, Instant::now());
     } else {
@@ -691,7 +710,10 @@ pub async fn register(
         "INSERT INTO soul_states (user_id, updated_at) VALUES (?1, ?2)",
         rusqlite::params![user_id, now],
     ) {
-        eprintln!("[auth] soul state init failed (will lazy-create later): {}", e);
+        eprintln!(
+            "[auth] soul state init failed (will lazy-create later): {}",
+            e
+        );
     }
 
     // If pending, notify all admins
@@ -1417,9 +1439,7 @@ pub fn check_guest_ai_quota(
             drop(db);
             if !ip.is_empty() {
                 let mut agg = state.guest_ai_ip_aggregate.lock();
-                let entry = agg
-                    .entry(ip.to_string())
-                    .or_insert((0, Instant::now()));
+                let entry = agg.entry(ip.to_string()).or_insert((0, Instant::now()));
                 if entry.1.elapsed().as_secs() >= GUEST_AI_IP_AGG_WINDOW_SECS {
                     *entry = (1, Instant::now());
                 } else if entry.0 >= GUEST_AI_IP_AGG_LIMIT {
@@ -1755,10 +1775,7 @@ pub async fn delete_memory_by_id(
             StatusCode::NOT_FOUND,
             Json(serde_json::json!({"success": false, "message": "记忆不存在"})),
         ),
-        Ok(_) => (
-            StatusCode::OK,
-            Json(serde_json::json!({"success": true})),
-        ),
+        Ok(_) => (StatusCode::OK, Json(serde_json::json!({"success": true}))),
         Err(e) => {
             eprintln!("[memories] delete error: {}", e);
             (
@@ -1775,10 +1792,7 @@ pub async fn delete_all_memories(
     user_id: UserId,
 ) -> impl IntoResponse {
     let db = state.db.lock();
-    match db.execute(
-        "DELETE FROM ergou_memories WHERE user_id=?1",
-        [&user_id.0],
-    ) {
+    match db.execute("DELETE FROM ergou_memories WHERE user_id=?1", [&user_id.0]) {
         Ok(count) => (
             StatusCode::OK,
             Json(serde_json::json!({"success": true, "deleted": count})),
@@ -1913,9 +1927,14 @@ mod tests {
     async fn body_json(resp: axum::response::Response) -> (StatusCode, JsonValue) {
         let status = resp.status();
         let body = to_bytes(resp.into_body(), 1_000_000).await.unwrap();
-        let v: JsonValue = serde_json::from_slice(&body)
-            .unwrap_or_else(|e| panic!("parse fail status={} body={:?} err={}",
-                status, String::from_utf8_lossy(&body), e));
+        let v: JsonValue = serde_json::from_slice(&body).unwrap_or_else(|e| {
+            panic!(
+                "parse fail status={} body={:?} err={}",
+                status,
+                String::from_utf8_lossy(&body),
+                e
+            )
+        });
         (status, v)
     }
 
@@ -1942,8 +1961,13 @@ mod tests {
         std::env::remove_var("OWNER_RECOVERY_KEY");
         let state = test_state();
         let app = crate::build_app(state);
-        let resp = app.oneshot(recovery_req("10.0.0.1",
-            r#"{"recovery_key":"x","username":"a","new_password":"Strong1A"}"#)).await.unwrap();
+        let resp = app
+            .oneshot(recovery_req(
+                "10.0.0.1",
+                r#"{"recovery_key":"x","username":"a","new_password":"Strong1A"}"#,
+            ))
+            .await
+            .unwrap();
         let (status, body) = body_json(resp).await;
         assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
         assert_eq!(body["error"], "RECOVERY_DISABLED");
@@ -1971,8 +1995,16 @@ mod tests {
         std::env::set_var("OWNER_RECOVERY_KEY", TEST_KEY);
         let state = test_state();
         let app = crate::build_app(state);
-        let resp = app.oneshot(recovery_req("10.0.0.3", &format!(
-            r#"{{"recovery_key":"{}","username":"nobody","new_password":"NewPass1A"}}"#, TEST_KEY))).await.unwrap();
+        let resp = app
+            .oneshot(recovery_req(
+                "10.0.0.3",
+                &format!(
+                    r#"{{"recovery_key":"{}","username":"nobody","new_password":"NewPass1A"}}"#,
+                    TEST_KEY
+                ),
+            ))
+            .await
+            .unwrap();
         let (status, body) = body_json(resp).await;
         assert_eq!(status, StatusCode::UNAUTHORIZED);
         assert_eq!(body["error"], "INVALID_CREDENTIALS");
@@ -1988,8 +2020,16 @@ mod tests {
         // 默认创建的 user role = 'user',不提升
         let (_uid, _) = create_test_user(&state, "alice", "OldPass1");
         let app = crate::build_app(state);
-        let resp = app.oneshot(recovery_req("10.0.0.4", &format!(
-            r#"{{"recovery_key":"{}","username":"alice","new_password":"NewPass1A"}}"#, TEST_KEY))).await.unwrap();
+        let resp = app
+            .oneshot(recovery_req(
+                "10.0.0.4",
+                &format!(
+                    r#"{{"recovery_key":"{}","username":"alice","new_password":"NewPass1A"}}"#,
+                    TEST_KEY
+                ),
+            ))
+            .await
+            .unwrap();
         let (status, body) = body_json(resp).await;
         assert_eq!(status, StatusCode::FORBIDDEN);
         assert_eq!(body["error"], "NOT_OWNER");
@@ -2005,8 +2045,13 @@ mod tests {
         promote_to_owner(&state, &uid);
         let app = crate::build_app(state);
         // key 错(长度/内容都不对)
-        let resp = app.oneshot(recovery_req("10.0.0.5",
-            r#"{"recovery_key":"wrong","username":"boris2","new_password":"NewPass1A"}"#)).await.unwrap();
+        let resp = app
+            .oneshot(recovery_req(
+                "10.0.0.5",
+                r#"{"recovery_key":"wrong","username":"boris2","new_password":"NewPass1A"}"#,
+            ))
+            .await
+            .unwrap();
         let (status, body) = body_json(resp).await;
         assert_eq!(status, StatusCode::UNAUTHORIZED);
         assert_eq!(body["error"], "INVALID_CREDENTIALS");
@@ -2030,27 +2075,49 @@ mod tests {
                 "INSERT INTO sessions (token, user_id, created_at, expires_at) VALUES (?1, ?2, ?3, ?4)",
                 rusqlite::params!["extra_session_token", uid, now, expires],
             ).unwrap();
-            let cnt: i64 = db.query_row("SELECT COUNT(*) FROM sessions WHERE user_id=?1", [&uid], |r| r.get(0)).unwrap();
+            let cnt: i64 = db
+                .query_row(
+                    "SELECT COUNT(*) FROM sessions WHERE user_id=?1",
+                    [&uid],
+                    |r| r.get(0),
+                )
+                .unwrap();
             assert_eq!(cnt, 2, "应有 2 个 session(原 + 额外)");
         }
 
         let app = crate::build_app(state.clone());
-        let resp = app.oneshot(recovery_req("10.0.0.6", &format!(
-            r#"{{"recovery_key":"{}","username":"boris3","new_password":"NewPass1A"}}"#, TEST_KEY))).await.unwrap();
+        let resp = app
+            .oneshot(recovery_req(
+                "10.0.0.6",
+                &format!(
+                    r#"{{"recovery_key":"{}","username":"boris3","new_password":"NewPass1A"}}"#,
+                    TEST_KEY
+                ),
+            ))
+            .await
+            .unwrap();
         let (status, body) = body_json(resp).await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(body["success"], true);
 
         // 验证:旧密码失败 + 新密码可登 + sessions 表中该用户行清空
         let db = state.db.lock();
-        let new_hash: String = db.query_row(
-            "SELECT password_hash FROM users WHERE id = ?1", [&uid], |r| r.get(0)
-        ).unwrap();
+        let new_hash: String = db
+            .query_row(
+                "SELECT password_hash FROM users WHERE id = ?1",
+                [&uid],
+                |r| r.get(0),
+            )
+            .unwrap();
         assert!(!verify_password("OldPass1", &new_hash), "旧密码应失效");
         assert!(verify_password("NewPass1A", &new_hash), "新密码应可用");
-        let session_cnt: i64 = db.query_row(
-            "SELECT COUNT(*) FROM sessions WHERE user_id = ?1", [&uid], |r| r.get(0)
-        ).unwrap();
+        let session_cnt: i64 = db
+            .query_row(
+                "SELECT COUNT(*) FROM sessions WHERE user_id = ?1",
+                [&uid],
+                |r| r.get(0),
+            )
+            .unwrap();
         assert_eq!(session_cnt, 0, "所有 session 应被吊销");
         std::env::remove_var("OWNER_RECOVERY_KEY");
     }
@@ -2063,13 +2130,24 @@ mod tests {
         let app = crate::build_app(state);
 
         // 第 1 次:用户不存在 → 401(但占了 IP 配额 1/1)
-        let resp1 = app.clone().oneshot(recovery_req("10.0.0.7",
-            r#"{"recovery_key":"x","username":"nobody","new_password":"NewPass1A"}"#)).await.unwrap();
+        let resp1 = app
+            .clone()
+            .oneshot(recovery_req(
+                "10.0.0.7",
+                r#"{"recovery_key":"x","username":"nobody","new_password":"NewPass1A"}"#,
+            ))
+            .await
+            .unwrap();
         assert_eq!(resp1.status(), StatusCode::UNAUTHORIZED);
 
         // 第 2 次同 IP(立即):应被限流 → 429
-        let resp2 = app.oneshot(recovery_req("10.0.0.7",
-            r#"{"recovery_key":"x","username":"nobody","new_password":"NewPass1A"}"#)).await.unwrap();
+        let resp2 = app
+            .oneshot(recovery_req(
+                "10.0.0.7",
+                r#"{"recovery_key":"x","username":"nobody","new_password":"NewPass1A"}"#,
+            ))
+            .await
+            .unwrap();
         let (status, body) = body_json(resp2).await;
         assert_eq!(status, StatusCode::TOO_MANY_REQUESTS);
         assert_eq!(body["error"], "RATE_LIMITED");

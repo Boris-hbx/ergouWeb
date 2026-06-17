@@ -1,8 +1,8 @@
-//! `/api/insights/:id/reports` — 报告版本化端点(T-105)。
+﻿//! `/api/insights/:id/reports` â€” æŠ¥å‘Šç‰ˆæœ¬åŒ–ç«¯ç‚¹(T-105)ã€‚
 //!
-//! Claude Code POST 创建新 version;Boris 在 Web 上 PATCH 同一 version 改 MD(spec 原则 3)。
-//! 创建 report 时(v0.2):status 从 processing → editing(Boris review);
-//! current_report_id 自动指向新 report。修订模式还会清空 insight.pending_revision_note。
+//! Claude Code POST åˆ›å»ºæ–° version;Boris åœ¨ Web ä¸Š PATCH åŒä¸€ version æ”¹ MD(spec åŽŸåˆ™ 3)ã€‚
+//! åˆ›å»º report æ—¶(v0.2):status ä»Ž processing â†’ editing(Boris review);
+//! current_report_id è‡ªåŠ¨æŒ‡å‘æ–° reportã€‚ä¿®è®¢æ¨¡å¼è¿˜ä¼šæ¸…ç©º insight.pending_revision_noteã€‚
 
 use axum::{
     extract::{Path, State},
@@ -26,12 +26,12 @@ fn db_error(ctx: &str, e: rusqlite::Error) -> (StatusCode, Json<JsonValue>) {
     error!(target: "reports", "{} db error: {}", ctx, e);
     (
         StatusCode::INTERNAL_SERVER_ERROR,
-        Json(json!({ "success": false, "error": "内部错误" })),
+        Json(json!({ "success": false, "error": "å†…éƒ¨é”™è¯¯" })),
     )
 }
 
-/// v0.2:加 4 字段 revision_note / parent_report_id / published_at / retracted_at
-/// v0.2.1:加 citations 字段(CC 输出的引用条目)
+/// v0.2:åŠ  4 å­—æ®µ revision_note / parent_report_id / published_at / retracted_at
+/// v0.2.1:åŠ  citations å­—æ®µ(CC è¾“å‡ºçš„å¼•ç”¨æ¡ç›®)
 const SELECT_COLS: &str = "id, insight_id, version, template, content_md, source_ids, \
     citations, revision_note, parent_report_id, generated_by, model_used, \
     published_at, retracted_at, created_at, updated_at";
@@ -61,7 +61,7 @@ fn row_to_report(row: &rusqlite::Row) -> rusqlite::Result<Report> {
     })
 }
 
-/// 内部:确认 user 拥有该 insight
+/// å†…éƒ¨:ç¡®è®¤ user æ‹¥æœ‰è¯¥ insight
 pub fn check_owns_insight(db: &Connection, user_id: &str, insight_id: i64) -> bool {
     db.query_row(
         "SELECT COUNT(*) > 0 FROM insights WHERE id = ?1 AND user_id = ?2 AND deleted = 0",
@@ -71,9 +71,9 @@ pub fn check_owns_insight(db: &Connection, user_id: &str, insight_id: i64) -> bo
     .unwrap_or(false)
 }
 
-/// POST /api/insights/:id/reports — Claude Code 提交新报告版本
-/// 副作用(v0.2):status 从 processing → editing;current_report_id 自动指向新 report;
-/// 修订模式(parent_report_id 非空)还会清空 insight.pending_revision_note。
+/// POST /api/insights/:id/reports â€” Claude Code æäº¤æ–°æŠ¥å‘Šç‰ˆæœ¬
+/// å‰¯ä½œç”¨(v0.2):status ä»Ž processing â†’ editing;current_report_id è‡ªåŠ¨æŒ‡å‘æ–° report;
+/// ä¿®è®¢æ¨¡å¼(parent_report_id éžç©º)è¿˜ä¼šæ¸…ç©º insight.pending_revision_noteã€‚
 pub async fn create_report(
     State(state): State<AppState>,
     user_id: UserId,
@@ -84,11 +84,11 @@ pub async fn create_report(
     if !check_owns_insight(&db, &user_id.0, insight_id) {
         return (
             StatusCode::NOT_FOUND,
-            Json(json!({ "success": false, "error": "未找到洞察" })),
+            Json(json!({ "success": false, "error": "æœªæ‰¾åˆ°æ´žå¯Ÿ" })),
         );
     }
 
-    // 计算下一个 version
+    // è®¡ç®—ä¸‹ä¸€ä¸ª version
     let next_version: i64 = db
         .query_row(
             "SELECT COALESCE(MAX(version), 0) + 1 FROM reports WHERE insight_id = ?1",
@@ -100,8 +100,8 @@ pub async fn create_report(
     let source_ids_json = serde_json::to_string(&req.source_ids).unwrap_or_else(|_| "[]".into());
     let citations_json = serde_json::to_string(&req.citations).unwrap_or_else(|_| "[]".into());
     let now = now_rfc3339();
-    // v0.2:INSERT 加 revision_note 和 parent_report_id
-    // v0.2.1:INSERT 加 citations
+    // v0.2:INSERT åŠ  revision_note å’Œ parent_report_id
+    // v0.2.1:INSERT åŠ  citations
     let res = db.execute(
         "INSERT INTO reports (insight_id, version, template, content_md, source_ids, citations,
                               revision_note, parent_report_id,
@@ -126,10 +126,10 @@ pub async fn create_report(
         Err(e) => return db_error("create insert", e),
     };
 
-    // 副作用(v0.2):
-    //   - status:processing → 'editing'(v0.1 是 'drafting',v0.2 重命名)
-    //   - current_report_id:指向新 report
-    //   - 修订模式(parent_report_id 非空):清空 pending_revision_note(spec § 6.3.3 / § 8.3)
+    // å‰¯ä½œç”¨(v0.2):
+    //   - status:processing â†’ 'editing'(v0.1 æ˜¯ 'drafting',v0.2 é‡å‘½å)
+    //   - current_report_id:æŒ‡å‘æ–° report
+    //   - ä¿®è®¢æ¨¡å¼(parent_report_id éžç©º):æ¸…ç©º pending_revision_note(spec Â§ 6.3.3 / Â§ 8.3)
     let clear_pending_sql = if req.parent_report_id.is_some() {
         ", pending_revision_note = ''"
     } else {
@@ -146,7 +146,7 @@ pub async fn create_report(
     fetch_report(&db, insight_id, new_report_id)
 }
 
-/// GET /api/insights/:id/reports — 历史版本列表
+/// GET /api/insights/:id/reports â€” åŽ†å²ç‰ˆæœ¬åˆ—è¡¨
 pub async fn list_reports(
     State(state): State<AppState>,
     user_id: UserId,
@@ -156,12 +156,11 @@ pub async fn list_reports(
     if !check_owns_insight(&db, &user_id.0, insight_id) {
         return (
             StatusCode::NOT_FOUND,
-            Json(json!({ "success": false, "error": "未找到洞察" })),
+            Json(json!({ "success": false, "error": "æœªæ‰¾åˆ°æ´žå¯Ÿ" })),
         );
     }
-    let sql = format!(
-        "SELECT {SELECT_COLS} FROM reports WHERE insight_id = ?1 ORDER BY version DESC"
-    );
+    let sql =
+        format!("SELECT {SELECT_COLS} FROM reports WHERE insight_id = ?1 ORDER BY version DESC");
     let mut stmt = match db.prepare(&sql) {
         Ok(s) => s,
         Err(e) => return db_error("list prepare", e),
@@ -177,9 +176,9 @@ pub async fn list_reports(
     )
 }
 
-/// GET /api/insights/:id/reports/latest(T-107 v0.2) — 拿当前 insight 的最新版报告
-/// Claude Code 判断修订模式时调用,比逐个翻 reports 列表方便。
-/// 找不到任何 report → 404(insight 还在 collecting 状态)。
+/// GET /api/insights/:id/reports/latest(T-107 v0.2) â€” æ‹¿å½“å‰ insight çš„æœ€æ–°ç‰ˆæŠ¥å‘Š
+/// Claude Code åˆ¤æ–­ä¿®è®¢æ¨¡å¼æ—¶è°ƒç”¨,æ¯”é€ä¸ªç¿» reports åˆ—è¡¨æ–¹ä¾¿ã€‚
+/// æ‰¾ä¸åˆ°ä»»ä½• report â†’ 404(insight è¿˜åœ¨ collecting çŠ¶æ€)ã€‚
 pub async fn get_latest_report(
     State(state): State<AppState>,
     user_id: UserId,
@@ -189,20 +188,17 @@ pub async fn get_latest_report(
     if !check_owns_insight(&db, &user_id.0, insight_id) {
         return (
             StatusCode::NOT_FOUND,
-            Json(json!({ "success": false, "error": "未找到洞察" })),
+            Json(json!({ "success": false, "error": "æœªæ‰¾åˆ°æ´žå¯Ÿ" })),
         );
     }
     let sql = format!(
         "SELECT {SELECT_COLS} FROM reports WHERE insight_id = ?1 ORDER BY version DESC LIMIT 1"
     );
     match db.query_row(&sql, params![insight_id], row_to_report) {
-        Ok(t) => (
-            StatusCode::OK,
-            Json(json!({ "success": true, "item": t })),
-        ),
+        Ok(t) => (StatusCode::OK, Json(json!({ "success": true, "item": t }))),
         Err(rusqlite::Error::QueryReturnedNoRows) => (
             StatusCode::NOT_FOUND,
-            Json(json!({ "success": false, "error": "尚无报告版本" })),
+            Json(json!({ "success": false, "error": "å°šæ— æŠ¥å‘Šç‰ˆæœ¬" })),
         ),
         Err(e) => db_error("get_latest", e),
     }
@@ -218,34 +214,30 @@ pub async fn get_report_by_version(
     if !check_owns_insight(&db, &user_id.0, insight_id) {
         return (
             StatusCode::NOT_FOUND,
-            Json(json!({ "success": false, "error": "未找到洞察" })),
+            Json(json!({ "success": false, "error": "æœªæ‰¾åˆ°æ´žå¯Ÿ" })),
         );
     }
-    let sql = format!(
-        "SELECT {SELECT_COLS} FROM reports WHERE insight_id = ?1 AND version = ?2"
-    );
+    let sql = format!("SELECT {SELECT_COLS} FROM reports WHERE insight_id = ?1 AND version = ?2");
     match db.query_row(&sql, params![insight_id, version], row_to_report) {
-        Ok(t) => (
-            StatusCode::OK,
-            Json(json!({ "success": true, "item": t })),
-        ),
+        Ok(t) => (StatusCode::OK, Json(json!({ "success": true, "item": t }))),
         Err(rusqlite::Error::QueryReturnedNoRows) => (
             StatusCode::NOT_FOUND,
-            Json(json!({ "success": false, "error": "未找到该版本" })),
+            Json(json!({ "success": false, "error": "æœªæ‰¾åˆ°è¯¥ç‰ˆæœ¬" })),
         ),
         Err(e) => db_error("get_report", e),
     }
 }
 
-/// PATCH /api/insights/:id/reports/:version — Boris 手改 MD
+/// PATCH /api/insights/:id/reports/:version â€” Boris æ‰‹æ”¹ MD
 ///
-/// T-107 v0.2 自动 fork(spec § 8.3 + § 5.3.3):
-/// 如果该 report 版本 `published_at` 非 NULL(已发布过,无论是否已撤回),
-/// 直接 PATCH 会改写历史快照。所以服务端自动:
-///   1. 新建 version+1 行,parent_report_id=原版,content_md=新值,generated_by='boris-inline'
-///   2. insight.current_report_id 切到新版
-///   3. 返回新 report(新 id / 新 version)
-/// 前端应在编辑前问"确定?"(spec § 5.3.3),但即使前端没问,后端也会做对。
+/// T-107 v0.2 è‡ªåŠ¨ fork(spec Â§ 8.3 + Â§ 5.3.3):
+/// å¦‚æžœè¯¥ report ç‰ˆæœ¬ `published_at` éž NULL(å·²å‘å¸ƒè¿‡,æ— è®ºæ˜¯å¦å·²æ’¤å›ž),
+/// ç›´æŽ¥ PATCH ä¼šæ”¹å†™åŽ†å²å¿«ç…§ã€‚æ‰€ä»¥æœåŠ¡ç«¯è‡ªåŠ¨:
+///   1. æ–°å»º version+1 è¡Œ,parent_report_id=åŽŸç‰ˆ,content_md=æ–°å€¼,generated_by='boris-inline'
+///   2. insight.current_report_id åˆ‡åˆ°æ–°ç‰ˆ
+///   3. è¿”å›žæ–° report(æ–° id / æ–° version)
+///
+/// å‰ç«¯åº”åœ¨ç¼–è¾‘å‰é—®"ç¡®å®š?"(spec Â§ 5.3.3),ä½†å³ä½¿å‰ç«¯æ²¡é—®,åŽç«¯ä¹Ÿä¼šåšå¯¹ã€‚
 pub async fn update_report(
     State(state): State<AppState>,
     user_id: UserId,
@@ -256,7 +248,7 @@ pub async fn update_report(
     if !check_owns_insight(&db, &user_id.0, insight_id) {
         return (
             StatusCode::NOT_FOUND,
-            Json(json!({ "success": false, "error": "未找到洞察" })),
+            Json(json!({ "success": false, "error": "æœªæ‰¾åˆ°æ´žå¯Ÿ" })),
         );
     }
     let Some(content_md) = patch.content_md else {
@@ -265,8 +257,8 @@ pub async fn update_report(
             Json(json!({ "success": false, "error": "需要 contentMd 字段" })),
         );
     };
-    // 拿现版的 id / published_at / template / source_ids / citations,
-    // 用来决定走 fork 还是 inline;fork 时同时拷贝父版本的 citations 不变。
+    // æ‹¿çŽ°ç‰ˆçš„ id / published_at / template / source_ids / citations,
+    // ç”¨æ¥å†³å®šèµ° fork è¿˜æ˜¯ inline;fork æ—¶åŒæ—¶æ‹·è´çˆ¶ç‰ˆæœ¬çš„ citations ä¸å˜ã€‚
     let row: Option<(i64, Option<String>, String, String, String)> = db
         .query_row(
             "SELECT id, published_at, template, source_ids, citations FROM reports \
@@ -286,15 +278,15 @@ pub async fn update_report(
     let Some((id, published_at, template, source_ids_raw, citations_raw)) = row else {
         return (
             StatusCode::NOT_FOUND,
-            Json(json!({ "success": false, "error": "未找到该版本" })),
+            Json(json!({ "success": false, "error": "æœªæ‰¾åˆ°è¯¥ç‰ˆæœ¬" })),
         );
     };
 
     let now = now_rfc3339();
 
-    // 已发布过 → fork(spec § 5.3.3 / § 8.3)
-    // citations 直接拷贝父版本(boris-inline 通常只改文字,引用结构不变);
-    // 如果 Boris 改动让某些 `[^N]` 不再存在,前端 popover 找不到对应 citation 时不显示。
+    // å·²å‘å¸ƒè¿‡ â†’ fork(spec Â§ 5.3.3 / Â§ 8.3)
+    // citations ç›´æŽ¥æ‹·è´çˆ¶ç‰ˆæœ¬(boris-inline é€šå¸¸åªæ”¹æ–‡å­—,å¼•ç”¨ç»“æž„ä¸å˜);
+    // å¦‚æžœ Boris æ”¹åŠ¨è®©æŸäº› `[^N]` ä¸å†å­˜åœ¨,å‰ç«¯ popover æ‰¾ä¸åˆ°å¯¹åº” citation æ—¶ä¸æ˜¾ç¤ºã€‚
     if published_at.is_some() {
         let next_version: i64 = db
             .query_row(
@@ -340,7 +332,7 @@ pub async fn update_report(
         return fetch_report(&db, insight_id, new_id);
     }
 
-    // 未发布 → 原地 PATCH(v0.1 行为)
+    // æœªå‘å¸ƒ â†’ åŽŸåœ° PATCH(v0.1 è¡Œä¸º)
     let n = db.execute(
         "UPDATE reports SET content_md = ?1, updated_at = ?2 \
          WHERE insight_id = ?3 AND version = ?4",
@@ -349,7 +341,7 @@ pub async fn update_report(
     match n {
         Ok(0) => (
             StatusCode::NOT_FOUND,
-            Json(json!({ "success": false, "error": "未找到该版本" })),
+            Json(json!({ "success": false, "error": "æœªæ‰¾åˆ°è¯¥ç‰ˆæœ¬" })),
         ),
         Ok(_) => {
             let _ = db.execute(
@@ -363,14 +355,9 @@ pub async fn update_report(
 }
 
 fn fetch_report(db: &Connection, insight_id: i64, id: i64) -> (StatusCode, Json<JsonValue>) {
-    let sql = format!(
-        "SELECT {SELECT_COLS} FROM reports WHERE id = ?1 AND insight_id = ?2"
-    );
+    let sql = format!("SELECT {SELECT_COLS} FROM reports WHERE id = ?1 AND insight_id = ?2");
     match db.query_row(&sql, params![id, insight_id], row_to_report) {
-        Ok(t) => (
-            StatusCode::OK,
-            Json(json!({ "success": true, "item": t })),
-        ),
+        Ok(t) => (StatusCode::OK, Json(json!({ "success": true, "item": t }))),
         Err(e) => db_error("fetch_report", e),
     }
 }
@@ -419,7 +406,9 @@ mod tests {
                         .uri(format!("/api/insights/{iid}/reports"))
                         .header("Cookie", &cookie)
                         .header("Content-Type", "application/json")
-                        .body(Body::from(r#"{"template":"survey","contentMd":"hi v1","sourceIds":[1,2]}"#))
+                        .body(Body::from(
+                            r#"{"template":"survey","contentMd":"hi v1","sourceIds":[1,2]}"#,
+                        ))
                         .unwrap(),
                 )
                 .await
@@ -429,7 +418,7 @@ mod tests {
             assert_eq!(j["item"]["sourceIds"], json!([1, 2]));
         }
 
-        // v0.2:status 从 collecting → ready → processing → editing(等 Boris review)
+        // v0.2:status ä»Ž collecting â†’ ready â†’ processing â†’ editing(ç­‰ Boris review)
         let resp = app
             .clone()
             .oneshot(
@@ -467,7 +456,7 @@ mod tests {
             .unwrap();
         let iid = body_json(resp).await["item"]["id"].as_i64().unwrap();
 
-        // 没 report → 404
+        // æ²¡ report â†’ 404
         let resp = app
             .clone()
             .oneshot(
@@ -547,7 +536,7 @@ mod tests {
             .await
             .unwrap();
         let v1_id = body_json(resp).await["item"]["id"].as_i64().unwrap();
-        // regenerate → pending_revision_note 写入
+        // regenerate â†’ pending_revision_note å†™å…¥
         app.clone()
             .oneshot(
                 Request::builder()
@@ -555,7 +544,7 @@ mod tests {
                     .uri(format!("/api/insights/{iid}/regenerate"))
                     .header("Cookie", &cookie)
                     .header("Content-Type", "application/json")
-                    .body(Body::from(r#"{"revisionNote":"加反例"}"#))
+                    .body(Body::from(r#"{"revisionNote":"åŠ åä¾‹"}"#))
                     .unwrap(),
             )
             .await
@@ -572,7 +561,7 @@ mod tests {
             )
             .await
             .unwrap();
-        // CC 提交 v2(parent_report_id = v1_id, revision_note 拷过来)
+        // CC æäº¤ v2(parent_report_id = v1_id, revision_note æ‹·è¿‡æ¥)
         let resp = app
             .clone()
             .oneshot(
@@ -582,7 +571,7 @@ mod tests {
                     .header("Cookie", &cookie)
                     .header("Content-Type", "application/json")
                     .body(Body::from(format!(
-                        r#"{{"template":"survey","contentMd":"v2","parentReportId":{v1_id},"revisionNote":"加反例"}}"#
+                        r#"{{"template":"survey","contentMd":"v2","parentReportId":{v1_id},"revisionNote":"åŠ åä¾‹"}}"#
                     )))
                     .unwrap(),
             )
@@ -591,9 +580,9 @@ mod tests {
         let j = body_json(resp).await;
         assert_eq!(j["item"]["version"], 2);
         assert_eq!(j["item"]["parentReportId"], v1_id);
-        assert_eq!(j["item"]["revisionNote"], "加反例");
+        assert_eq!(j["item"]["revisionNote"], "åŠ åä¾‹");
 
-        // insight.pendingRevisionNote 已清空,status=editing
+        // insight.pendingRevisionNote å·²æ¸…ç©º,status=editing
         let resp = app
             .oneshot(
                 Request::builder()
@@ -638,7 +627,9 @@ mod tests {
                     .uri(format!("/api/insights/{iid}/reports"))
                     .header("Cookie", &cookie)
                     .header("Content-Type", "application/json")
-                    .body(Body::from(r#"{"template":"survey","contentMd":"v1 original"}"#))
+                    .body(Body::from(
+                        r#"{"template":"survey","contentMd":"v1 original"}"#,
+                    ))
                     .unwrap(),
             )
             .await
@@ -659,7 +650,7 @@ mod tests {
             .await
             .unwrap();
 
-        // PATCH v1(已发布)→ 应自动 fork 出 v2
+        // PATCH v1(å·²å‘å¸ƒ)â†’ åº”è‡ªåŠ¨ fork å‡º v2
         let resp = app
             .clone()
             .oneshot(
@@ -679,7 +670,7 @@ mod tests {
         assert_eq!(j["item"]["generatedBy"], "boris-inline");
         assert_eq!(j["item"]["contentMd"], "v1 edited by Boris");
 
-        // v1 应该还是 "v1 original"(历史快照不被改写)
+        // v1 åº”è¯¥è¿˜æ˜¯ "v1 original"(åŽ†å²å¿«ç…§ä¸è¢«æ”¹å†™)
         let resp = app
             .clone()
             .oneshot(
@@ -694,7 +685,7 @@ mod tests {
         let j = body_json(resp).await;
         assert_eq!(j["item"]["contentMd"], "v1 original");
 
-        // insight.current_report_id 切到 v2
+        // insight.current_report_id åˆ‡åˆ° v2
         let resp = app
             .oneshot(
                 Request::builder()
@@ -738,7 +729,9 @@ mod tests {
                     .uri(format!("/api/insights/{iid}/reports"))
                     .header("Cookie", &cookie)
                     .header("Content-Type", "application/json")
-                    .body(Body::from(r#"{"template":"survey","contentMd":"original"}"#))
+                    .body(Body::from(
+                        r#"{"template":"survey","contentMd":"original"}"#,
+                    ))
                     .unwrap(),
             )
             .await
@@ -758,10 +751,10 @@ mod tests {
             .await
             .unwrap();
         let j = body_json(resp).await;
-        assert_eq!(j["item"]["version"], 1); // 没开新版
+        assert_eq!(j["item"]["version"], 1); // æ²¡å¼€æ–°ç‰ˆ
         assert_eq!(j["item"]["contentMd"], "edited by Boris");
 
-        // 列表里仍然只有 1 个版本
+        // åˆ—è¡¨é‡Œä»ç„¶åªæœ‰ 1 ä¸ªç‰ˆæœ¬
         let resp = app
             .oneshot(
                 Request::builder()

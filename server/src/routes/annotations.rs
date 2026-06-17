@@ -100,10 +100,8 @@ pub async fn list_annotations(
     let include_deleted = f.include_deleted.unwrap_or(0) == 1;
 
     // 动态 SQL:filter 都可选
-    let mut conditions: Vec<String> = vec![
-        "user_id = ?1".to_string(),
-        "insight_id = ?2".to_string(),
-    ];
+    let mut conditions: Vec<String> =
+        vec!["user_id = ?1".to_string(), "insight_id = ?2".to_string()];
     let mut params_v: Vec<Box<dyn rusqlite::ToSql>> =
         vec![Box::new(user_id.0.clone()), Box::new(insight_id)];
     let mut idx = 3;
@@ -204,9 +202,8 @@ pub async fn create_annotation(
     match res {
         Ok(_) => {
             let new_id = db.last_insert_rowid();
-            let sql = format!(
-                "SELECT {SELECT_COLS} FROM annotations WHERE id = ?1 AND user_id = ?2"
-            );
+            let sql =
+                format!("SELECT {SELECT_COLS} FROM annotations WHERE id = ?1 AND user_id = ?2");
             match db.query_row(&sql, params![new_id, &user_id.0], row_to_annotation) {
                 Ok(item) => (
                     StatusCode::OK,
@@ -290,9 +287,8 @@ pub async fn update_annotation(
             Json(json!({ "success": false, "error": "未找到备注" })),
         ),
         Ok(_) => {
-            let sql = format!(
-                "SELECT {SELECT_COLS} FROM annotations WHERE id = ?1 AND user_id = ?2"
-            );
+            let sql =
+                format!("SELECT {SELECT_COLS} FROM annotations WHERE id = ?1 AND user_id = ?2");
             match db.query_row(&sql, params![id, &user_id.0], row_to_annotation) {
                 Ok(item) => (
                     StatusCode::OK,
@@ -340,10 +336,7 @@ mod tests {
         serde_json::from_slice(&body).unwrap()
     }
 
-    async fn make_insight_with_report(
-        app: &axum::Router,
-        cookie: &str,
-    ) -> (i64, i64) {
+    async fn make_insight_with_report(app: &axum::Router, cookie: &str) -> (i64, i64) {
         let resp = app
             .clone()
             .oneshot(

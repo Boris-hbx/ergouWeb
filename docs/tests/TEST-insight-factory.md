@@ -44,3 +44,14 @@
 - 禁用某条 factory memory 后，下次 worker 上下文不再包含该记忆。
 - worker 注入顺序固定为 `project_fact -> boris_profile -> report_preference -> insight_summary`，同类内部按 importance DESC、updated_at DESC。
 - factory memories 不同写、不污染 `/api/memories` 通用记忆。
+
+## T-217 生产 worker 运行时与可观测性
+
+- 运行时镜像内必须存在 codex 可执行文件（`/usr/local/bin/codex`），`codex --version` 可读。
+- worker 默认沙箱为 `bypass`（`--dangerously-bypass-approvals-and-sandbox`）；`INSIGHT_FACTORY_CODEX_SANDBOX=read-only` 可回退到 `-s read-only`，无需改代码。
+- job 失败时 `error_message` 带分类前缀：`[codex_missing]`（os error 2）、`[auth_expired]`（401/未登录）、`[sandbox_failed]`（landlock/seccomp）、`[quota_blocked]`（OPENAI_API_KEY）、`[timeout]`、`[other]`。
+- `worker/health` 区分：CLI 缺失 → `cliAvailable=false`/`gate=cli_unavailable`；CLI 在但无 auth.json → `status=blocked`/`gate=auth_missing`/`authPresent=false`；CLI+auth 齐 → `status=ready`/`gate=chatgpt_subscription`/`authPresent=true`，并带 `lastRefresh`。
+- worker 处理每个 job 输出结构化日志：成功 `info`、失败/阻塞 `warn`，字段含 `job_id/task_id/mode/provider/status/error`，error 经 sanitize 不含 token/prompt。
+- 前端：最新 job `failed`/`blocked` 且无报告时，「最新报告」区展示失败摘要 + 重试入口，不再停留在「等待 worker 写回」。
+- 前端：详情存在 active job（pending/running）时自动轮询（~6s），job 终态后页面自动从「等待」翻到报告或失败态；离开详情停止轮询。
+- 前端：列表页 health 徽标在未就绪时显示原因（`auth_missing`/`cli_unavailable` 等）。

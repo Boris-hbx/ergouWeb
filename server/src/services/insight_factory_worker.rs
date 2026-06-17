@@ -16,7 +16,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 #[derive(Debug, Clone)]
 pub struct InsightJobContext {
@@ -32,6 +32,7 @@ pub struct InsightJobContext {
     pub previous_report_md: String,
     pub feedback_note: String,
     pub parent_report_id: Option<i64>,
+    pub retry_of_job_id: Option<i64>,
     pub report_contract_md: String,
 }
 
@@ -66,6 +67,10 @@ pub struct ProviderHealth {
     pub cli_available: bool,
     #[serde(rename = "versionSummary")]
     pub version_summary: String,
+    #[serde(rename = "authPresent")]
+    pub auth_present: bool,
+    #[serde(rename = "lastRefresh")]
+    pub last_refresh: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
 }
@@ -75,7 +80,11 @@ pub struct WorkerRunSummary {
     pub processed: usize,
     #[serde(rename = "jobId", skip_serializing_if = "Option::is_none")]
     pub job_id: Option<i64>,
+    #[serde(rename = "taskId", skip_serializing_if = "Option::is_none")]
+    pub task_id: Option<i64>,
     pub status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
 }
 
 pub trait FactoryReportProvider: Send + Sync {
@@ -92,6 +101,33 @@ pub struct CodexProvider {
     command: String,
     cwd: Option<PathBuf>,
     timeout: Duration,
+    sandbox: SandboxMode,
+}
+
+/// Codex sandbox policy when spawning `codex exec`.
+///
+/// In the Fly container the box itself is the isolation boundary, so the default
+/// is `Bypass` (T-217, Boris ruling): container kernels may not expose
+/// landlock/seccomp, which would make codex's own sandbox init fail. Override
+/// with `INSIGHT_FACTORY_CODEX_SANDBOX=read-only` without a code change/redeploy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SandboxMode {
+    Bypass,
+    ReadOnly,
+}
+
+impl SandboxMode {
+    fn from_env() -> Self {
+        match std::env::var("INSIGHT_FACTORY_CODEX_SANDBOX")
+            .unwrap_or_default()
+            .trim()
+            .to_ascii_lowercase()
+            .as_str()
+        {
+            "read-only" | "readonly" | "read_only" => SandboxMode::ReadOnly,
+            _ => SandboxMode::Bypass,
+        }
+    }
 }
 
 impl Default for CodexProvider {
@@ -106,6 +142,7 @@ impl Default for CodexProvider {
                     .and_then(|s| s.parse().ok())
                     .unwrap_or(300),
             ),
+            sandbox: SandboxMode::from_env(),
         }
     }
 }
@@ -130,6 +167,7 @@ impl FactoryReportProvider for CodexProvider {
 impl CodexProvider {
     async fn health_check(&self) -> ProviderHealth {
         let api_key_detected = api_key_detected();
+        let (auth_present, last_refresh) = read_auth_state();
         if api_key_detected {
             return ProviderHealth {
                 provider: "codex".to_string(),
@@ -139,6 +177,8 @@ impl CodexProvider {
                 api_key_detected: true,
                 cli_available: false,
                 version_summary: String::new(),
+                auth_present,
+                last_refresh,
                 error: Some("OPENAI_API_KEY detected; API billing path is disabled".to_string()),
             };
         }
@@ -151,15 +191,32 @@ impl CodexProvider {
         match tokio::time::timeout(Duration::from_secs(10), cmd.output()).await {
             Ok(Ok(out)) if out.status.success() => {
                 let version = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                // CLI is present; readiness now hinges on the subscription login
+                // state living on the persistent volume (T-217).
+                let (status, quota_gate, error) = if auth_present {
+                    ("ready", "chatgpt_subscription", None)
+                } else {
+                    (
+                        "blocked",
+                        "auth_missing",
+                        Some(
+                            "codex CLI ok but auth.json missing; inject the \
+                             CODEX_AUTH_JSON_B64 secret and redeploy"
+                                .to_string(),
+                        ),
+                    )
+                };
                 ProviderHealth {
                     provider: "codex".to_string(),
-                    status: "ready".to_string(),
-                    quota_gate: "chatgpt_auth_assumed_from_T-208".to_string(),
+                    status: status.to_string(),
+                    quota_gate: quota_gate.to_string(),
                     api_key_fallback: false,
                     api_key_detected: false,
                     cli_available: true,
                     version_summary: sanitize_error(&version),
-                    error: None,
+                    auth_present,
+                    last_refresh,
+                    error,
                 }
             }
             Ok(Ok(out)) => ProviderHealth {
@@ -170,6 +227,8 @@ impl CodexProvider {
                 api_key_detected: false,
                 cli_available: false,
                 version_summary: String::new(),
+                auth_present,
+                last_refresh,
                 error: Some(sanitize_error(&String::from_utf8_lossy(&out.stderr))),
             },
             Ok(Err(e)) => ProviderHealth {
@@ -180,7 +239,9 @@ impl CodexProvider {
                 api_key_detected: false,
                 cli_available: false,
                 version_summary: String::new(),
-                error: Some(sanitize_error(&e.to_string())),
+                auth_present,
+                last_refresh,
+                error: Some(tag_error(&e.to_string())),
             },
             Err(_) => ProviderHealth {
                 provider: "codex".to_string(),
@@ -190,6 +251,8 @@ impl CodexProvider {
                 api_key_detected: false,
                 cli_available: false,
                 version_summary: String::new(),
+                auth_present,
+                last_refresh,
                 error: Some("codex --version timed out".to_string()),
             },
         }
@@ -214,11 +277,18 @@ impl CodexProvider {
             uuid::Uuid::new_v4()
         ));
         let mut cmd = Command::new(&self.command);
-        cmd.arg("exec")
-            .arg("--ephemeral")
-            .arg("-s")
-            .arg("read-only")
-            .arg("--skip-git-repo-check")
+        cmd.arg("exec").arg("--ephemeral");
+        match self.sandbox {
+            // Container is the isolation boundary; codex's own sandbox may fail to
+            // initialise without landlock/seccomp, so bypass it inside Fly.
+            SandboxMode::Bypass => {
+                cmd.arg("--dangerously-bypass-approvals-and-sandbox");
+            }
+            SandboxMode::ReadOnly => {
+                cmd.arg("-s").arg("read-only");
+            }
+        }
+        cmd.arg("--skip-git-repo-check")
             .arg("--output-last-message")
             .arg(&output_path)
             .arg("-")
@@ -332,14 +402,9 @@ pub fn spawn_worker(db: Arc<Mutex<Connection>>) {
             .and_then(|s| s.parse().ok())
             .unwrap_or(10);
         loop {
-            match run_once(db.clone(), &provider).await {
-                Ok(summary) if summary.processed > 0 => {
-                    info!(target: "insight_factory_worker", ?summary, "processed job");
-                }
-                Ok(_) => {}
-                Err(e) => {
-                    error!(target: "insight_factory_worker", error = %e, "worker run failed");
-                }
+            // run_once already logs each processed job at the right level.
+            if let Err(e) = run_once(db.clone(), &provider).await {
+                error!(target: "insight_factory_worker", error = %e, "worker run failed");
             }
             tokio::time::sleep(Duration::from_secs(interval_secs)).await;
         }
@@ -354,30 +419,55 @@ pub async fn run_once<P: FactoryReportProvider>(
         return Ok(WorkerRunSummary {
             processed: 0,
             job_id: None,
+            task_id: None,
             status: "idle".to_string(),
+            error: None,
         });
     };
 
+    let effective_mode = effective_job_mode(&ctx);
     let result = provider.generate(&ctx).await;
-    let status = match result.status {
+    let (status, error_summary) = match result.status {
         ProviderStatus::Done => {
             persist_report(db.clone(), &ctx, result)?;
-            "done"
+            ("done", None)
         }
         ProviderStatus::Blocked => {
+            let tagged = tag_error(&result.error_message);
             mark_job_terminal(db.clone(), &ctx, "blocked", &result.error_message)?;
-            "blocked"
+            ("blocked", Some(tagged))
         }
         ProviderStatus::Failed => {
+            let tagged = tag_error(&result.error_message);
             mark_job_terminal(db.clone(), &ctx, "failed", &result.error_message)?;
-            "failed"
+            ("failed", Some(tagged))
         }
     };
+
+    // Structured, sanitized observability so PM can tell running/failed/idle apart
+    // from logs alone, without DB access (T-217).
+    if status == "done" {
+        info!(
+            target: "insight_factory_worker",
+            job_id = ctx.job_id, task_id = ctx.task_id, mode = effective_mode,
+            provider = provider.name(), status, "job completed"
+        );
+    } else {
+        warn!(
+            target: "insight_factory_worker",
+            job_id = ctx.job_id, task_id = ctx.task_id, mode = effective_mode,
+            provider = provider.name(), status,
+            error = error_summary.as_deref().unwrap_or(""),
+            "job did not complete"
+        );
+    }
 
     Ok(WorkerRunSummary {
         processed: 1,
         job_id: Some(ctx.job_id),
+        task_id: Some(ctx.task_id),
         status: status.to_string(),
+        error: error_summary,
     })
 }
 
@@ -430,7 +520,7 @@ fn load_context(db: &Connection, job_id: i64) -> Result<InsightJobContext, Strin
     let row = db
         .query_row(
             "SELECT j.id, j.task_id, j.user_id, j.mode, j.template, j.feedback_note,
-                    j.parent_report_id,
+                    j.parent_report_id, j.retry_of_job_id,
                     t.input_type, t.input_content, t.source_snapshot, t.template
              FROM factory_jobs j
              JOIN factory_tasks t ON t.id = j.task_id AND t.user_id = j.user_id
@@ -445,10 +535,11 @@ fn load_context(db: &Connection, job_id: i64) -> Result<InsightJobContext, Strin
                     r.get::<_, Option<String>>(4)?,
                     r.get::<_, String>(5)?,
                     r.get::<_, Option<i64>>(6)?,
-                    r.get::<_, String>(7)?,
+                    r.get::<_, Option<i64>>(7)?,
                     r.get::<_, String>(8)?,
                     r.get::<_, String>(9)?,
-                    r.get::<_, Option<String>>(10)?,
+                    r.get::<_, String>(10)?,
+                    r.get::<_, Option<String>>(11)?,
                 ))
             },
         )
@@ -462,6 +553,7 @@ fn load_context(db: &Connection, job_id: i64) -> Result<InsightJobContext, Strin
         job_template,
         feedback_note,
         parent_report_id,
+        retry_of_job_id,
         input_type,
         input_content,
         source_snapshot,
@@ -496,6 +588,7 @@ fn load_context(db: &Connection, job_id: i64) -> Result<InsightJobContext, Strin
         previous_report_md,
         feedback_note,
         parent_report_id,
+        retry_of_job_id,
         report_contract_md: report_contract_md(),
     })
 }
@@ -592,7 +685,7 @@ fn mark_job_terminal(
 ) -> Result<(), String> {
     let db = db.lock();
     let now = now_rfc3339();
-    let clean = sanitize_error(error_message);
+    let clean = tag_error(error_message);
     db.execute(
         "UPDATE factory_jobs
          SET status = ?1, finished_at = ?2, error_message = ?3
@@ -609,6 +702,8 @@ fn mark_job_terminal(
 }
 
 fn build_prompt(ctx: &InsightJobContext) -> String {
+    let effective_mode = effective_job_mode(ctx);
+    let retry_note = retry_instruction(ctx, effective_mode);
     format!(
         r#"你是洞察工厂的报告生成 worker。只输出一份完整 Markdown 报告，不要输出解释、diff、JSON 或代码块围栏。
 
@@ -618,8 +713,11 @@ fn build_prompt(ctx: &InsightJobContext) -> String {
 - task_id: {task_id}
 - job_id: {job_id}
 - mode: {mode}
+- stored_mode: {stored_mode}
+- retry_of_job_id: {retry_of_job_id}
 - template: {template}
 - input_type: {input_type}
+{retry_note}
 
 ## Input
 {input}
@@ -639,15 +737,41 @@ fn build_prompt(ctx: &InsightJobContext) -> String {
         contract = ctx.report_contract_md,
         task_id = ctx.task_id,
         job_id = ctx.job_id,
-        mode = ctx.mode,
+        mode = effective_mode,
+        stored_mode = ctx.mode,
+        retry_of_job_id = ctx
+            .retry_of_job_id
+            .map(|id| id.to_string())
+            .unwrap_or_else(|| "(none)".to_string()),
         template = ctx.template,
         input_type = ctx.input_type,
+        retry_note = retry_note,
         input = ctx.input_content,
         source_snapshot = empty_marker(&ctx.source_snapshot),
         memories = empty_marker(&ctx.memory_context_md),
         previous_report = empty_marker(&ctx.previous_report_md),
         feedback = empty_marker(&ctx.feedback_note),
     )
+}
+
+fn effective_job_mode(ctx: &InsightJobContext) -> &'static str {
+    match ctx.mode.as_str() {
+        "retry" if ctx.parent_report_id.is_some() || !ctx.feedback_note.trim().is_empty() => {
+            "revise"
+        }
+        "retry" => "generate",
+        "revise" => "revise",
+        _ => "generate",
+    }
+}
+
+fn retry_instruction(ctx: &InsightJobContext, effective_mode: &str) -> String {
+    match ctx.retry_of_job_id {
+        Some(id) => format!(
+            "- retry_note: retrying failed job #{id}; execute it as a {effective_mode} job using the copied context below."
+        ),
+        None => String::new(),
+    }
 }
 
 fn report_contract_md() -> String {
@@ -684,14 +808,79 @@ fn looks_like_markdown_report(s: &str) -> bool {
     trimmed.chars().count() >= 80 && trimmed.contains('#')
 }
 
+/// Resolve `CODEX_HOME` (set in fly.toml to the persistent volume) or fall back
+/// to the platform `~/.codex`.
+fn codex_home_dir() -> PathBuf {
+    if let Ok(h) = std::env::var("CODEX_HOME") {
+        if !h.trim().is_empty() {
+            return PathBuf::from(h);
+        }
+    }
+    if let Some(home) = std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE")) {
+        return PathBuf::from(home).join(".codex");
+    }
+    PathBuf::from(".codex")
+}
+
+/// Report whether the Codex subscription `auth.json` is present and, if so, its
+/// `last_refresh` timestamp. Never returns token contents.
+fn read_auth_state() -> (bool, String) {
+    let path = codex_home_dir().join("auth.json");
+    match std::fs::read_to_string(&path) {
+        Ok(content) => {
+            let last_refresh = serde_json::from_str::<serde_json::Value>(&content)
+                .ok()
+                .and_then(|v| {
+                    v.get("last_refresh")
+                        .and_then(|x| x.as_str())
+                        .map(|s| s.to_string())
+                })
+                .unwrap_or_default();
+            (true, last_refresh)
+        }
+        Err(_) => (false, String::new()),
+    }
+}
+
 fn api_key_detected() -> bool {
     std::env::var("OPENAI_API_KEY")
         .map(|v| !v.trim().is_empty())
         .unwrap_or(false)
 }
 
+/// Coarse category for a worker failure so the UI and logs can tell apart the
+/// common failure modes without leaking internals (T-217 observability).
+fn classify_error(raw: &str) -> &'static str {
+    let s = raw.to_ascii_lowercase();
+    if s.contains("os error 2") || s.contains("no such file") || s.contains("not found") {
+        "codex_missing"
+    } else if s.contains("openai_api_key") || s.contains("api billing") || s.contains("quota") {
+        "quota_blocked"
+    } else if s.contains("401")
+        || s.contains("unauthorized")
+        || s.contains("not logged in")
+        || s.contains("please run")
+        || s.contains("login")
+        || s.contains("auth")
+    {
+        "auth_expired"
+    } else if s.contains("landlock") || s.contains("seccomp") || s.contains("sandbox") {
+        "sandbox_failed"
+    } else if s.contains("timed out") || s.contains("timeout") {
+        "timeout"
+    } else {
+        "other"
+    }
+}
+
+/// Sanitize then prefix a failure with its category, e.g. `[codex_missing] ...`.
+fn tag_error(raw: &str) -> String {
+    let clean = sanitize_error(raw);
+    format!("[{}] {}", classify_error(&clean), clean)
+}
+
 fn sanitize_error(raw: &str) -> String {
-    let mut s = raw.replace('\n', " ").replace('\r', " ");
+    let mut s = raw.replace(['\n', '\r'], " ");
     for marker in ["OPENAI_API_KEY", "sk-", "session", "token", "api key"] {
         s = s.replace(marker, "[redacted]");
     }
@@ -742,6 +931,8 @@ mod tests {
                     api_key_detected: false,
                     cli_available: true,
                     version_summary: "test".to_string(),
+                    auth_present: true,
+                    last_refresh: String::new(),
                     error: None,
                 }
             })
@@ -921,6 +1112,58 @@ mod tests {
     }
 
     #[test]
+    fn retry_prompt_preserves_effective_generate_semantics() {
+        let ctx = InsightJobContext {
+            task_id: 1,
+            job_id: 4,
+            user_id: "u".to_string(),
+            mode: "retry".to_string(),
+            input_type: "topic".to_string(),
+            input_content: "AI search".to_string(),
+            source_snapshot: String::new(),
+            template: "survey".to_string(),
+            memory_context_md: String::new(),
+            previous_report_md: String::new(),
+            feedback_note: String::new(),
+            parent_report_id: None,
+            retry_of_job_id: Some(3),
+            report_contract_md: report_contract_md(),
+        };
+
+        let prompt = build_prompt(&ctx);
+        assert!(prompt.contains("- mode: generate"), "{prompt}");
+        assert!(prompt.contains("- stored_mode: retry"), "{prompt}");
+        assert!(prompt.contains("- retry_of_job_id: 3"), "{prompt}");
+        assert!(prompt.contains("execute it as a generate job"), "{prompt}");
+    }
+
+    #[test]
+    fn retry_prompt_preserves_effective_revise_semantics() {
+        let ctx = InsightJobContext {
+            task_id: 1,
+            job_id: 5,
+            user_id: "u".to_string(),
+            mode: "retry".to_string(),
+            input_type: "topic".to_string(),
+            input_content: "AI search".to_string(),
+            source_snapshot: String::new(),
+            template: "survey".to_string(),
+            memory_context_md: String::new(),
+            previous_report_md: "# Previous\n\nBody".to_string(),
+            feedback_note: "make it sharper".to_string(),
+            parent_report_id: Some(2),
+            retry_of_job_id: Some(4),
+            report_contract_md: report_contract_md(),
+        };
+
+        let prompt = build_prompt(&ctx);
+        assert!(prompt.contains("- mode: revise"), "{prompt}");
+        assert!(prompt.contains("- stored_mode: retry"), "{prompt}");
+        assert!(prompt.contains("- retry_of_job_id: 4"), "{prompt}");
+        assert!(prompt.contains("execute it as a revise job"), "{prompt}");
+    }
+
+    #[test]
     fn memory_context_uses_spec_order_and_skips_disabled_items() {
         let state = test_state();
         let (user_id, _) = create_test_user(&state, "factory-memory-order", "Pa55word1");
@@ -950,5 +1193,48 @@ mod tests {
         let s = ctx.find("[insight_summary]").unwrap();
         assert!(p < b && b < r && r < s, "unexpected context order: {ctx}");
         assert!(!ctx.contains("disabled fact"));
+    }
+
+    #[test]
+    fn classify_error_buckets_known_failure_modes() {
+        assert_eq!(
+            classify_error("No such file or directory (os error 2)"),
+            "codex_missing"
+        );
+        assert_eq!(
+            classify_error("OPENAI_API_KEY detected; API billing path is disabled"),
+            "quota_blocked"
+        );
+        assert_eq!(
+            classify_error("401 Unauthorized: please run codex login"),
+            "auth_expired"
+        );
+        assert_eq!(
+            classify_error("landlock sandbox init failed"),
+            "sandbox_failed"
+        );
+        assert_eq!(classify_error("Codex generation timed out"), "timeout");
+        assert_eq!(classify_error("some unmapped weirdness"), "other");
+    }
+
+    #[test]
+    fn tag_error_prefixes_category_and_sanitizes() {
+        let tagged = tag_error("No such file or directory (os error 2)");
+        assert!(tagged.starts_with("[codex_missing] "), "{tagged}");
+        // sanitize redacts secret markers even inside a tagged message
+        let secret = tag_error("token=abc leaked in error");
+        assert!(secret.contains("[redacted]"), "{secret}");
+    }
+
+    #[test]
+    fn read_auth_state_reports_missing_when_dir_empty() {
+        // Point CODEX_HOME at a path with no auth.json; expect (false, "").
+        // Note: env is process-global; this only asserts the missing branch.
+        let dir = std::env::temp_dir().join("ergou-codex-home-missing-xyz");
+        std::env::set_var("CODEX_HOME", &dir);
+        let (present, last) = read_auth_state();
+        std::env::remove_var("CODEX_HOME");
+        assert!(!present);
+        assert_eq!(last, "");
     }
 }
