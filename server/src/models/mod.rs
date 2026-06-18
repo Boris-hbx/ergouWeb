@@ -8,6 +8,8 @@ pub mod reminder;
 pub mod review;
 pub mod routine;
 pub mod soul_state;
+pub mod stakeholder;
+pub mod stakeholder_column;
 pub mod todo;
 pub mod trip;
 pub mod work_column;
