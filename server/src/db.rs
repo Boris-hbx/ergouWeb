@@ -983,6 +983,48 @@ fn create_tables(conn: &Connection) {
         );
         CREATE INDEX IF NOT EXISTS idx_work_columns_user_pos ON work_columns(user_id, position);
 
+        -- Stakeholders (T-221 / SPEC stakeholder)
+        -- Independent per-user stakeholder ledger under Work Hub. Mirrors the
+        -- work table storage shape: builtin fields + flexible custom_fields.
+        CREATE TABLE IF NOT EXISTS stakeholders (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id       TEXT    NOT NULL REFERENCES users(id),
+            name          TEXT    NOT NULL DEFAULT '',
+            team          TEXT    NOT NULL DEFAULT '',
+            region        TEXT    NOT NULL DEFAULT '',
+            title         TEXT    NOT NULL DEFAULT '',
+            duty          TEXT    NOT NULL DEFAULT '[]',
+            liaison       TEXT    NOT NULL DEFAULT '[]',
+            relation      TEXT    NOT NULL DEFAULT '',
+            method        TEXT    NOT NULL DEFAULT '[]',
+            cadence       TEXT    NOT NULL DEFAULT '',
+            strategy      TEXT    NOT NULL DEFAULT '',
+            notes         TEXT    NOT NULL DEFAULT '',
+            custom_fields TEXT    NOT NULL DEFAULT '{}',
+            sort_order    REAL    NOT NULL DEFAULT 0,
+            created_at    TEXT    NOT NULL,
+            updated_at    TEXT    NOT NULL,
+            deleted       INTEGER NOT NULL DEFAULT 0,
+            deleted_at    TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_stakeholders_user ON stakeholders(user_id, deleted);
+
+        -- Stakeholder columns (per-user schema config for stakeholders)
+        CREATE TABLE IF NOT EXISTS stakeholder_columns (
+            user_id   TEXT    NOT NULL REFERENCES users(id),
+            key       TEXT    NOT NULL,
+            name      TEXT    NOT NULL,
+            type      TEXT    NOT NULL,
+            options   TEXT    NOT NULL DEFAULT '[]',
+            width     INTEGER,
+            min_width INTEGER,
+            position  INTEGER NOT NULL,
+            builtin   INTEGER NOT NULL DEFAULT 0,
+            sys       INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (user_id, key)
+        );
+        CREATE INDEX IF NOT EXISTS idx_stakeholder_columns_user_pos ON stakeholder_columns(user_id, position);
+
         -- ============ Insight (T-105 / SPEC insight) ============
         -- Boris 把多源素材整理成可分享研究报告。架构 = Hybrid:
         --   Web 后端 = 收件箱 + 抓取 + 存储(本表);

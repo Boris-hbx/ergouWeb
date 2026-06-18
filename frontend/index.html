@@ -912,17 +912,17 @@
                 <h2>生活</h2>
             </div>
             <div class="life-hub-grid">
-                <div class="life-hub-card" onclick="Life.openFeature('expense')">
+                <div class="life-hub-card" data-track="life.expense" onclick="Life.openFeature('expense')">
                     <div class="life-hub-card-icon">💰</div>
                     <div class="life-hub-card-title">记账</div>
                     <div class="life-hub-card-desc">记录每一笔消费</div>
                 </div>
-                <div class="life-hub-card" onclick="Life.openFeature('trip')">
+                <div class="life-hub-card" data-track="life.trip" onclick="Life.openFeature('trip')">
                     <div class="life-hub-card-icon">✈️</div>
                     <div class="life-hub-card-title">差旅</div>
                     <div class="life-hub-card-desc">出差行程与报销</div>
                 </div>
-                <div class="life-hub-card" onclick="Life.openFeature('health')">
+                <div class="life-hub-card" data-track="life.health" onclick="Life.openFeature('health')">
                     <div class="life-hub-card-icon">🏥</div>
                     <div class="life-hub-card-title">健康</div>
                     <div class="life-hub-card-desc">八段锦 · 经络</div>
@@ -1110,7 +1110,7 @@
         </div>
 
         <!-- 记账 FAB -->
-        <button class="expense-fab" id="expense-fab" style="display:none;" onclick="Expense.openAddModal()">+</button>
+        <button class="expense-fab" id="expense-fab" data-track="expense.add" data-track-label="记一笔" style="display:none;" onclick="Expense.openAddModal()">+</button>
 
         <!-- 差旅子视图 -->
         <div class="trip-view" id="trip-view" style="display:none;">
@@ -1192,24 +1192,24 @@
         <div class="life-hub" id="work-hub">
             <div class="life-hub-header"><h2>工作</h2></div>
             <div class="life-hub-grid">
-                <div class="life-hub-card" onclick="Work.openFeature('table')">
+                <div class="life-hub-card" data-track="work.table" onclick="Work.openFeature('table')">
                     <div class="life-hub-card-icon">📋</div>
                     <div class="life-hub-card-title">任务表</div>
                     <div class="life-hub-card-desc">表格 · 看板 · 日历 多视图</div>
                 </div>
                 <!-- T-106 / T-123 v0.3 -->
-                <div class="life-hub-card" onclick="Insight.openHub()">
+                <div class="life-hub-card" data-track="work.insight" onclick="Insight.openHub()">
                     <div class="life-hub-card-icon">📍</div>
                     <div class="life-hub-card-title">洞察</div>
                     <div class="life-hub-card-desc">随手录入,Claude Code 帮你研究成报告</div>
                 </div>
-                <div class="life-hub-card" onclick="InsightFactory.openHub()">
+                <div class="life-hub-card" data-track="work.insight_factory" onclick="InsightFactory.openHub()">
                     <div class="life-hub-card-icon">⚙</div>
                     <div class="life-hub-card-title">洞察工厂</div>
                     <div class="life-hub-card-desc">Web 录入 · worker 生成 · 多版修订</div>
                 </div>
                 <!-- T-111 -->
-                <div class="life-hub-card" onclick="WorkDone.openFeature()">
+                <div class="life-hub-card" data-track="work.done" onclick="WorkDone.openFeature()">
                     <div class="life-hub-card-icon">📦</div>
                     <div class="life-hub-card-title">已完成档案</div>
                     <div class="life-hub-card-desc">按月分组复盘 · 周月报数据源</div>
@@ -1285,7 +1285,7 @@
                     <option value="engage">按参与模式分组</option>
                 </select>
                 <button class="wt-select" onclick="WorkColumnCfg.open()" title="编辑表头、列类型、增删列">⚙ 列设置</button>
-                <button class="wt-newbtn" onclick="WorkTable.addRow()">+ 新建任务</button>
+                <button class="wt-newbtn" data-track="work.task.create" onclick="WorkTable.addRow()">+ 新建任务</button>
             </div>
 
             <div id="wt-center-view" class="wt-hidden"></div>
@@ -1724,7 +1724,7 @@
     <div class="gesture-hint" id="gesture-hint"></div>
 
     <!-- Mobile FAB (Floating Action Button) for adding tasks -->
-    <button class="mobile-fab" id="mobile-fab" onclick="showAddModal()">+</button>
+    <button class="mobile-fab" id="mobile-fab" data-track="todo.add" data-track-label="新建待办" onclick="showAddModal()">+</button>
 
     <!-- Mobile Bottom Navigation (hidden on desktop via CSS) -->
     <nav class="mobile-bottom-nav" id="mobile-bottom-nav">
@@ -1855,6 +1855,8 @@
     <script src="assets/js/notifications.js?v=20260618a"></script>
     <script src="assets/js/settings.js?v=20260618a"></script>
     <script src="assets/js/admin-panel.js?v=20260618a"></script>
+    <!-- T-219 行为分析采集：必须在 app.js / admin-panel.js 之后加载（要 hook 它们） -->
+    <script src="assets/js/tracker.js?v=20260618a"></script>
     <!-- Work module (T-094 / SPEC work-task-table) -->
     <script src="assets/js/work-pick.js?v=20260618a"></script>
     <script src="assets/js/work-table.js?v=20260618a"></script>
@@ -1902,6 +1904,9 @@
     if (typeof Patrol !== 'undefined') { Patrol.init(); }
     // 值班调试面板（仅 admin + localStorage 标记激活）
     if (typeof PatrolDebug !== 'undefined') { PatrolDebug.init(); }
+
+    // T-219 行为分析采集（best-effort，永不阻塞主体验）
+    if (typeof Tracker !== 'undefined') { Tracker.init(); }
 
     // Register Service Worker (版本号强制更新)
     if ('serviceWorker' in navigator) {
