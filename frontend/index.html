@@ -766,6 +766,7 @@
                 <a class="admin-nav-item" data-section="chats"><span class="admin-nav-icon">💬</span>对话</a>
                 <a class="admin-nav-item" data-section="ai"><span class="admin-nav-icon">🤖</span>AI</a>
                 <a class="admin-nav-item" data-section="risk"><span class="admin-nav-icon">🛡️</span>风控</a>
+                <a class="admin-nav-item" data-section="analytics"><span class="admin-nav-icon">📈</span>行为</a>
                 <a class="admin-nav-item" data-section="system"><span class="admin-nav-icon">⚙️</span>系统</a>
                 <a class="admin-nav-item" data-section="audit"><span class="admin-nav-icon">📋</span>审计</a>
                 <a class="admin-nav-item" data-section="people"><span class="admin-nav-icon">👤</span>人物</a>
@@ -791,6 +792,10 @@
                 <div class="admin-section" id="admin-sec-risk">
                     <div class="admin-section-title">风险监控</div>
                     <div id="admin-risk-content"></div>
+                </div>
+                <div class="admin-section" id="admin-sec-analytics">
+                    <div class="admin-section-title">行为分析</div>
+                    <div id="admin-analytics-content"></div>
                 </div>
                 <div class="admin-section" id="admin-sec-system">
                     <div class="admin-section-title">系统状态</div>
@@ -1818,6 +1823,7 @@
     <script>window.DOMPurify||document.write('<script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"><\/script>');</script>
 
     <!-- JS Modules -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
     <script src="assets/js/observability.js?v=20260618b"></script>
     <script src="assets/js/api.js?v=20260618b"></script>
     <script src="assets/js/utils.js?v=20260618b"></script>
