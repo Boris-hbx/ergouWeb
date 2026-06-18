@@ -7,7 +7,7 @@
 // 卡片只显示精简元数据(spec § 6.2):标题 / 责任人头像 / 层级 / 频率 / 截止日 / 简介小图标。
 
 var WorkBoard = (function() {
-    var _dragId = null;
+    var _drag = { id: null };
 
     function render() {
         var host = document.getElementById('wt-board-view');
@@ -15,59 +15,33 @@ var WorkBoard = (function() {
 
         var rows = _visibleRows();
         var STATUS = WorkTable._STATUS;
-        host.innerHTML = '';
-        STATUS.forEach(function(col) {
-            // T-113:看板砍'已完成'列,只保留 3 列(待办 / 进行中 / 阻塞)
-            //   完成路径走单元格 ☐ → progress dialog → 100% → 二次确认 → 彩纸(保护 B.3 完成确认链)
-            //   不允许通过拖动改 status=done 绕过确认链
-            if (col.key === 'done') return;
-            var items = rows.filter(function(t) { return t.status === col.key; });
-            var div = document.createElement('div');
-            div.className = 'wt-col';
-            div.dataset.col = col.key;
-            div.innerHTML =
-                '<div class="wt-col-head">'
-              +   '<span class="wt-pdot" style="width:9px;height:9px;flex:0 0 9px;background:' + col.dot + '"></span>'
-              +   col.label
-              +   '<span class="wt-count">' + items.length + '</span>'
-              + '</div>'
-              + '<div class="wt-col-body">'
-              +   items.map(_card).join('')
-              + '</div>';
-            host.appendChild(div);
-        });
-
-        // 绑定拖动
-        host.querySelectorAll('.wt-card').forEach(function(c) {
-            c.addEventListener('dragstart', function() {
-                _dragId = +c.dataset.id;
-                c.classList.add('dragging');
-                c.classList.add('wt-dragging');   // T-103 B.4:物理感共用类
-            });
-            c.addEventListener('dragend', function() {
-                c.classList.remove('dragging');
-                c.classList.remove('wt-dragging');
-            });
-        });
-        host.querySelectorAll('.wt-col').forEach(function(col) {
-            var body = col.querySelector('.wt-col-body');
-            col.addEventListener('dragover', function(e) {
-                e.preventDefault();
-                body.classList.add('drop-hover');
-            });
-            col.addEventListener('dragleave', function() {
-                body.classList.remove('drop-hover');
-            });
-            col.addEventListener('drop', function(e) {
-                e.preventDefault();
-                body.classList.remove('drop-hover');
-                if (_dragId == null) return;
-                var newStatus = col.dataset.col;
+        WorkGridEngine.renderBoard({
+            host: host,
+            columns: STATUS,
+            rows: rows,
+            dragState: _drag,
+            skipColumn: function(col) {
+                // T-113:看板砍'已完成'列,只保留 3 列(待办 / 进行中 / 阻塞)
+                //   完成路径走单元格 ☐ → progress dialog → 100% → 二次确认 → 彩纸(保护 B.3 完成确认链)
+                //   不允许通过拖动改 status=done 绕过确认链
+                return col.key === 'done';
+            },
+            rowsForColumn: function(list, col) {
+                return list.filter(function(t) { return t.status === col.key; });
+            },
+            columnHeaderHtml: function(col, items) {
+                return '<div class="wt-col-head">'
+                  +   '<span class="wt-pdot" style="width:9px;height:9px;flex:0 0 9px;background:' + col.dot + '"></span>'
+                  +   col.label
+                  +   '<span class="wt-count">' + items.length + '</span>'
+                  + '</div>';
+            },
+            cardHtml: _card,
+            onDrop: function(id, newStatus) {
                 var patch = { status: newStatus };
                 if (newStatus === 'done') patch.progress = 100;
-                Work.updateRow(_dragId, patch);
-                _dragId = null;
-            });
+                Work.updateRow(id, patch);
+            },
         });
     }
 

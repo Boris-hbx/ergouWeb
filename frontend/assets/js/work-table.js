@@ -381,22 +381,11 @@ var WorkTable = (function() {
             return;
         }
 
-        // 计算表格总宽
-        var sumW = SERIAL_W;
-        for (var i = 0; i < cols.length; i++) sumW += (parseInt(cols[i].width, 10) || 130);
-
-        // colgroup
-        var colgroup = '<colgroup><col style="width:' + SERIAL_W + 'px">'
-            + cols.map(function(c) {
-                var w = (c.width || 130);
-                return '<col style="width:' + w + 'px">';
-            }).join('')
-            + '</colgroup>';
-
         // thead — 表头不可点(原则 3);只在两列之间出拖动条;最右列右侧不放拖动条
         // T-132:可筛列加漏斗图标(独立小热区,不占文字/拖宽条);该列有筛选生效时高亮
-        var thead = '<thead><tr><th class="wt-num-th">#</th>'
-            + cols.map(function(c, i) {
+        function headerHtml(headerCols) {
+            return '<thead><tr><th class="wt-num-th">#</th>'
+            + headerCols.map(function(c, i) {
                 var rz = (i < cols.length - 1)
                     ? '<span class="wt-resizer" title="拖动调整左右两列的列宽" onmousedown="WorkTable._resizeStart(event,' + i + ')"></span>'
                     : '';
@@ -409,33 +398,40 @@ var WorkTable = (function() {
                 return '<th>' + _esc(c.name) + funnel + rz + '</th>';
             }).join('')
             + '</tr></thead>';
+        }
 
-        var span = cols.length + 1;
         var group = _groupValue();
-        var n = 0, body = '';
-        function block(list) { return list.map(function(t) { n++; return _rowHTML(t, n, withStagger); }).join(''); }
-
-        if (!group) {
-            body = block(rows);
-        } else {
-            var keys = [];
-            rows.forEach(function(t) {
+        function groupRows(list) {
+            if (!group) return null;
+            var keys = [], groups = [];
+            list.forEach(function(t) {
                 var kv = t[group] || '';
                 if (keys.indexOf(kv) < 0) keys.push(kv);
             });
             keys.forEach(function(k) {
                 var label = (group === 'status') ? _statusBy(k).label : (k || '(空)');
-                var items = rows.filter(function(t) { return (t[group] || '') === k; });
-                body += '<tr class="wt-group-row"><td colspan="' + span + '">' + _esc(label) + ' · ' + items.length + '</td></tr>';
-                body += block(items);
+                groups.push({
+                    label: label,
+                    items: list.filter(function(t) { return (t[group] || '') === k; }),
+                });
             });
+            return groups;
         }
-        // 加行按钮:仅底部(首行不放,避免误点)
-        body += '<tr class="wt-add-row" onclick="WorkTable.addRow()"><td colspan="' + span + '">+ 新建任务</td></tr>';
 
-        host.innerHTML = '<div class="wt-table-scroll">'
-            + '<table class="wt-table" style="width:' + sumW + 'px">'
-            + colgroup + thead + '<tbody>' + body + '</tbody></table></div>';
+        WorkGridEngine.renderTable({
+            host: host,
+            columns: cols,
+            rows: rows,
+            serialWidth: SERIAL_W,
+            defaultWidth: 130,
+            headerHtml: headerHtml,
+            rowHtml: function(t, num) { return _rowHTML(t, num, withStagger); },
+            groupRows: group ? groupRows : null,
+            addRowHtml: function(span) {
+                // 加行按钮:仅底部(首行不放,避免误点)
+                return '<tr class="wt-add-row" onclick="WorkTable.addRow()"><td colspan="' + span + '">+ 新建任务</td></tr>';
+            },
+        });
     }
 
     // ============ 单元格编辑函数(T-095:全部走居中 modal,禁用原生 prompt)============
