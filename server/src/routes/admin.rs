@@ -2122,3 +2122,350 @@ mod migrate_tests {
         assert_eq!(status, "ready", "无 report → ready");
     }
 }
+
+// ===== Behavior Analytics (T-218 / SPEC analytics) =====
+//
+// Admin-only aggregation over `behavior_events`. Every endpoint supports an
+// optional `user_id` filter (= owner / a user / everyone) and a `from`/`to`
+// RFC3339 time range (default: last 7 days). `user_id` is the analysis key here,
+// NOT a trust boundary — these handlers are guarded by `AdminUserId`.
+
+type AnalyticsParams = std::collections::HashMap<String, String>;
+
+/// Parse `(from, to, user_id)`; defaults to the last 7 days, empty user_id = all.
+fn analytics_range(params: &AnalyticsParams) -> (String, String, String) {
+    let to = params
+        .get("to")
+        .cloned()
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| chrono::Utc::now().to_rfc3339());
+    let from = params
+        .get("from")
+        .cloned()
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| (chrono::Utc::now() - chrono::Duration::days(7)).to_rfc3339());
+    let user_id = params.get("user_id").cloned().unwrap_or_default();
+    (from, to, user_id)
+}
+
+fn analytics_db_error(ctx: &str, e: rusqlite::Error) -> (StatusCode, Json<serde_json::Value>) {
+    tracing::warn!("[admin] analytics {} error: {}", ctx, e);
+    (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(json!({ "success": false, "error": "内部错误" })),
+    )
+}
+
+/// GET /api/admin/analytics/overview — totals + hour/day distribution.
+pub async fn analytics_overview(
+    State(state): State<AppState>,
+    admin: AdminUserId,
+    axum::extract::Query(params): axum::extract::Query<AnalyticsParams>,
+) -> impl IntoResponse {
+    let _ = admin;
+    let (from, to, user_id) = analytics_range(&params);
+    let db = state.db.lock();
+
+    let (total_events, active_users, sessions): (i64, i64, i64) = match db.query_row(
+        "SELECT COUNT(*), COUNT(DISTINCT user_id), COUNT(DISTINCT session_id)
+         FROM behavior_events
+         WHERE created_at >= ?1 AND created_at <= ?2 AND (?3 = '' OR user_id = ?3)",
+        rusqlite::params![from, to, user_id],
+        |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+    ) {
+        Ok(t) => t,
+        Err(e) => return analytics_db_error("overview counts", e),
+    };
+
+    // Hour-of-day distribution from client_ts (user local clock), 24 buckets.
+    let mut by_hour = vec![0i64; 24];
+    if let Ok(mut stmt) = db.prepare(
+        "SELECT CAST(substr(client_ts, 12, 2) AS INTEGER) AS hr, COUNT(*)
+         FROM behavior_events
+         WHERE created_at >= ?1 AND created_at <= ?2 AND (?3 = '' OR user_id = ?3)
+         GROUP BY hr",
+    ) {
+        let rows = stmt
+            .query_map(rusqlite::params![from, to, user_id], |r| {
+                Ok((r.get::<_, i64>(0)?, r.get::<_, i64>(1)?))
+            })
+            .map(|rows| rows.filter_map(|x| x.ok()).collect::<Vec<_>>())
+            .unwrap_or_default();
+        for (hr, c) in rows {
+            if (0..24).contains(&hr) {
+                by_hour[hr as usize] = c;
+            }
+        }
+    }
+
+    // Day distribution from client_ts date.
+    let by_day: Vec<serde_json::Value> = db
+        .prepare(
+            "SELECT substr(client_ts, 1, 10) AS day, COUNT(*)
+             FROM behavior_events
+             WHERE created_at >= ?1 AND created_at <= ?2 AND (?3 = '' OR user_id = ?3)
+             GROUP BY day ORDER BY day ASC",
+        )
+        .and_then(|mut stmt| {
+            stmt.query_map(rusqlite::params![from, to, user_id], |r| {
+                Ok(json!({ "day": r.get::<_, String>(0)?, "count": r.get::<_, i64>(1)? }))
+            })
+            .map(|rows| rows.filter_map(|x| x.ok()).collect())
+        })
+        .unwrap_or_default();
+
+    let events_per_user = if active_users > 0 {
+        (total_events as f64 / active_users as f64 * 100.0).round() / 100.0
+    } else {
+        0.0
+    };
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "success": true,
+            "total_events": total_events,
+            "active_users": active_users,
+            "sessions": sessions,
+            "events_per_user": events_per_user,
+            "by_hour": by_hour,
+            "by_day": by_day,
+        })),
+    )
+}
+
+/// GET /api/admin/analytics/top-targets — most-clicked elements.
+pub async fn analytics_top_targets(
+    State(state): State<AppState>,
+    admin: AdminUserId,
+    axum::extract::Query(params): axum::extract::Query<AnalyticsParams>,
+) -> impl IntoResponse {
+    let _ = admin;
+    let (from, to, user_id) = analytics_range(&params);
+    let limit: i64 = params
+        .get("limit")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(20)
+        .clamp(1, 200);
+    let db = state.db.lock();
+
+    let items: Vec<serde_json::Value> = match db.prepare(&format!(
+        "SELECT target_id, MAX(target_label) AS label, COUNT(*) AS clicks
+         FROM behavior_events
+         WHERE event_type = 'click' AND target_id IS NOT NULL AND target_id != ''
+           AND created_at >= ?1 AND created_at <= ?2 AND (?3 = '' OR user_id = ?3)
+         GROUP BY target_id ORDER BY clicks DESC LIMIT {limit}"
+    )) {
+        Ok(mut stmt) => stmt
+            .query_map(rusqlite::params![from, to, user_id], |r| {
+                Ok(json!({
+                    "target_id": r.get::<_, String>(0)?,
+                    "target_label": r.get::<_, Option<String>>(1)?,
+                    "clicks": r.get::<_, i64>(2)?,
+                }))
+            })
+            .map(|rows| rows.filter_map(|x| x.ok()).collect())
+            .unwrap_or_default(),
+        Err(e) => return analytics_db_error("top_targets", e),
+    };
+
+    (
+        StatusCode::OK,
+        Json(json!({ "success": true, "items": items })),
+    )
+}
+
+/// GET /api/admin/analytics/feature-usage — pageviews + dwell per route.
+pub async fn analytics_feature_usage(
+    State(state): State<AppState>,
+    admin: AdminUserId,
+    axum::extract::Query(params): axum::extract::Query<AnalyticsParams>,
+) -> impl IntoResponse {
+    let _ = admin;
+    let (from, to, user_id) = analytics_range(&params);
+    let db = state.db.lock();
+
+    let items: Vec<serde_json::Value> = match db.prepare(
+        "SELECT route,
+                SUM(CASE WHEN event_type = 'pageview' THEN 1 ELSE 0 END) AS pageviews,
+                COALESCE(SUM(CASE WHEN event_type = 'dwell' THEN dwell_ms ELSE 0 END), 0) AS total_dwell,
+                SUM(CASE WHEN event_type = 'dwell' AND dwell_ms IS NOT NULL THEN 1 ELSE 0 END) AS dwell_samples
+         FROM behavior_events
+         WHERE route IS NOT NULL AND route != ''
+           AND created_at >= ?1 AND created_at <= ?2 AND (?3 = '' OR user_id = ?3)
+         GROUP BY route ORDER BY pageviews DESC, total_dwell DESC",
+    ) {
+        Ok(mut stmt) => stmt
+            .query_map(rusqlite::params![from, to, user_id], |r| {
+                let total_dwell: i64 = r.get(2)?;
+                let samples: i64 = r.get(3)?;
+                let avg = if samples > 0 { total_dwell / samples } else { 0 };
+                Ok(json!({
+                    "route": r.get::<_, String>(0)?,
+                    "pageviews": r.get::<_, i64>(1)?,
+                    "total_dwell_ms": total_dwell,
+                    "avg_dwell_ms": avg,
+                }))
+            })
+            .map(|rows| rows.filter_map(|x| x.ok()).collect())
+            .unwrap_or_default(),
+        Err(e) => return analytics_db_error("feature_usage", e),
+    };
+
+    (
+        StatusCode::OK,
+        Json(json!({ "success": true, "items": items })),
+    )
+}
+
+/// GET /api/admin/analytics/dwell — avg/median dwell per route (median in Rust).
+pub async fn analytics_dwell(
+    State(state): State<AppState>,
+    admin: AdminUserId,
+    axum::extract::Query(params): axum::extract::Query<AnalyticsParams>,
+) -> impl IntoResponse {
+    let _ = admin;
+    let (from, to, user_id) = analytics_range(&params);
+    let db = state.db.lock();
+
+    let rows: Vec<(String, i64)> = match db.prepare(
+        "SELECT route, dwell_ms
+         FROM behavior_events
+         WHERE event_type = 'dwell' AND dwell_ms IS NOT NULL AND route IS NOT NULL AND route != ''
+           AND created_at >= ?1 AND created_at <= ?2 AND (?3 = '' OR user_id = ?3)",
+    ) {
+        Ok(mut stmt) => stmt
+            .query_map(rusqlite::params![from, to, user_id], |r| {
+                Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?))
+            })
+            .map(|rows| rows.filter_map(|x| x.ok()).collect())
+            .unwrap_or_default(),
+        Err(e) => return analytics_db_error("dwell", e),
+    };
+
+    let mut by_route: std::collections::HashMap<String, Vec<i64>> =
+        std::collections::HashMap::new();
+    for (route, ms) in rows {
+        by_route.entry(route).or_default().push(ms);
+    }
+    let mut items: Vec<serde_json::Value> = by_route
+        .into_iter()
+        .map(|(route, mut samples)| {
+            samples.sort_unstable();
+            let n = samples.len();
+            let sum: i64 = samples.iter().sum();
+            let avg = if n > 0 { sum / n as i64 } else { 0 };
+            let median = if n == 0 {
+                0
+            } else if n % 2 == 1 {
+                samples[n / 2]
+            } else {
+                (samples[n / 2 - 1] + samples[n / 2]) / 2
+            };
+            json!({
+                "route": route,
+                "avg_dwell_ms": avg,
+                "median_dwell_ms": median,
+                "samples": n as i64,
+            })
+        })
+        .collect();
+    items.sort_by(|a, b| b["samples"].as_i64().cmp(&a["samples"].as_i64()));
+
+    (
+        StatusCode::OK,
+        Json(json!({ "success": true, "items": items })),
+    )
+}
+
+/// GET /api/admin/analytics/trail — event timeline for a session (or a user's recent events).
+pub async fn analytics_trail(
+    State(state): State<AppState>,
+    admin: AdminUserId,
+    axum::extract::Query(params): axum::extract::Query<AnalyticsParams>,
+) -> impl IntoResponse {
+    let _ = admin;
+    let db = state.db.lock();
+    let session_id = params.get("session_id").cloned().unwrap_or_default();
+    let user_id = params.get("user_id").cloned().unwrap_or_default();
+    if session_id.is_empty() && user_id.is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "success": false, "error": "需要 session_id 或 user_id" })),
+        );
+    }
+    let limit: i64 = params
+        .get("limit")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(200)
+        .clamp(1, 1000);
+
+    let sql = format!(
+        "SELECT event_type, target_id, target_label, route, dwell_ms, client_ts, session_id
+         FROM behavior_events
+         WHERE (?1 = '' OR session_id = ?1) AND (?2 = '' OR user_id = ?2)
+         ORDER BY client_ts ASC LIMIT {limit}"
+    );
+    let items: Vec<serde_json::Value> = match db.prepare(&sql) {
+        Ok(mut stmt) => stmt
+            .query_map(rusqlite::params![session_id, user_id], |r| {
+                Ok(json!({
+                    "event_type": r.get::<_, String>(0)?,
+                    "target_id": r.get::<_, Option<String>>(1)?,
+                    "target_label": r.get::<_, Option<String>>(2)?,
+                    "route": r.get::<_, Option<String>>(3)?,
+                    "dwell_ms": r.get::<_, Option<i64>>(4)?,
+                    "client_ts": r.get::<_, String>(5)?,
+                    "session_id": r.get::<_, String>(6)?,
+                }))
+            })
+            .map(|rows| rows.filter_map(|x| x.ok()).collect())
+            .unwrap_or_default(),
+        Err(e) => return analytics_db_error("trail", e),
+    };
+
+    (
+        StatusCode::OK,
+        Json(json!({ "success": true, "items": items })),
+    )
+}
+
+/// GET /api/admin/analytics/users — per-user activity cohort.
+pub async fn analytics_users(
+    State(state): State<AppState>,
+    admin: AdminUserId,
+    axum::extract::Query(params): axum::extract::Query<AnalyticsParams>,
+) -> impl IntoResponse {
+    let _ = admin;
+    let (from, to, _user_id) = analytics_range(&params);
+    let db = state.db.lock();
+
+    let items: Vec<serde_json::Value> = match db.prepare(
+        "SELECT b.user_id, COALESCE(u.display_name, u.username) AS name, COALESCE(u.role, 'user') AS role,
+                COUNT(*) AS events, COUNT(DISTINCT b.session_id) AS sessions, MAX(b.created_at) AS last_active
+         FROM behavior_events b
+         JOIN users u ON u.id = b.user_id
+         WHERE b.created_at >= ?1 AND b.created_at <= ?2
+         GROUP BY b.user_id ORDER BY events DESC",
+    ) {
+        Ok(mut stmt) => stmt
+            .query_map(rusqlite::params![from, to], |r| {
+                Ok(json!({
+                    "user_id": r.get::<_, String>(0)?,
+                    "display_name": r.get::<_, String>(1)?,
+                    "role": r.get::<_, String>(2)?,
+                    "events": r.get::<_, i64>(3)?,
+                    "sessions": r.get::<_, i64>(4)?,
+                    "last_active": r.get::<_, String>(5)?,
+                }))
+            })
+            .map(|rows| rows.filter_map(|x| x.ok()).collect())
+            .unwrap_or_default(),
+        Err(e) => return analytics_db_error("users", e),
+    };
+
+    (
+        StatusCode::OK,
+        Json(json!({ "success": true, "items": items })),
+    )
+}
