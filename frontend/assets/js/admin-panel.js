@@ -24,6 +24,17 @@ var AdminPanel = (function() {
         if (bytes >= 1024) return (bytes / 1024).toFixed(1) + ' KB';
         return bytes + ' B';
     }
+    function fmtDuration(ms) {
+        ms = Number(ms || 0);
+        if (ms <= 0) return '0s';
+        var sec = Math.round(ms / 1000);
+        if (sec < 60) return sec + 's';
+        var min = Math.floor(sec / 60);
+        var rest = sec % 60;
+        if (min < 60) return min + 'm ' + rest + 's';
+        var hour = Math.floor(min / 60);
+        return hour + 'h ' + (min % 60) + 'm';
+    }
     function shortDate(s) { return s ? s.substring(0, 10) : '-'; }
     function shortDateTime(s) { return s ? s.substring(0, 16).replace('T', ' ') : '-'; }
     function fmtUptime(secs) {
@@ -95,6 +106,7 @@ var AdminPanel = (function() {
             case 'chats': Chats.load(); break;
             case 'ai': AI.load(); break;
             case 'risk': Risk.load(); break;
+            case 'analytics': Analytics.load(); break;
             case 'system': System.load(); break;
             case 'audit': Audit.load(); break;
             case 'people': People.load(); break;
@@ -779,6 +791,294 @@ var AdminPanel = (function() {
             var nextBtn = document.getElementById('admin-risk-next');
             if (prevBtn) prevBtn.addEventListener('click', function() { self._offset -= self._limit; self.fetchList(); });
             if (nextBtn) nextBtn.addEventListener('click', function() { self._offset += self._limit; self.fetchList(); });
+        }
+    };
+
+    // ═══════════════════════════════════════════
+    // ANALYTICS Section (Behavior Analytics)
+    // ═══════════════════════════════════════════
+    var Analytics = {
+        _range: '7d',
+        _userId: '',
+        _customFrom: '',
+        _customTo: '',
+        _users: [],
+        _charts: {},
+
+        load: async function() {
+            var el = document.getElementById('admin-analytics-content');
+            if (!el) return;
+            if (!document.getElementById('admin-analytics-shell')) {
+                this.renderShell(el);
+            }
+            await this.fetchAll();
+        },
+
+        renderShell: function(el) {
+            el.innerHTML = '<div class="admin-analytics" id="admin-analytics-shell">' +
+                '<div class="admin-analytics-toolbar">' +
+                '<div class="admin-filter-group">' +
+                '<label>时间</label>' +
+                '<select class="admin-filter-select" id="analytics-range">' +
+                '<option value="today">今天</option>' +
+                '<option value="7d" selected>近 7 天</option>' +
+                '<option value="30d">近 30 天</option>' +
+                '<option value="custom">自定义</option>' +
+                '</select>' +
+                '</div>' +
+                '<div class="admin-filter-group analytics-custom-range" id="analytics-custom-range" style="display:none;">' +
+                '<input class="admin-filter-input" type="date" id="analytics-from">' +
+                '<span>至</span>' +
+                '<input class="admin-filter-input" type="date" id="analytics-to">' +
+                '</div>' +
+                '<div class="admin-filter-group">' +
+                '<label>用户</label>' +
+                '<select class="admin-filter-select" id="analytics-user"><option value="">全部用户</option></select>' +
+                '</div>' +
+                '<button class="admin-refresh-btn" id="analytics-refresh">刷新</button>' +
+                '</div>' +
+                '<div id="analytics-status"></div>' +
+                '<div id="analytics-body"></div>' +
+                '</div>';
+            var self = this;
+            document.getElementById('analytics-range').addEventListener('change', function() {
+                self._range = this.value;
+                document.getElementById('analytics-custom-range').style.display = self._range === 'custom' ? '' : 'none';
+                self.fetchAll();
+            });
+            document.getElementById('analytics-user').addEventListener('change', function() {
+                self._userId = this.value;
+                self.fetchAll();
+            });
+            document.getElementById('analytics-from').addEventListener('change', function() {
+                self._customFrom = this.value;
+                if (self._range === 'custom') self.fetchAll();
+            });
+            document.getElementById('analytics-to').addEventListener('change', function() {
+                self._customTo = this.value;
+                if (self._range === 'custom') self.fetchAll();
+            });
+            document.getElementById('analytics-refresh').addEventListener('click', function() {
+                self.fetchAll();
+            });
+        },
+
+        params: function(includeUser) {
+            var p = [];
+            var now = new Date();
+            var from = null;
+            var to = new Date(now.getTime());
+            if (this._range === 'today') {
+                from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            } else if (this._range === '30d') {
+                from = new Date(now.getTime() - 29 * 86400000);
+            } else if (this._range === 'custom') {
+                if (this._customFrom) from = new Date(this._customFrom + 'T00:00:00');
+                if (this._customTo) to = new Date(this._customTo + 'T23:59:59');
+            } else {
+                from = new Date(now.getTime() - 6 * 86400000);
+            }
+            if (from) p.push('from=' + encodeURIComponent(from.toISOString()));
+            if (to) p.push('to=' + encodeURIComponent(to.toISOString()));
+            if (includeUser && this._userId) p.push('user_id=' + encodeURIComponent(this._userId));
+            return p.length ? '?' + p.join('&') : '';
+        },
+
+        fetchAll: async function() {
+            var status = document.getElementById('analytics-status');
+            var body = document.getElementById('analytics-body');
+            if (!status || !body) return;
+            status.innerHTML = '<div class="admin-loading-text">加载行为数据中...</div>';
+            try {
+                var qs = this.params(true);
+                var results = await Promise.all([
+                    API.adminRequest('GET', '/admin/analytics/overview' + qs),
+                    API.adminRequest('GET', '/admin/analytics/top-targets' + qs + (qs ? '&' : '?') + 'limit=12'),
+                    API.adminRequest('GET', '/admin/analytics/feature-usage' + qs),
+                    API.adminRequest('GET', '/admin/analytics/dwell' + qs),
+                    API.adminRequest('GET', '/admin/analytics/users' + this.params(false))
+                ]);
+                for (var i = 0; i < results.length; i++) {
+                    if (!results[i].success) throw new Error(results[i].error || 'analytics api failed');
+                }
+                this._users = results[4].items || [];
+                this.renderUserOptions();
+                this.render(body, {
+                    overview: results[0],
+                    topTargets: results[1].items || [],
+                    featureUsage: results[2].items || [],
+                    dwell: results[3].items || [],
+                    users: this._users
+                });
+                status.innerHTML = '';
+                await this.loadTrail();
+            } catch(e) {
+                console.error('[admin-analytics]', e);
+                status.innerHTML = '<div class="admin-empty">加载失败，请重试</div>';
+                body.innerHTML = '';
+            }
+        },
+
+        renderUserOptions: function() {
+            var select = document.getElementById('analytics-user');
+            if (!select) return;
+            var current = this._userId;
+            var html = '<option value="">全部用户</option>';
+            for (var i = 0; i < this._users.length; i++) {
+                var u = this._users[i];
+                html += '<option value="' + esc(u.user_id) + '">' + esc(u.display_name || u.user_id) + '</option>';
+            }
+            select.innerHTML = html;
+            select.value = current;
+        },
+
+        render: function(el, data) {
+            this.destroyCharts();
+            var overview = data.overview || {};
+            var html = '<div class="admin-cards-grid analytics-kpis">';
+            html += this.kpi(overview.active_users, '活跃用户');
+            html += this.kpi(overview.sessions, '会话数');
+            html += this.kpi(overview.total_events, '总事件');
+            html += this.kpi(overview.events_per_user, '人均事件');
+            html += '</div>';
+
+            html += '<div class="analytics-grid">' +
+                '<div class="analytics-panel analytics-wide"><div class="analytics-panel-title">时段活跃</div><div class="analytics-chart-wrap"><canvas id="analytics-hour-chart"></canvas></div></div>' +
+                '<div class="analytics-panel"><div class="analytics-panel-title">按钮点击排行</div><div id="analytics-top-targets"></div></div>' +
+                '<div class="analytics-panel analytics-wide"><div class="analytics-panel-title">功能使用与停留</div><div id="analytics-feature-usage"></div></div>' +
+                '<div class="analytics-panel"><div class="analytics-panel-title">停留排行</div><div id="analytics-dwell"></div></div>' +
+                '<div class="analytics-panel analytics-wide"><div class="analytics-panel-title">行为轨迹</div><div id="analytics-trail"></div></div>' +
+                '<div class="analytics-panel analytics-wide"><div class="analytics-panel-title">用户分群</div><div id="analytics-users"></div></div>' +
+                '</div>';
+            el.innerHTML = html;
+            this.renderHourChart(overview.by_hour || []);
+            this.renderTopTargets(document.getElementById('analytics-top-targets'), data.topTargets);
+            this.renderFeatureUsage(document.getElementById('analytics-feature-usage'), data.featureUsage);
+            this.renderDwell(document.getElementById('analytics-dwell'), data.dwell);
+            this.renderUsers(document.getElementById('analytics-users'), data.users);
+        },
+
+        kpi: function(value, label) {
+            return '<div class="admin-summary-card analytics-kpi"><div class="card-value">' + fmt(value || 0) + '</div><div class="card-label">' + esc(label) + '</div></div>';
+        },
+
+        renderHourChart: function(byHour) {
+            var canvas = document.getElementById('analytics-hour-chart');
+            if (!canvas) return;
+            var labels = [];
+            var values = [];
+            for (var i = 0; i < 24; i++) {
+                labels.push((i < 10 ? '0' : '') + i + ':00');
+                values.push(Number(byHour[i] || 0));
+            }
+            if (typeof Chart === 'undefined') {
+                canvas.parentElement.innerHTML = '<div class="admin-empty">Chart.js 未加载</div>';
+                return;
+            }
+            this._charts.hour = new Chart(canvas, {
+                type: 'bar',
+                data: { labels: labels, datasets: [{ label: '事件数', data: values, backgroundColor: '#4f8cff' }] },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+                }
+            });
+        },
+
+        renderTopTargets: function(el, items) {
+            if (!el) return;
+            if (!items.length) { el.innerHTML = '<div class="admin-empty">暂无点击数据</div>'; return; }
+            var max = Math.max.apply(null, items.map(function(x) { return x.clicks || 0; })) || 1;
+            var html = '<div class="analytics-bars">';
+            items.forEach(function(item) {
+                var pct = Math.max(4, Math.round((item.clicks || 0) / max * 100));
+                html += '<div class="analytics-bar-row">' +
+                    '<div class="analytics-bar-meta"><strong>' + esc(item.target_label || item.target_id) + '</strong><span>' + esc(item.target_id) + '</span></div>' +
+                    '<div class="analytics-bar-track"><div style="width:' + pct + '%"></div></div>' +
+                    '<div class="analytics-bar-value">' + fmt(item.clicks) + '</div>' +
+                    '</div>';
+            });
+            el.innerHTML = html + '</div>';
+        },
+
+        renderFeatureUsage: function(el, items) {
+            if (!el) return;
+            if (!items.length) { el.innerHTML = '<div class="admin-empty">暂无功能使用数据</div>'; return; }
+            var html = '<table class="admin-panel-table"><thead><tr><th>功能页</th><th>访问</th><th>总停留</th><th>平均停留</th></tr></thead><tbody>';
+            items.slice(0, 16).forEach(function(item) {
+                html += '<tr><td><code>' + esc(item.route) + '</code></td><td>' + fmt(item.pageviews) + '</td><td>' + fmtDuration(item.total_dwell_ms) + '</td><td>' + fmtDuration(item.avg_dwell_ms) + '</td></tr>';
+            });
+            el.innerHTML = html + '</tbody></table>';
+        },
+
+        renderDwell: function(el, items) {
+            if (!el) return;
+            if (!items.length) { el.innerHTML = '<div class="admin-empty">暂无停留数据</div>'; return; }
+            var html = '<table class="admin-panel-table"><thead><tr><th>功能页</th><th>中位</th><th>均值</th><th>样本</th></tr></thead><tbody>';
+            items.slice(0, 12).forEach(function(item) {
+                html += '<tr><td><code>' + esc(item.route) + '</code></td><td>' + fmtDuration(item.median_dwell_ms) + '</td><td>' + fmtDuration(item.avg_dwell_ms) + '</td><td>' + fmt(item.samples) + '</td></tr>';
+            });
+            el.innerHTML = html + '</tbody></table>';
+        },
+
+        renderUsers: function(el, users) {
+            if (!el) return;
+            if (!users.length) { el.innerHTML = '<div class="admin-empty">暂无用户行为数据</div>'; return; }
+            var html = '<table class="admin-panel-table"><thead><tr><th>用户</th><th>角色</th><th>事件</th><th>会话</th><th>最近活跃</th><th>操作</th></tr></thead><tbody>';
+            users.forEach(function(u) {
+                html += '<tr><td>' + esc(u.display_name || u.user_id) + '</td><td>' + roleBadge(u.role || 'user') + '</td><td>' + fmt(u.events) + '</td><td>' + fmt(u.sessions) + '</td><td>' + shortDateTime(u.last_active) + '</td>' +
+                    '<td><button class="admin-btn admin-btn-secondary" data-analytics-user="' + esc(u.user_id) + '">钻取</button></td></tr>';
+            });
+            el.innerHTML = html + '</tbody></table>';
+            var self = this;
+            el.querySelectorAll('[data-analytics-user]').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    self._userId = btn.dataset.analyticsUser;
+                    var sel = document.getElementById('analytics-user');
+                    if (sel) sel.value = self._userId;
+                    self.fetchAll();
+                });
+            });
+        },
+
+        loadTrail: async function() {
+            var el = document.getElementById('analytics-trail');
+            if (!el) return;
+            var targetUser = this._userId || (this._users[0] && this._users[0].user_id);
+            if (!targetUser) { el.innerHTML = '<div class="admin-empty">暂无行为轨迹</div>'; return; }
+            el.innerHTML = '<div class="admin-loading-text">加载轨迹中...</div>';
+            try {
+                var data = await API.adminRequest('GET', '/admin/analytics/trail?user_id=' + encodeURIComponent(targetUser) + '&limit=80');
+                if (!data.success) { el.innerHTML = '<div class="admin-empty">加载失败，请重试</div>'; return; }
+                this.renderTrail(el, data.items || []);
+            } catch(e) {
+                console.error('[admin-analytics-trail]', e);
+                el.innerHTML = '<div class="admin-empty">加载失败，请重试</div>';
+            }
+        },
+
+        renderTrail: function(el, items) {
+            if (!items.length) { el.innerHTML = '<div class="admin-empty">暂无行为轨迹</div>'; return; }
+            var html = '<div class="analytics-trail">';
+            items.forEach(function(item) {
+                var main = item.target_label || item.target_id || item.route || item.event_type;
+                html += '<div class="analytics-trail-item">' +
+                    '<div class="analytics-trail-time">' + shortDateTime(item.client_ts) + '</div>' +
+                    '<div class="analytics-trail-dot"></div>' +
+                    '<div class="analytics-trail-main"><strong>' + esc(item.event_type) + '</strong> ' + esc(main || '-') +
+                    '<div>' + esc(item.route || '-') + (item.dwell_ms ? ' · ' + fmtDuration(item.dwell_ms) : '') + '</div></div>' +
+                    '</div>';
+            });
+            el.innerHTML = html + '</div>';
+        },
+
+        destroyCharts: function() {
+            for (var key in this._charts) {
+                if (this._charts[key] && this._charts[key].destroy) this._charts[key].destroy();
+            }
+            this._charts = {};
         }
     };
 
