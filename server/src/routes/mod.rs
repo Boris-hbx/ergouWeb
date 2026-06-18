@@ -19,6 +19,8 @@ pub mod routines;
 pub mod soul_state;
 pub mod todos;
 pub mod trips;
+pub mod stakeholder_columns;
+pub mod stakeholders;
 pub mod work_columns;
 pub mod work_tasks;
 // T-105 SPEC insight
