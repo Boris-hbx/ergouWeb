@@ -852,6 +852,24 @@ fn create_tables(conn: &Connection) {
         );
         CREATE INDEX IF NOT EXISTS idx_client_errors_created ON client_errors(created_at);
 
+        -- Behavior analytics events (T-218 / SPEC analytics) — append-only, one row per event
+        CREATE TABLE IF NOT EXISTS behavior_events (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL REFERENCES users(id),
+            session_id TEXT NOT NULL,
+            event_type TEXT NOT NULL,
+            target_id TEXT,
+            target_label TEXT,
+            route TEXT,
+            dwell_ms INTEGER,
+            meta TEXT,
+            client_ts TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_be_user_time ON behavior_events(user_id, created_at);
+        CREATE INDEX IF NOT EXISTS idx_be_type ON behavior_events(event_type, created_at);
+        CREATE INDEX IF NOT EXISTS idx_be_session ON behavior_events(session_id);
+
         -- Ergou people (二狗认识的人)
         CREATE TABLE IF NOT EXISTS ergou_people (
             id TEXT PRIMARY KEY,
