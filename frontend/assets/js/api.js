@@ -624,6 +624,37 @@ var API = (function() {
         workAddColumn:    async function(data)     { return await request('POST',   '/work/columns', data); },
         workDeleteColumn: async function(key)      { return await request('DELETE', '/work/columns/' + encodeURIComponent(key)); },
 
+        // ===== Stakeholders (T-223 frontend / T-221 backend) =====
+        stakeholderList: async function(params) {
+            params = params || {};
+            var q = [];
+            if (params.q) q.push('q=' + encodeURIComponent(params.q));
+            if (params.team) q.push('team=' + encodeURIComponent(params.team));
+            if (params.region) q.push('region=' + encodeURIComponent(params.region));
+            return await request('GET', '/work/stakeholders' + (q.length ? '?' + q.join('&') : ''));
+        },
+        stakeholderCreate: async function(data) {
+            return await request('POST', '/work/stakeholders', data);
+        },
+        stakeholderUpdate: async function(id, patch) {
+            return await request('PATCH', '/work/stakeholders/' + encodeURIComponent(id), patch);
+        },
+        stakeholderDelete: async function(id) {
+            return await request('DELETE', '/work/stakeholders/' + encodeURIComponent(id));
+        },
+        stakeholderListColumns: async function() {
+            return await request('GET', '/work/stakeholder-columns');
+        },
+        stakeholderSaveColumns: async function(patches) {
+            return await request('PUT', '/work/stakeholder-columns', { columns: patches });
+        },
+        stakeholderAddColumn: async function(data) {
+            return await request('POST', '/work/stakeholder-columns', data);
+        },
+        stakeholderDeleteColumn: async function(key) {
+            return await request('DELETE', '/work/stakeholder-columns/' + encodeURIComponent(key));
+        },
+
         // ===== Insight Tasks v0.3 (T-122 后端 / T-123 前端) =====
         // 单层 insight_task。claim / create-report 由 Claude Code 调,前端不用。
         // v0.2 的 insight/source/annotation/publish API 已废弃(后端保留只读 30 天)。
