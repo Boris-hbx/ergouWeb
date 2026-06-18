@@ -288,7 +288,11 @@ pub fn build_app(state: state::AppState) -> Router {
                 )
                 .route("/batch", post(routes::memories::batch_import))
                 .route("/search", get(routes::memories::search_memories))
-                .route("/{id}", delete(routes::memories::delete_memory)),
+                .route(
+                    "/{id}",
+                    put(routes::memories::update_memory)
+                        .delete(routes::memories::delete_memory),
+                ),
         )
         // T-218 行为分析:用户侧事件上报(必须双写 main.rs + lib.rs)
         .route("/events/batch", post(routes::events::events_batch))

@@ -661,3 +661,77 @@ pub async fn clear_memories(
         ),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::test_helpers::{auth_cookie, create_test_user, test_state};
+    use axum::body::{Body, to_bytes};
+    use axum::http::{Request, StatusCode};
+    use serde_json::{Value as JsonValue, json};
+    use tower::ServiceExt;
+
+    async fn body_json(resp: axum::response::Response) -> JsonValue {
+        let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        serde_json::from_slice(&bytes).unwrap()
+    }
+
+    #[tokio::test]
+    async fn api_memories_put_updates_memory_via_build_app() {
+        let state = test_state();
+        let (_uid, token) = create_test_user(&state, "memory_editor", "Pa55word1");
+        let cookie = auth_cookie(&token);
+        let app = crate::build_app(state);
+
+        let create_resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/memories")
+                    .header("Cookie", &cookie)
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(
+                        json!({
+                            "category": "fact",
+                            "content": "用户喜欢绿茶",
+                            "importance": 3
+                        })
+                        .to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(create_resp.status(), StatusCode::CREATED);
+        let created = body_json(create_resp).await;
+        let id = created["memory"]["id"].as_str().unwrap();
+
+        let update_resp = app
+            .oneshot(
+                Request::builder()
+                    .method("PUT")
+                    .uri(format!("/api/memories/{id}"))
+                    .header("Cookie", &cookie)
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(
+                        json!({
+                            "category": "habit",
+                            "content": "用户每天喝绿茶",
+                            "importance": 5
+                        })
+                        .to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(update_resp.status(), StatusCode::OK);
+        let updated = body_json(update_resp).await;
+        assert_eq!(updated["success"], true);
+        assert_eq!(updated["memory"]["id"], id);
+        assert_eq!(updated["memory"]["category"], "habit");
+        assert_eq!(updated["memory"]["content"], "用户每天喝绿茶");
+        assert_eq!(updated["memory"]["importance"], 5);
+    }
+}
