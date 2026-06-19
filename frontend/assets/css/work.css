@@ -114,6 +114,8 @@ body:has(.sidebar.collapsed) { --sidebar-width: 0px; }
 }
 .sh-detail-drawer {
   padding: 18px 20px;
+  background: var(--eg-surface-overlay);
+  border-left: 1px solid var(--eg-border);
 }
 .sh-detail-head {
   display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 12px;
@@ -157,23 +159,25 @@ body:has(.sidebar.collapsed) { --sidebar-width: 0px; }
   font-size: 0.72rem; color: var(--text-muted); opacity: 0.8;
 }
 .sh-detail-actions {
-  display: flex; justify-content: flex-end; margin-top: 16px; padding-top: 14px;
-  border-top: 1px solid var(--border-light);
+  display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; padding-top: 14px;
+  border-top: 1px solid var(--eg-border-subtle);
 }
 .sh-create-ov {
   display: none; position: fixed; inset: 0; z-index: 1080;
-  background: rgba(15, 23, 42, .34); align-items: center; justify-content: center;
+  background: var(--overlay-bg); align-items: center; justify-content: center;
+  backdrop-filter: blur(2px);
 }
 .sh-create-ov.open { display: flex; }
 .sh-create-box {
   width: min(720px, 94vw); max-height: 88vh; overflow: hidden;
-  background: var(--bg-card); border-radius: 12px;
-  box-shadow: 0 18px 48px rgba(15, 23, 42, .22);
+  background: var(--eg-surface-overlay); border: 1px solid var(--eg-border);
+  border-radius: var(--eg-radius-xl);
+  box-shadow: var(--eg-shadow-overlay);
   display: flex; flex-direction: column;
 }
 .sh-create-hd {
   padding: 16px 18px; font-weight: 700; color: var(--text-primary);
-  border-bottom: 1px solid var(--border-light);
+  border-bottom: 1px solid var(--eg-border-subtle);
 }
 .sh-create-bd {
   padding: 16px 18px; overflow: auto;
@@ -181,7 +185,8 @@ body:has(.sidebar.collapsed) { --sidebar-width: 0px; }
 }
 .sh-create-bar {
   display: flex; justify-content: flex-end; gap: 8px;
-  padding: 14px 18px; border-top: 1px solid var(--border-light);
+  padding: 14px 18px; border-top: 1px solid var(--eg-border-subtle);
+  background: var(--eg-surface-subtle);
 }
 
 .sh-graph-toolbar { margin-top: 0; }
@@ -793,19 +798,19 @@ table.wt-table {
 }
 .wt-modal-overlay.open { display: flex; }
 .wt-modal {
-  background: var(--bg-card); border: 1px solid var(--border-color);
-  border-radius: 18px; width: 100%; max-width: 580px;
-  box-shadow: var(--shadow-medium); padding: 24px 24px 20px;
+  background: var(--eg-surface-overlay); border: 1px solid var(--eg-border);
+  border-radius: var(--eg-radius-xl); width: 100%; max-width: 580px;
+  box-shadow: var(--eg-shadow-overlay); padding: 22px 22px 18px;
 }
 .wt-modal-title { font-size: 1.12rem; color: var(--text-primary); font-weight: 600; }
 .wt-modal-sub { font-size: 0.8rem; color: var(--text-muted); margin: 3px 0 16px; }
 .wt-modal textarea {
   width: 100%; min-height: 240px; resize: vertical; box-sizing: border-box;
-  background: var(--bg-input); color: var(--text-primary);
-  border: 1px solid var(--border-color); border-radius: 12px;
+  background: var(--eg-surface); color: var(--text-primary);
+  border: 1px solid var(--eg-border); border-radius: var(--eg-radius-lg);
   padding: 14px 16px; font-size: 0.94rem; line-height: 1.8; font-family: inherit;
 }
-.wt-modal textarea:focus { outline: none; border-color: var(--primary-color); }
+.wt-modal textarea:focus { outline: none; border-color: var(--primary-color); box-shadow: var(--eg-focus-ring); }
 .wt-modal-actions {
   display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px;
 }
@@ -943,8 +948,8 @@ table.wt-table {
 .wt-pick {
   position: absolute; z-index: 1070;
   min-width: 200px; max-width: 300px;
-  background: #fff; border: 1px solid var(--border-color);
-  border-radius: 12px; box-shadow: var(--shadow-medium);
+  background: var(--eg-surface-overlay); border: 1px solid var(--eg-border);
+  border-radius: var(--eg-radius-lg); box-shadow: var(--eg-shadow-popover);
   padding: 6px; display: none;
 }
 .wt-pick.open { display: block; }
@@ -953,15 +958,15 @@ table.wt-table {
   padding: 9px 12px; border-radius: 7px; cursor: pointer; font-size: 0.88rem;
   color: var(--text-primary); display: flex; align-items: center; gap: 10px;
 }
-.wt-pick-opt:hover { background: #F4F6F9; }
-.wt-pick-opt.selected { background: #EEE9FA; color: #5B3E9E; font-weight: 500; }
+.wt-pick-opt:hover { background: var(--eg-surface-muted); }
+.wt-pick-opt.selected { background: rgba(var(--primary-rgb), .1); color: var(--primary-color); font-weight: 500; }
 .wt-pick-check {
   color: #B0BFCE; font-size: 0.95rem; width: 16px; text-align: center; flex: 0 0 16px; line-height: 1;
 }
-.wt-pick-opt.selected .wt-pick-check { color: #5B3E9E; }
+.wt-pick-opt.selected .wt-pick-check { color: var(--primary-color); }
 .wt-pick-actions {
   display: flex; gap: 8px; justify-content: flex-end;
-  padding: 8px 4px 2px; border-top: 1px solid var(--border-light); margin-top: 6px;
+  padding: 8px 4px 2px; border-top: 1px solid var(--eg-border-subtle); margin-top: 6px;
 }
 .wt-pick-actions .wt-mbtn {
   padding: 6px 14px; font-size: 0.82rem; border-radius: 8px;
@@ -1276,20 +1281,20 @@ table.wt-table {
   position: fixed;
   top: 0; right: 0; bottom: 0;
   width: 540px;
-  background: var(--bg-card);
-  box-shadow: -8px 0 32px rgba(15, 15, 30, 0.12);
+  background: var(--eg-surface-overlay);
+  box-shadow: var(--eg-shadow-popover);
   transform: translateX(100%);
   transition: transform .28s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex; flex-direction: column;
   z-index: 1050;
-  border-left: 1px solid var(--border-color);
+  border-left: 1px solid var(--eg-border);
 }
 .wt-detail-drawer.open { transform: translateX(0); }
 
 /* —— 头部 —— */
 .wt-d-head {
   padding: 14px 18px 0;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--eg-border-subtle);
   flex-shrink: 0;
 }
 .wt-d-head-top {
@@ -1495,8 +1500,8 @@ table.wt-table {
 /* —— 底部元信息 —— */
 .wt-d-foot {
   padding: 10px 18px;
-  border-top: 1px solid var(--border-color);
-  background: var(--bg-secondary);
+  border-top: 1px solid var(--eg-border-subtle);
+  background: var(--eg-surface-subtle);
   color: var(--text-muted);
   font-size: 11.5px;
   display: flex; gap: 12px;

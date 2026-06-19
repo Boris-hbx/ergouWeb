@@ -36,6 +36,45 @@
 .eg-text-muted { color: var(--eg-text-muted); }
 .eg-text-faint { color: var(--eg-text-faint); }
 
+/* ========== Modal / Drawer / Popover Primitives (T-240) ========== */
+.eg-modal-overlay {
+    background: var(--overlay-bg, rgba(28, 27, 31, 0.4));
+    backdrop-filter: blur(2px);
+}
+
+.eg-modal {
+    background: var(--eg-surface-overlay);
+    border: 1px solid var(--eg-border);
+    border-radius: var(--eg-radius-xl);
+    box-shadow: var(--eg-shadow-overlay);
+}
+
+.eg-modal__header {
+    border-bottom: 1px solid var(--eg-border-subtle);
+}
+
+.eg-modal__body {
+    background: var(--eg-surface-overlay);
+}
+
+.eg-modal__footer {
+    border-top: 1px solid var(--eg-border-subtle);
+    background: var(--eg-surface-subtle);
+}
+
+.eg-drawer {
+    background: var(--eg-surface-overlay);
+    border-color: var(--eg-border);
+    box-shadow: var(--eg-shadow-popover);
+}
+
+.eg-popover {
+    background: var(--eg-surface-overlay);
+    border: 1px solid var(--eg-border);
+    border-radius: var(--eg-radius-lg);
+    box-shadow: var(--eg-shadow-popover);
+}
+
 /* ========== Unified Button Language (T-238) ========== */
 .eg-btn {
     --eg-btn-primary: var(--primary-color, #315bea);
@@ -123,7 +162,7 @@
 
 .eg-btn--danger {
     border-color: rgba(217, 45, 72, .38);
-    background: #fff;
+    background: var(--eg-surface, #fff);
     color: var(--eg-btn-danger);
 }
 
@@ -445,8 +484,8 @@ html.sidebar-will-collapse .sidebar-hint {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(4px);
+    background: var(--overlay-bg, rgba(28, 27, 31, 0.4));
+    backdrop-filter: blur(2px);
     z-index: 10000;
     display: flex;
     align-items: center;
@@ -454,18 +493,18 @@ html.sidebar-will-collapse .sidebar-hint {
     animation: fadeIn 0.2s ease;
 }
 .progress-dialog {
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(20px);
-    border-radius: 16px;
+    background: var(--eg-surface-overlay);
+    border: 1px solid var(--eg-border);
+    border-radius: var(--eg-radius-xl);
     padding: 24px;
     min-width: 320px;
     max-width: 90vw;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    box-shadow: var(--eg-shadow-overlay);
     animation: slideUp 0.3s ease;
 }
 [data-theme="dark"] .progress-dialog {
-    background: rgba(30, 30, 40, 0.95);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--eg-surface-overlay);
+    border-color: var(--eg-border);
 }
 /* @keyframes slideUp — moved to base.css */
 .progress-dialog-title {
@@ -481,8 +520,8 @@ html.sidebar-will-collapse .sidebar-hint {
     margin-bottom: 20px;
     text-align: center;
     padding: 8px 12px;
-    background: var(--bg-secondary, #f3f4f6);
-    border-radius: 8px;
+    background: var(--eg-surface-muted, var(--bg-secondary, #f3f4f6));
+    border-radius: var(--eg-radius-md, 8px);
     max-height: 60px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1004,8 +1043,8 @@ html.sidebar-will-collapse .sidebar-hint {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.4);
-    backdrop-filter: blur(4px);
+    background: var(--overlay-bg, rgba(28, 27, 31, 0.4));
+    backdrop-filter: blur(2px);
     z-index: 10000;
     display: flex;
     align-items: flex-start;
@@ -1014,28 +1053,28 @@ html.sidebar-will-collapse .sidebar-hint {
     animation: fadeIn 0.2s ease;
 }
 .task-modal {
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(20px);
-    border-radius: 12px;
+    background: var(--eg-surface-overlay);
+    border: 1px solid var(--eg-border);
+    border-radius: var(--eg-radius-xl);
     width: 720px;
     max-width: 95vw;
     max-height: 85vh;
     display: flex;
     flex-direction: column;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    box-shadow: var(--eg-shadow-overlay);
     animation: slideDown 0.3s ease;
 }
 /* @keyframes slideDown — moved to base.css */
 [data-theme="dark"] .task-modal {
-    background: rgba(30, 30, 40, 0.95);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--eg-surface-overlay);
+    border-color: var(--eg-border);
 }
 .task-modal-header {
     display: flex;
     align-items: flex-start;
     padding: 16px 20px 12px;
     gap: 12px;
-    border-bottom: 1px solid rgba(0,0,0,0.06);
+    border-bottom: 1px solid var(--eg-border-subtle);
     flex-shrink: 0;
 }
 .task-modal-header .title-input {
@@ -1586,9 +1625,9 @@ html.sidebar-will-collapse .sidebar-hint {
     justify-content: flex-end;
     gap: 12px;
     padding: 16px 24px;
-    border-top: 1px solid var(--border-color, #e5e7eb);
+    border-top: 1px solid var(--eg-border-subtle, var(--border-color, #e5e7eb));
     flex-shrink: 0;
-    background: inherit;
+    background: var(--eg-surface-subtle);
 }
 @media (max-height: 700px) {
     .task-modal-footer {
@@ -1609,6 +1648,9 @@ html.sidebar-will-collapse .sidebar-hint {
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s;
+}
+.task-modal-btn.eg-btn {
+    padding: 0 14px;
 }
 .task-modal-btn.secondary {
     background: var(--bg-secondary, #e5e7eb);
@@ -2445,10 +2487,10 @@ html.sidebar-will-collapse .sidebar-hint {
     position: fixed;
     min-width: 260px;
     max-width: 300px;
-    background: var(--bg-card);
-    border: 1px solid var(--border-color);
-    border-radius: 12px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    background: var(--eg-surface-overlay, var(--bg-card));
+    border: 1px solid var(--eg-border, var(--border-color));
+    border-radius: var(--eg-radius-lg, 12px);
+    box-shadow: var(--eg-shadow-popover, 0 8px 24px rgba(0, 0, 0, 0.15));
     padding: 12px;
     z-index: 10002;
     animation: slideDown 0.15s ease;
@@ -2887,8 +2929,8 @@ html.sidebar-will-collapse .sidebar-hint {
 .review-modal-overlay {
     position: fixed;
     top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0, 0, 0, 0.4);
-    backdrop-filter: blur(4px);
+    background: var(--overlay-bg, rgba(28, 27, 31, 0.4));
+    backdrop-filter: blur(2px);
     z-index: 10000;
     display: flex;
     align-items: flex-start;
@@ -2897,24 +2939,24 @@ html.sidebar-will-collapse .sidebar-hint {
     animation: fadeIn 0.2s ease;
 }
 .review-modal {
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(20px);
-    border-radius: 12px;
+    background: var(--eg-surface-overlay);
+    border: 1px solid var(--eg-border);
+    border-radius: var(--eg-radius-xl);
     width: 480px;
     max-width: 90vw;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    box-shadow: var(--eg-shadow-overlay);
     animation: slideDown 0.3s ease;
 }
 [data-theme="dark"] .review-modal {
-    background: rgba(30, 30, 40, 0.95);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--eg-surface-overlay);
+    border-color: var(--eg-border);
 }
 .review-modal-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 16px 20px;
-    border-bottom: 1px solid rgba(0,0,0,0.06);
+    border-bottom: 1px solid var(--eg-border-subtle);
 }
 .review-modal-header h3 {
     margin: 0;
@@ -2929,7 +2971,8 @@ html.sidebar-will-collapse .sidebar-hint {
     justify-content: flex-end;
     gap: 12px;
     padding: 16px 20px;
-    border-top: 1px solid rgba(0,0,0,0.06);
+    border-top: 1px solid var(--eg-border-subtle);
+    background: var(--eg-surface-subtle);
 }
 .review-field {
     margin-bottom: 16px;
