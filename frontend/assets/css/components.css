@@ -4,16 +4,49 @@
    panels, and interactive elements.
    ============================================ */
 
+/* ========== Clear Management Primitives (T-239) ========== */
+.eg-surface {
+    background: var(--eg-surface);
+    border: 1px solid var(--eg-border);
+    border-radius: var(--eg-radius-xl);
+    box-shadow: var(--eg-shadow-card);
+}
+
+.eg-surface--muted {
+    background: var(--eg-surface-muted);
+}
+
+.eg-surface--raised {
+    background: var(--eg-surface-raised);
+    box-shadow: var(--eg-shadow-raised);
+}
+
+.eg-surface--overlay {
+    background: var(--eg-surface-overlay);
+    border: 1px solid var(--eg-border);
+    box-shadow: var(--eg-shadow-overlay);
+}
+
+.eg-divider {
+    border-color: var(--eg-border-subtle);
+}
+
+.eg-text-strong { color: var(--eg-text-strong); }
+.eg-text-body { color: var(--eg-text-body); }
+.eg-text-muted { color: var(--eg-text-muted); }
+.eg-text-faint { color: var(--eg-text-faint); }
+
 /* ========== Unified Button Language (T-238) ========== */
 .eg-btn {
     --eg-btn-primary: var(--primary-color, #315bea);
     --eg-btn-primary-strong: var(--primary-hover, #2346c9);
-    --eg-btn-line: var(--border-color, #dfe5ee);
-    --eg-btn-line-strong: #c7d0dd;
-    --eg-btn-text: var(--text-primary, #172033);
-    --eg-btn-muted: var(--text-secondary, #647084);
-    --eg-btn-danger: #d92d48;
-    --eg-btn-danger-soft: #fff1f3;
+    --eg-btn-line: var(--eg-border, var(--border-color, #dfe5ee));
+    --eg-btn-line-strong: var(--eg-border-strong, #c7d0dd);
+    --eg-btn-text: var(--eg-text-strong, var(--text-primary, #172033));
+    --eg-btn-muted: var(--eg-text-body, var(--text-secondary, #647084));
+    --eg-btn-danger: var(--danger-color, #d92d48);
+    --eg-btn-danger-strong: var(--eg-danger-strong, #b4233a);
+    --eg-btn-danger-soft: var(--eg-danger-surface, #fff1f3);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -21,11 +54,11 @@
     min-height: 36px;
     padding: 0 14px;
     border: 1px solid var(--eg-btn-line);
-    border-radius: 8px;
-    background: #fff;
+    border-radius: var(--eg-radius-md, 8px);
+    background: var(--eg-surface, #fff);
     color: var(--eg-btn-text);
     font: inherit;
-    font-size: 13px;
+    font-size: var(--eg-font-size-sm, 13px);
     font-weight: 650;
     line-height: 1;
     text-decoration: none;
@@ -38,7 +71,7 @@
 
 .eg-btn:hover {
     border-color: var(--eg-btn-line-strong);
-    background: #f8fafc;
+    background: var(--eg-surface-muted, #f8fafc);
 }
 
 .eg-btn:active {
@@ -46,8 +79,8 @@
 }
 
 .eg-btn:focus-visible {
-    outline: 2px solid rgba(var(--primary-color-rgb, 49, 91, 234), .28);
-    outline-offset: 2px;
+    outline: 0;
+    box-shadow: var(--eg-focus-ring, 0 0 0 3px rgba(var(--primary-color-rgb, 49, 91, 234), .18));
 }
 
 .eg-btn:disabled,
@@ -63,7 +96,7 @@
     border-color: var(--eg-btn-primary);
     background: var(--eg-btn-primary);
     color: #fff;
-    box-shadow: 0 1px 2px rgba(23, 32, 51, .08);
+    box-shadow: var(--eg-shadow-card, 0 1px 2px rgba(23, 32, 51, .08));
 }
 
 .eg-btn--primary:hover {
@@ -72,7 +105,7 @@
 }
 
 .eg-btn--secondary {
-    background: #fff;
+    background: var(--eg-surface, #fff);
     color: var(--eg-btn-text);
 }
 
@@ -106,15 +139,15 @@
 }
 
 .eg-btn--danger-fill:hover {
-    border-color: #b4233a;
-    background: #b4233a;
+    border-color: var(--eg-btn-danger-strong);
+    background: var(--eg-btn-danger-strong);
 }
 
 .eg-btn--sm {
     min-height: 30px;
     padding: 0 10px;
-    font-size: 12px;
-    border-radius: 7px;
+    font-size: var(--eg-font-size-xs, 12px);
+    border-radius: var(--eg-radius-sm, 7px);
 }
 
 .eg-btn--md {
@@ -165,7 +198,7 @@
 
 .eg-actionbar--modal {
     padding-top: 14px;
-    border-top: 1px solid var(--border-color, #dfe5ee);
+    border-top: 1px solid var(--eg-border-subtle, var(--border-color, #dfe5ee));
 }
 
 @media (max-width: 640px) {
