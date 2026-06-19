@@ -26,9 +26,20 @@ var Stakeholder = (function() {
         return WorkGridEngine.esc(s);
     }
     function _arr(v) {
-        if (Array.isArray(v)) return v.filter(Boolean).map(String);
-        if (typeof v === 'string' && v.trim()) return v.split(/[,，;；]\s*/).map(function(x) { return x.trim(); }).filter(Boolean);
-        return [];
+        // T-230: accept comma OR newline separated tags; trim, drop empties, dedupe.
+        var list;
+        if (Array.isArray(v)) list = v.map(function(x) { return ('' + x).trim(); });
+        else if (typeof v === 'string' && v.trim()) list = v.split(/[\n\r,，;；]+/).map(function(x) { return x.trim(); });
+        else return [];
+        var seen = {}, out = [];
+        list.forEach(function(x) { if (x && !seen[x]) { seen[x] = 1; out.push(x); } });
+        return out;
+    }
+    // T-230: 「接口事项」→「相关工作标签」, frontend-only alias. Backend column key
+    // stays `liaison`; only overrides the default display name (not user renames).
+    function _colLabel(col) {
+        if (col && col.builtin && col.key === 'liaison' && col.name === '接口事项') return '相关工作标签';
+        return (col && (col.name || col.key)) || '';
     }
     function _get(row, key) {
         if (!row) return '';
@@ -132,7 +143,7 @@ var Stakeholder = (function() {
         var cols = _selectColumns();
         if (!cols.some(function(c) { return c.key === _boardDim; })) _boardDim = cols[0] ? cols[0].key : 'team';
         sel.innerHTML = cols.map(function(c) {
-            return '<option value="' + _esc(c.key) + '"' + (c.key === _boardDim ? ' selected' : '') + '>按' + _esc(c.name) + '</option>';
+            return '<option value="' + _esc(c.key) + '"' + (c.key === _boardDim ? ' selected' : '') + '>按' + _esc(_colLabel(c)) + '</option>';
         }).join('');
         sel.style.display = _view === 'board' ? '' : 'none';
     }
@@ -184,7 +195,7 @@ var Stakeholder = (function() {
             defaultWidth: 130,
             headerHtml: function(cols) {
                 return '<thead><tr><th class="wt-num-th">#</th>' + cols.map(function(c) {
-                    return '<th>' + _esc(c.name) + '</th>';
+                    return '<th>' + _esc(_colLabel(c)) + '</th>';
                 }).join('') + '</tr></thead>';
             },
             rowHtml: function(row, num) { return _rowHtml(row, num); },
@@ -282,11 +293,11 @@ var Stakeholder = (function() {
         var groups = WorkGridEngine.groupByDimension(rows, col, _valuesForDim, function(c, v) { return v; }, UNMARKED);
         var seg = dims.map(function(d) {
             return '<button class="wt-dim-btn' + (d.key === cur ? ' active' : '') + '" onclick="Stakeholder.setDistributionDim(\'' + _escAttr(d.key) + '\')">'
-                + _esc(d.name) + ' <span class="wt-dim-typ">' + _esc(d.type) + '</span></button>';
+                + _esc(_colLabel(d)) + ' <span class="wt-dim-typ">' + _esc(d.type) + '</span></button>';
         }).join('');
         host.innerHTML = '<div class="wt-dim-bar"><span class="wt-dim-lbl">按以下维度看分布:</span><div class="wt-dim-seg">' + seg + '</div></div>'
             + '<div class="wt-section-label">分布概览</div><div class="wt-bubble-wrap"><div class="wt-bubble-row" id="sh-bubble-row"></div></div>'
-            + '<div class="wt-section-label">各' + _esc(col.name) + '详情</div><div class="wt-tag-grid" id="sh-tag-grid"></div>';
+            + '<div class="wt-section-label">各' + _esc(_colLabel(col)) + '详情</div><div class="wt-tag-grid" id="sh-tag-grid"></div>';
         WorkGridEngine.renderBubbles({
             host: document.getElementById('sh-bubble-row'),
             groups: groups,
@@ -347,15 +358,23 @@ var Stakeholder = (function() {
         if (row) _applyPatch(row, patch);
         render();
         return API.stakeholderUpdate(id, patch).then(function(resp) {
+            // request() resolves with the body even on 4xx, so check success flag.
+            if (resp && resp.success === false) {
+                if (typeof showToast === 'function') showToast(resp.error || '保存失败', 'error');
+                reload();
+                return false;
+            }
             if (resp && resp.item) {
                 var idx = _rows.findIndex(function(r) { return r.id === id; });
                 if (idx >= 0) _rows[idx] = resp.item;
                 render();
             }
+            return true;
         }).catch(function(err) {
             console.error('[stakeholder] update failed', err);
             if (typeof showToast === 'function') showToast('保存失败,正在刷新...', 'warning');
             reload();
+            return false;
         });
     }
     function _applyPatch(row, patch) {
@@ -414,12 +433,15 @@ var Stakeholder = (function() {
     }
     function _detailField(row, col) {
         var v = _get(row, col.key);
-        var value = col.type === 'multi' ? _arr(v).join('，') : (v == null ? '' : '' + v);
-        var tag = col.type === 'longtext' ? 'textarea' : 'input';
-        return '<label class="sh-field"><span>' + _esc(col.name) + (col.key === 'name' ? ' *' : '') + '</span>'
-            + (tag === 'textarea'
-                ? '<textarea data-key="' + _esc(col.key) + '">' + _esc(value) + '</textarea>'
+        var isMulti = col.type === 'multi';
+        // multi: one tag per line so 换行/逗号 both work and existing tags are editable.
+        var value = isMulti ? _arr(v).join('\n') : (v == null ? '' : '' + v);
+        var useTextarea = col.type === 'longtext' || isMulti;
+        return '<label class="sh-field"><span>' + _esc(_colLabel(col)) + (col.key === 'name' ? ' *' : '') + '</span>'
+            + (useTextarea
+                ? '<textarea data-key="' + _esc(col.key) + '"' + (isMulti ? ' rows="2" placeholder="可用逗号或换行分隔多个标签"' : '') + '>' + _esc(value) + '</textarea>'
                 : '<input data-key="' + _esc(col.key) + '" value="' + _esc(value) + '">')
+            + (isMulti ? '<small class="sh-field-hint">可用逗号或换行分隔多个标签</small>' : '')
             + '</label>';
     }
     function saveDetail() {
@@ -428,7 +450,12 @@ var Stakeholder = (function() {
         if (!row || !d) return;
         var patch = _collectForm(d);
         if (patch.name != null && !patch.name.trim()) { showToast('姓名不能为空', 'warning'); return; }
-        updateRow(row.id, patch).then(function() { if (typeof showToast === 'function') showToast('已保存', 'success'); });
+        updateRow(row.id, patch).then(function(ok) {
+            if (!ok) return; // 保存失败：保留抽屉，updateRow 已提示错误
+            if (typeof showToast === 'function') showToast('已保存', 'success');
+            closeDetail();   // 保存成功后关闭右侧抽屉
+            render();        // 同步刷新表格/看板/分布
+        });
     }
     function navDetail(delta) {
         var idx = _detailIds.indexOf(_detailId);
@@ -560,7 +587,7 @@ var Stakeholder = (function() {
                 + '<span class="wt-colcfg-handle" draggable="true"'
                 + ' ondragstart="Stakeholder._colDragStart(event,' + i + ')"'
                 + ' ondragend="Stakeholder._colDragEnd()" title="按住拖动调整列顺序">≡</span>'
-                + '<input class="wt-colcfg-name" value="' + _esc(c.name) + '" onchange="Stakeholder._renameColumn(' + i + ',this.value)">'
+                + '<input class="wt-colcfg-name" value="' + _esc(_colLabel(c)) + '" onchange="Stakeholder._renameColumn(' + i + ',this.value)">'
                 + '<select class="wt-colcfg-type" onchange="Stakeholder._setColumnType(' + i + ',this.value)">';
             TYPES.forEach(function(tp) {
                 html += '<option value="' + tp.key + '"' + (tp.key === c.type ? ' selected' : '') + '>' + tp.label + '</option>';
