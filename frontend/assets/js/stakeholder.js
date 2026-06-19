@@ -390,7 +390,7 @@ var Stakeholder = (function() {
             var a = graph.nodeMap[e.from];
             var b = graph.nodeMap[e.to];
             if (!a || !b) return '';
-            return '<line class="sh-graph-edge' + (e.type === 'clue' ? ' is-clue' : '') + '" data-from="' + _attr(e.from) + '" data-to="' + _attr(e.to) + '" x1="' + a.x + '%" y1="' + a.y + '%" x2="' + b.x + '%" y2="' + b.y + '%"></line>';
+            return '<path class="sh-graph-edge' + (e.type === 'clue' ? ' is-clue' : '') + '" data-from="' + _attr(e.from) + '" data-to="' + _attr(e.to) + '" d="' + _attr(_graphEdgePath(e, a, b)) + '"></path>';
         }).join('');
         var nodes = graph.nodes.map(function(n) {
             var size = n.kind === 'dim' ? Math.round(54 + Math.min(44, Math.log2(n.count + 1) * 18)) : 46;
@@ -500,6 +500,47 @@ var Stakeholder = (function() {
             return true;
         }).map(function(v) { return { value: v, label: v }; });
         return values.length ? values : [{ value: UNMARKED, label: UNMARKED, isEmpty: true }];
+    }
+
+    function _graphEdgePath(edge, a, b) {
+        var sx = a.x, sy = a.y, ex = b.x, ey = b.y;
+        var dx = ex - sx, dy = ey - sy;
+        var len = Math.sqrt(dx * dx + dy * dy) || 1;
+        var sr = _graphNodeRadius(a);
+        var er = _graphNodeRadius(b);
+        sx += dx / len * sr;
+        sy += dy / len * sr;
+        ex -= dx / len * er;
+        ey -= dy / len * er;
+        if (edge.type === 'clue') return _graphCluePath(sx, sy, ex, ey);
+        var bend = Math.max(8, Math.min(18, Math.abs(dx) * 0.36));
+        var c1x = sx + (dx >= 0 ? bend : -bend);
+        var c2x = ex - (dx >= 0 ? bend : -bend);
+        var c1y = sy + dy * 0.08;
+        var c2y = ey - dy * 0.08;
+        return 'M ' + _num(sx) + ' ' + _num(sy) + ' C ' + _num(c1x) + ' ' + _num(c1y) + ', ' + _num(c2x) + ' ' + _num(c2y) + ', ' + _num(ex) + ' ' + _num(ey);
+    }
+
+    function _graphCluePath(sx, sy, ex, ey) {
+        var dx = ex - sx;
+        var dy = ey - sy;
+        var side = dx >= 0 ? 1 : -1;
+        if (Math.abs(dx) < 6) side = sy <= ey ? 1 : -1;
+        var lift = Math.max(5, Math.min(12, Math.abs(dy) * 0.22 + 5));
+        var c1x = sx + side * lift;
+        var c2x = ex + side * lift;
+        var c1y = sy + dy * 0.32;
+        var c2y = ey - dy * 0.32;
+        return 'M ' + _num(sx) + ' ' + _num(sy) + ' C ' + _num(c1x) + ' ' + _num(c1y) + ', ' + _num(c2x) + ' ' + _num(c2y) + ', ' + _num(ex) + ' ' + _num(ey);
+    }
+
+    function _graphNodeRadius(node) {
+        if (node.kind === 'dim') return 4.2 + Math.min(2.8, Math.log2((node.count || 1) + 1) * 0.9);
+        return 3.6;
+    }
+
+    function _num(n) {
+        return Math.round(n * 100) / 100;
     }
 
     function _placeGraphNodes(dims, people) {
