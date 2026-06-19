@@ -193,7 +193,7 @@ var InsightFactory = (function() {
             + '<label class="ins-cap-type-label">模板<select id="inf-cap-template" class="ins-cap-type">' + tmplOptions + '</select></label>'
             + '<span class="ins-cap-type-hint" id="inf-cap-type-hint"></span>'
             + '<div class="ins-cap-spacer"></div>'
-            + '<button class="ins-btn ins-btn-primary" onclick="InsightFactory.submitNew()">创建并生成</button>'
+            + '<button class="eg-btn eg-btn--primary" onclick="InsightFactory.submitNew()">创建并生成</button>'
             + '</div>'
             + '</div>';
     }
@@ -242,8 +242,8 @@ var InsightFactory = (function() {
             + '<textarea id="inf-mem-body" class="inf-memory-body" rows="2" placeholder="记忆内容：工程事实、Boris 偏好、报告风格约束或历史洞察摘要。">' + _esc(editing ? editing.body : '') + '</textarea>'
             + '<div class="inf-memory-actions">'
             + '<label class="inf-memory-enabled"><input id="inf-mem-enabled" type="checkbox"' + (!editing || editing.enabled ? ' checked' : '') + '>启用</label>'
-            + '<button class="ins-btn ins-btn-primary" onclick="InsightFactory.saveMemory()">' + (editing ? '保存记忆' : '新增记忆') + '</button>'
-            + (editing ? '<button class="ins-btn ins-btn-secondary" onclick="InsightFactory.cancelMemoryEdit()">取消</button>' : '')
+            + '<button class="eg-btn eg-btn--primary" onclick="InsightFactory.saveMemory()">' + (editing ? '保存记忆' : '新增记忆') + '</button>'
+            + (editing ? '<button class="eg-btn eg-btn--secondary" onclick="InsightFactory.cancelMemoryEdit()">取消</button>' : '')
             + '</div>'
             + '</div>'
             + '<div class="inf-memory-list">' + rows + '</div>'
@@ -582,13 +582,13 @@ var InsightFactory = (function() {
                 + '</div>';
         } else if (t.status === 'idle') {
             body = '<div class="inf-job-empty">尚未创建生成 job。</div>'
-                + '<button class="ins-btn ins-btn-primary" onclick="InsightFactory.generate()">生成 v1</button>';
+                + '<button class="eg-btn eg-btn--primary" onclick="InsightFactory.generate()">生成 v1</button>';
         } else if (t.status === 'failed' || latestBad) {
             var bad = latestBad || {};
             body = '<div class="inf-job-error">'
                 + '<div class="inf-job-error-title">最近一次 job 失败</div>'
                 + '<div class="inf-job-error-msg">' + _esc(bad.errorMessage || '无错误摘要') + '</div>'
-                + (bad.id ? '<button class="ins-btn ins-btn-danger ins-btn-sm" onclick="InsightFactory.retry(' + bad.id + ')">重试</button>' : '')
+                + (bad.id ? '<button class="eg-btn eg-btn--danger eg-btn--sm" onclick="InsightFactory.retry(' + bad.id + ')">重试</button>' : '')
                 + '</div>';
         } else {
             body = '<div class="inf-job-empty">没有 active job。</div>';
@@ -636,7 +636,7 @@ var InsightFactory = (function() {
         return '<section class="ins-det-card ins-det-feedback">'
             + '<div class="ins-det-card-title">写反馈生成下一版</div>'
             + '<textarea id="inf-fb-text" class="ins-fb-textarea" rows="3" placeholder="写下要改的方向、删补重点或新的约束。"></textarea>'
-            + '<div class="ins-fb-foot"><button class="ins-btn ins-btn-primary" onclick="InsightFactory.submitFeedback()">提交修订</button></div>'
+            + '<div class="ins-fb-foot"><button class="eg-btn eg-btn--primary" onclick="InsightFactory.submitFeedback()">提交修订</button></div>'
             + '</section>';
     }
 

@@ -694,11 +694,7 @@ var WorkTable = (function() {
           + '.wt-create-pk:hover{border-color:var(--primary-color,#4c6ef5);}'
           + '.wt-create-pk.empty{color:var(--text-muted,#aaa);}'
           + '.wt-create-cbx{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:var(--text-color,#333);}'
-          + '.wt-create-bar{display:flex;justify-content:flex-end;gap:8px;padding:14px 18px;border-top:1px solid var(--border-color,#e3e5e8);}'
-          + '.wt-create-btn{padding:8px 18px;border-radius:8px;border:none;cursor:pointer;font-size:14px;}'
-          + '.wt-create-ok{background:var(--primary-color,#4c6ef5);color:#fff;}'
-          + '.wt-create-ok:disabled{opacity:.5;cursor:not-allowed;}'
-          + '.wt-create-cancel{background:var(--hover-bg,#f2f3f5);color:var(--text-color,#333);}'
+          + '.wt-create-bar{padding:14px 18px;}'
           + '.wt-create-row4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}'
           + '.wt-create-row2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}'
           + '.wt-create-row4 .wt-create-pk{padding:8px 8px;}'
@@ -787,13 +783,13 @@ var WorkTable = (function() {
         box.appendChild(bd);
 
         var bar = document.createElement('div');
-        bar.className = 'wt-create-bar';
+        bar.className = 'wt-create-bar eg-actionbar eg-actionbar--modal';
         var cancel = document.createElement('button');
-        cancel.className = 'wt-create-btn wt-create-cancel';
+        cancel.className = 'eg-btn eg-btn--secondary';
         cancel.textContent = '取消';
         cancel.addEventListener('click', closeCreate);
         okBtn = document.createElement('button');
-        okBtn.className = 'wt-create-btn wt-create-ok';
+        okBtn.className = 'eg-btn eg-btn--primary';
         okBtn.textContent = '创建';
         okBtn.disabled = true;
         okBtn.addEventListener('click', function() { _submitCreate(state); });

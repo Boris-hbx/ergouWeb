@@ -4,6 +4,181 @@
    panels, and interactive elements.
    ============================================ */
 
+/* ========== Unified Button Language (T-238) ========== */
+.eg-btn {
+    --eg-btn-primary: var(--primary-color, #315bea);
+    --eg-btn-primary-strong: var(--primary-hover, #2346c9);
+    --eg-btn-line: var(--border-color, #dfe5ee);
+    --eg-btn-line-strong: #c7d0dd;
+    --eg-btn-text: var(--text-primary, #172033);
+    --eg-btn-muted: var(--text-secondary, #647084);
+    --eg-btn-danger: #d92d48;
+    --eg-btn-danger-soft: #fff1f3;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-height: 36px;
+    padding: 0 14px;
+    border: 1px solid var(--eg-btn-line);
+    border-radius: 8px;
+    background: #fff;
+    color: var(--eg-btn-text);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 650;
+    line-height: 1;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    box-sizing: border-box;
+    transition: background .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease, transform .05s ease;
+}
+
+.eg-btn:hover {
+    border-color: var(--eg-btn-line-strong);
+    background: #f8fafc;
+}
+
+.eg-btn:active {
+    transform: translateY(1px);
+}
+
+.eg-btn:focus-visible {
+    outline: 2px solid rgba(var(--primary-color-rgb, 49, 91, 234), .28);
+    outline-offset: 2px;
+}
+
+.eg-btn:disabled,
+.eg-btn[disabled],
+.eg-btn[aria-disabled="true"] {
+    opacity: .52;
+    cursor: not-allowed;
+    pointer-events: none;
+    transform: none;
+}
+
+.eg-btn--primary {
+    border-color: var(--eg-btn-primary);
+    background: var(--eg-btn-primary);
+    color: #fff;
+    box-shadow: 0 1px 2px rgba(23, 32, 51, .08);
+}
+
+.eg-btn--primary:hover {
+    border-color: var(--eg-btn-primary-strong);
+    background: var(--eg-btn-primary-strong);
+}
+
+.eg-btn--secondary {
+    background: #fff;
+    color: var(--eg-btn-text);
+}
+
+.eg-btn--ghost {
+    border-color: transparent;
+    background: transparent;
+    color: var(--eg-btn-muted);
+}
+
+.eg-btn--ghost:hover {
+    border-color: transparent;
+    background: rgba(100, 112, 132, .1);
+    color: var(--eg-btn-text);
+}
+
+.eg-btn--danger {
+    border-color: rgba(217, 45, 72, .38);
+    background: #fff;
+    color: var(--eg-btn-danger);
+}
+
+.eg-btn--danger:hover {
+    border-color: rgba(217, 45, 72, .56);
+    background: var(--eg-btn-danger-soft);
+}
+
+.eg-btn--danger-fill {
+    border-color: var(--eg-btn-danger);
+    background: var(--eg-btn-danger);
+    color: #fff;
+}
+
+.eg-btn--danger-fill:hover {
+    border-color: #b4233a;
+    background: #b4233a;
+}
+
+.eg-btn--sm {
+    min-height: 30px;
+    padding: 0 10px;
+    font-size: 12px;
+    border-radius: 7px;
+}
+
+.eg-btn--md {
+    min-height: 36px;
+}
+
+.eg-btn--lg {
+    min-height: 42px;
+    padding: 0 18px;
+    font-size: 14px;
+}
+
+.eg-btn--icon {
+    width: 36px;
+    min-width: 36px;
+    padding: 0;
+}
+
+.eg-btn--icon.eg-btn--sm {
+    width: 30px;
+    min-width: 30px;
+}
+
+.eg-btn.is-loading,
+.eg-btn[aria-busy="true"] {
+    cursor: wait;
+}
+
+.eg-btn__spinner {
+    width: 13px;
+    height: 13px;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: eg-btn-spin .75s linear infinite;
+}
+
+@keyframes eg-btn-spin {
+    to { transform: rotate(360deg); }
+}
+
+.eg-actionbar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.eg-actionbar--modal {
+    padding-top: 14px;
+    border-top: 1px solid var(--border-color, #dfe5ee);
+}
+
+@media (max-width: 640px) {
+    .eg-actionbar--modal {
+        flex-direction: column-reverse;
+        align-items: stretch;
+    }
+
+    .eg-actionbar--modal .eg-btn {
+        width: 100%;
+    }
+}
+
 /* ========== Sidebar Anti-Flicker ========== */
 html.sidebar-will-collapse .sidebar {
     transform: translateX(-100%);
