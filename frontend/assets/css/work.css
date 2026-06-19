@@ -153,6 +153,9 @@ body:has(.sidebar.collapsed) { --sidebar-width: 0px; }
 .sh-field textarea:focus {
   outline: none; border-color: var(--primary-color);
 }
+.sh-field-hint {
+  font-size: 0.72rem; color: var(--text-muted); opacity: 0.8;
+}
 .sh-detail-actions {
   display: flex; justify-content: flex-end; margin-top: 16px; padding-top: 14px;
   border-top: 1px solid var(--border-light);
