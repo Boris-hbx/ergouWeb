@@ -226,6 +226,15 @@ body:has(.sidebar.collapsed) { --sidebar-width: 0px; }
   stroke: rgba(20, 184, 166, 0.78);
   stroke-width: 0.9;
 }
+.sh-graph-edge.is-clue {
+  stroke: rgba(148, 163, 184, 0.5);
+  stroke-width: 0.38;
+  stroke-dasharray: 1.6 1.4;
+}
+.sh-graph-edge.is-clue.is-active {
+  stroke: rgba(79, 70, 229, 0.68);
+  stroke-width: 0.78;
+}
 .sh-graph-edge.is-dimmed { opacity: .12; }
 .sh-graph-node {
   position: absolute;
@@ -265,6 +274,10 @@ body:has(.sidebar.collapsed) { --sidebar-width: 0px; }
   border-style: dashed;
 }
 .sh-graph-person { background: #FFFFFF; }
+.sh-graph-person.has-rhythm {
+  border-color: rgba(20, 184, 166, 0.54);
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.08), 0 2px 8px rgba(15, 15, 30, 0.08);
+}
 .sh-graph-label {
   max-width: 92px;
   overflow: hidden;
@@ -308,6 +321,145 @@ body:has(.sidebar.collapsed) { --sidebar-width: 0px; }
   border: 1px dashed #E5E3EE;
   border-radius: 8px;
   background: #FAF9FC;
+}
+.sh-graph-action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+.sh-graph-action-grid div {
+  border: 1px solid #E5E3EE;
+  border-radius: 8px;
+  padding: 9px 10px;
+  background: #FAF9FC;
+}
+.sh-graph-action-grid span {
+  display: block;
+  color: #1F2937;
+  font-size: 18px;
+  font-weight: 760;
+  line-height: 1.1;
+}
+.sh-graph-action-grid small {
+  display: block;
+  margin-top: 3px;
+  color: #64748B;
+  font-size: 11px;
+}
+.sh-graph-risk,
+.sh-graph-ok,
+.sh-graph-clue-note {
+  margin-top: 10px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.sh-graph-risk {
+  border: 1px solid rgba(245, 158, 11, 0.28);
+  background: #FFFBEB;
+  color: #92400E;
+}
+.sh-graph-ok {
+  border: 1px solid rgba(20, 184, 166, 0.22);
+  background: #F0FDFA;
+  color: #0F766E;
+}
+.sh-graph-clue-note {
+  border: 1px solid #E5E3EE;
+  background: #FAF9FC;
+  color: #475569;
+}
+.sh-graph-section-title {
+  margin-top: 14px;
+  color: #1F2937;
+  font-size: 12px;
+  font-weight: 740;
+}
+.sh-graph-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.sh-graph-chip-row button {
+  border: 1px solid #D7D2E6;
+  border-radius: 999px;
+  background: #FFFFFF;
+  color: #334155;
+  padding: 5px 9px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.sh-graph-chip-row button:hover {
+  border-color: rgba(20, 184, 166, 0.54);
+  color: #0F766E;
+}
+.sh-graph-field-grid {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+.sh-graph-field {
+  border: 1px solid #E5E3EE;
+  border-radius: 8px;
+  background: #FAF9FC;
+  padding: 8px 10px;
+}
+.sh-graph-field small {
+  display: block;
+  color: #64748B;
+  font-size: 11px;
+  margin-bottom: 3px;
+}
+.sh-graph-field span {
+  display: block;
+  color: #1F2937;
+  font-size: 12px;
+  line-height: 1.42;
+  white-space: pre-wrap;
+}
+.sh-graph-field.is-long span {
+  max-height: 92px;
+  overflow: auto;
+}
+.sh-graph-clue-list {
+  display: grid;
+  gap: 7px;
+  margin-top: 8px;
+}
+.sh-graph-clue-item {
+  border: 1px dashed #D7D2E6;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #FFFFFF;
+}
+.sh-graph-clue-item span {
+  display: block;
+  color: #1F2937;
+  font-size: 12px;
+  font-weight: 650;
+}
+.sh-graph-clue-item small {
+  display: block;
+  margin-top: 3px;
+  color: #64748B;
+  font-size: 11px;
+}
+.sh-graph-detail-btn {
+  width: 100%;
+  margin-top: 14px;
+  border: 1px solid rgba(20, 184, 166, 0.45);
+  border-radius: 8px;
+  background: #F0FDFA;
+  color: #0F766E;
+  font-weight: 720;
+  padding: 9px 10px;
+  cursor: pointer;
+}
+.sh-graph-detail-btn:hover {
+  background: #CCFBF1;
 }
 .sh-graph-person-list {
   margin-top: 12px;

@@ -390,13 +390,13 @@ var Stakeholder = (function() {
             var a = graph.nodeMap[e.from];
             var b = graph.nodeMap[e.to];
             if (!a || !b) return '';
-            return '<line class="sh-graph-edge" data-from="' + _attr(e.from) + '" data-to="' + _attr(e.to) + '" x1="' + a.x + '%" y1="' + a.y + '%" x2="' + b.x + '%" y2="' + b.y + '%"></line>';
+            return '<line class="sh-graph-edge' + (e.type === 'clue' ? ' is-clue' : '') + '" data-from="' + _attr(e.from) + '" data-to="' + _attr(e.to) + '" x1="' + a.x + '%" y1="' + a.y + '%" x2="' + b.x + '%" y2="' + b.y + '%"></line>';
         }).join('');
         var nodes = graph.nodes.map(function(n) {
             var size = n.kind === 'dim' ? Math.round(54 + Math.min(44, Math.log2(n.count + 1) * 18)) : 46;
             var style = 'left:' + n.x + '%;top:' + n.y + '%;width:' + size + 'px;height:' + size + 'px;';
             var meta = n.kind === 'dim' ? (n.count + ' 人') : (n.meta || '');
-            var classes = 'sh-graph-node sh-graph-' + n.kind + (n.isEmpty ? ' is-empty' : '') + (_nodeMatchesSearch(n) ? ' is-match' : '');
+            var classes = 'sh-graph-node sh-graph-' + n.kind + (n.isEmpty ? ' is-empty' : '') + (n.hasRhythm ? ' has-rhythm' : '') + (_nodeMatchesSearch(n) ? ' is-match' : '');
             return '<button type="button" class="' + classes + '" style="' + style + '" data-node="' + _attr(n.id) + '" title="' + _attr(n.label) + '">'
                 + '<span class="sh-graph-label">' + _esc(n.label) + '</span>'
                 + (meta ? '<span class="sh-graph-meta">' + _esc(meta) + '</span>' : '')
@@ -421,7 +421,15 @@ var Stakeholder = (function() {
             if (!vals.length) return;
             var personId = 'p:' + r.id;
             if (!personMap[personId]) {
-                personMap[personId] = { id: personId, kind: 'person', row: r, label: r.name || '(未命名)', meta: [r.title, r.team, r.region].filter(Boolean).slice(0, 2).join(' · '), count: 1 };
+                personMap[personId] = {
+                    id: personId,
+                    kind: 'person',
+                    row: r,
+                    label: r.name || '(未命名)',
+                    meta: [r.title, r.team || r.region].filter(Boolean).join(' · '),
+                    count: 1,
+                    hasRhythm: _hasFollowRhythm(r),
+                };
             }
             vals.forEach(function(v) {
                 var dimId = 'd:' + mode + ':' + v.value;
@@ -430,7 +438,7 @@ var Stakeholder = (function() {
                     dimMap[dimId].people.push(r.id);
                     dimMap[dimId].count++;
                 }
-                edges.push({ from: dimId, to: personId });
+                edges.push({ from: dimId, to: personId, type: 'main' });
             });
         });
         var dims = Object.keys(dimMap).map(function(k) { return dimMap[k]; }).sort(function(a, b) {
@@ -444,7 +452,36 @@ var Stakeholder = (function() {
         var nodes = dims.concat(people);
         var nodeMap = {};
         nodes.forEach(function(n) { nodeMap[n.id] = n; });
-        return { mode: mode, dims: dims, people: people, nodes: nodes, edges: edges, nodeMap: nodeMap };
+        var clueEdges = _graphRelationClues(people);
+        return { mode: mode, dims: dims, people: people, nodes: nodes, edges: edges.concat(clueEdges), mainEdges: edges, clueEdges: clueEdges, nodeMap: nodeMap };
+    }
+
+    function _graphRelationClues(people) {
+        var names = people.map(function(p) {
+            return { id: p.id, name: (p.row.name || '').trim() };
+        }).filter(function(p) {
+            return p.name.length >= 2;
+        }).sort(function(a, b) {
+            return b.name.length - a.name.length || a.name.localeCompare(b.name);
+        });
+        var seen = {};
+        var edges = [];
+        people.forEach(function(p) {
+            var text = (p.row.relation || '').trim();
+            if (!text) return;
+            names.forEach(function(target) {
+                if (target.id === p.id || text.indexOf(target.name) < 0) return;
+                var key = p.id + '>' + target.id;
+                if (seen[key]) return;
+                seen[key] = 1;
+                edges.push({ from: p.id, to: target.id, type: 'clue', source: p.row.id, target: target.name, text: text });
+            });
+        });
+        return edges;
+    }
+
+    function _hasFollowRhythm(row) {
+        return _arr(row.method).length > 0 || !!(row.cadence || '').trim();
     }
 
     function _graphValues(row, mode) {
@@ -494,10 +531,6 @@ var Stakeholder = (function() {
     function _clickGraphNode(id, graph) {
         var node = graph.nodeMap[id];
         if (!node) return;
-        if (node.kind === 'person') {
-            openDetail(node.row.id, graph.people.map(function(p) { return p.row.id; }));
-            return;
-        }
         _graphFocus = _graphFocus === id ? null : id;
         _highlightGraphNode(_graphFocus);
         var side = document.getElementById('sh-graph-side');
@@ -530,20 +563,82 @@ var Stakeholder = (function() {
 
     function _graphSideHtml(graph) {
         var node = _graphFocus && graph.nodeMap[_graphFocus];
-        if (!node || node.kind !== 'dim') {
+        if (!node) {
             return '<div class="sh-graph-side-title">关系图</div>'
                 + '<div class="sh-graph-side-sub">' + _graphModeLabel(graph.mode) + ' · ' + graph.dims.length + ' 个维度节点 · ' + graph.people.length + ' 人</div>'
-                + '<div class="sh-graph-side-empty">点击左侧部门、事项或地域节点，查看关联人员。</div>';
+                + '<div class="sh-graph-side-empty">点击部门、事项、地域或人员节点，查看下一步找谁、补谁、盯谁。</div>'
+                + (graph.clueEdges.length ? '<div class="sh-graph-clue-note">已从关系说明中识别 ' + graph.clueEdges.length + ' 条可能的触达路径。</div>' : '');
         }
+        if (node.kind === 'person') return _graphPersonSideHtml(graph, node);
         var people = node.people.map(rowById).filter(Boolean);
+        var hasUnmarked = !!node.isEmpty || people.some(function(r) {
+            return _graphValues(r, graph.mode).some(function(v) { return v.isEmpty; });
+        });
+        var hubs = people.filter(function(r) {
+            return _arr(r.duty).concat(_arr(r.liaison)).length > 1;
+        });
+        var risks = [];
+        if (people.length === 1) risks.push('单点联系人风险');
+        if (hasUnmarked) risks.push('包含未填信息');
         return '<div class="sh-graph-side-title">' + _esc(node.label) + '</div>'
-            + '<div class="sh-graph-side-sub">' + people.length + ' 个关联人员</div>'
+            + '<div class="sh-graph-side-sub">' + _graphModeLabel(graph.mode) + ' · 行动面板</div>'
+            + '<div class="sh-graph-action-grid">'
+            + '<div><span>' + people.length + '</span><small>关联人员</small></div>'
+            + '<div><span>' + (hasUnmarked ? '有' : '无') + '</span><small>未填情况</small></div>'
+            + '<div><span>' + (people.length === 1 ? '有' : '无') + '</span><small>单点风险</small></div>'
+            + '<div><span>' + hubs.length + '</span><small>枢纽人员</small></div>'
+            + '</div>'
+            + (risks.length ? '<div class="sh-graph-risk">' + risks.map(_esc).join(' · ') + '</div>' : '<div class="sh-graph-ok">覆盖较稳，暂未发现单点联系人风险。</div>')
+            + (hubs.length ? '<div class="sh-graph-section-title">可作为枢纽</div><div class="sh-graph-chip-row">' + hubs.slice(0, 6).map(function(r) { return '<button type="button" onclick="Stakeholder.focusGraphPerson(' + r.id + ')">' + _esc(r.name || '(未命名)') + '</button>'; }).join('') + '</div>' : '')
+            + _graphCluesHtml(graph, people.map(function(r) { return 'p:' + r.id; }))
+            + '<div class="sh-graph-section-title">关联人员</div>'
             + '<div class="sh-graph-person-list">' + people.map(function(r) {
-                return '<button type="button" class="sh-graph-person-row" onclick="Stakeholder.openDetail(' + r.id + ')">'
+                return '<button type="button" class="sh-graph-person-row" onclick="Stakeholder.focusGraphPerson(' + r.id + ')">'
                     + '<span>' + _esc(r.name || '(未命名)') + '</span>'
                     + '<small>' + _esc([r.title, r.team, r.region].filter(Boolean).join(' · ') || '未补充职务/部门') + '</small>'
                     + '</button>';
             }).join('') + '</div>';
+    }
+
+    function _graphPersonSideHtml(graph, node) {
+        var r = node.row;
+        var ids = graph.people.map(function(p) { return p.row.id; });
+        return '<div class="sh-graph-side-title">' + _esc(r.name || '(未命名)') + '</div>'
+            + '<div class="sh-graph-side-sub">人员行动面板' + (_hasFollowRhythm(r) ? ' · 已有跟进节奏' : ' · 未设置跟进节奏') + '</div>'
+            + '<div class="sh-graph-field-grid">'
+            + _graphField('职务', r.title)
+            + _graphField('部门', r.team)
+            + _graphField('地域', r.region)
+            + _graphField('负责事项', _arr(r.duty).join('、'))
+            + _graphField('相关工作标签', _arr(r.liaison).join('、'))
+            + _graphField('管理方式/频率', [_arr(r.method).join('、'), r.cadence].filter(Boolean).join(' · '))
+            + _graphField('关系说明', r.relation, true)
+            + '</div>'
+            + _graphCluesHtml(graph, [node.id])
+            + '<button type="button" class="sh-graph-detail-btn" onclick="Stakeholder.openDetail(' + r.id + ', [' + ids.join(',') + '])">打开详情抽屉</button>';
+    }
+
+    function _graphField(label, value, long) {
+        var text = (value || '').trim();
+        return '<div class="sh-graph-field' + (long ? ' is-long' : '') + '"><small>' + _esc(label) + '</small><span>' + _esc(text || '未填') + '</span></div>';
+    }
+
+    function _graphCluesHtml(graph, nodeIds) {
+        var lookup = {};
+        nodeIds.forEach(function(id) { lookup[id] = 1; });
+        var clues = graph.clueEdges.filter(function(e) { return lookup[e.from] || lookup[e.to]; });
+        if (!clues.length) return '';
+        return '<div class="sh-graph-section-title">可能的触达路径/关系线索</div>'
+            + '<div class="sh-graph-clue-list">' + clues.map(function(e) {
+                var from = graph.nodeMap[e.from];
+                var to = graph.nodeMap[e.to];
+                return '<div class="sh-graph-clue-item"><span>' + _esc((from && from.label) || '') + ' → ' + _esc((to && to.label) || '') + '</span><small>来源：relation 文本匹配</small></div>';
+            }).join('') + '</div>';
+    }
+
+    function focusGraphPerson(id) {
+        _graphFocus = 'p:' + id;
+        render();
     }
 
     function _graphModeLabel(mode) {
@@ -956,6 +1051,7 @@ var Stakeholder = (function() {
         setBoardDim: setBoardDim,
         setDistributionDim: setDistributionDim,
         setGraphMode: setGraphMode,
+        focusGraphPerson: focusGraphPerson,
         onSearchInput: onSearchInput,
         onSearchKey: onSearchKey,
         clearSearch: clearSearch,
