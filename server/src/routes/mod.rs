@@ -17,6 +17,8 @@ pub mod reviews;
 pub mod routine_collab;
 pub mod routines;
 pub mod soul_state;
+pub mod stakeholder_columns;
+pub mod stakeholders;
 pub mod todos;
 pub mod trips;
 pub mod work_columns;
@@ -36,3 +38,5 @@ pub mod insight_tasks;
 pub mod insight_share;
 // T-204 SPEC insight-factory P0
 pub mod insight_factory;
+// T-218 SPEC analytics — user behavior events ingest
+pub mod events;

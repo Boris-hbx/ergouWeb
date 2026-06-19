@@ -38,6 +38,7 @@ body:has(.sidebar.collapsed) { --sidebar-width: 0px; }
   min-width: 0;
 }
 #work-table-view { width: 100%; min-width: 0; }
+#stakeholder-view { width: 100%; min-width: 0; }
 
 /* ============ 工具栏 ============ */
 .wt-back-btn {
@@ -92,6 +93,407 @@ body:has(.sidebar.collapsed) { --sidebar-width: 0px; }
 .wt-newbtn {
   background: var(--primary-gradient); border: none; color: #fff; font-weight: 600;
   border-radius: 10px; padding: 9px 17px; font-size: 0.88rem; cursor: pointer;
+}
+
+/* ============ T-223 干系人 ============ */
+.sh-toolbar {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 18px;
+}
+.sh-toolbar h2 {
+  font-size: 1.45rem; margin: 0 6px 0 0; color: var(--text-primary); letter-spacing: .01em;
+}
+.sh-card .wt-card-title { font-size: 0.98rem; }
+.sh-bubble {
+  background: linear-gradient(135deg, rgba(20, 184, 166, .12), rgba(124, 77, 255, .12));
+  border-color: rgba(20, 184, 166, .24);
+}
+.sh-bubble .wt-b-count { color: #0F766E; }
+.sh-bubble-empty {
+  background: #F4F4F5;
+  border-color: #D4D4D8;
+}
+.sh-detail-drawer {
+  padding: 18px 20px;
+}
+.sh-detail-head {
+  display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 12px;
+}
+.sh-icon-btn {
+  width: 32px; height: 32px; border-radius: 8px;
+  border: 1px solid var(--border-color); background: var(--bg-card);
+  color: var(--text-secondary); cursor: pointer;
+}
+.sh-icon-btn:hover:not(:disabled) { color: var(--text-primary); border-color: var(--primary-color); }
+.sh-icon-btn:disabled { opacity: .38; cursor: default; }
+.sh-icon-btn.danger:hover { color: #E11D48; border-color: #E11D48; }
+.sh-detail-title {
+  font-size: 1.25rem; font-weight: 700; color: var(--text-primary);
+  margin-bottom: 16px; line-height: 1.35;
+}
+.sh-detail-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+}
+.sh-field {
+  display: flex; flex-direction: column; gap: 6px;
+}
+.sh-field span {
+  font-size: 0.78rem; color: var(--text-muted); font-weight: 600;
+}
+.sh-field input,
+.sh-field textarea {
+  width: 100%; box-sizing: border-box;
+  border: 1px solid var(--border-color); border-radius: 8px;
+  padding: 9px 11px; font-size: 0.9rem; color: var(--text-primary);
+  background: var(--bg-input); font-family: inherit;
+}
+.sh-field textarea {
+  min-height: 82px; resize: vertical;
+}
+.sh-field input:focus,
+.sh-field textarea:focus {
+  outline: none; border-color: var(--primary-color);
+}
+.sh-field-hint {
+  font-size: 0.72rem; color: var(--text-muted); opacity: 0.8;
+}
+.sh-detail-actions {
+  display: flex; justify-content: flex-end; margin-top: 16px; padding-top: 14px;
+  border-top: 1px solid var(--border-light);
+}
+.sh-create-ov {
+  display: none; position: fixed; inset: 0; z-index: 1080;
+  background: rgba(15, 23, 42, .34); align-items: center; justify-content: center;
+}
+.sh-create-ov.open { display: flex; }
+.sh-create-box {
+  width: min(720px, 94vw); max-height: 88vh; overflow: hidden;
+  background: var(--bg-card); border-radius: 12px;
+  box-shadow: 0 18px 48px rgba(15, 23, 42, .22);
+  display: flex; flex-direction: column;
+}
+.sh-create-hd {
+  padding: 16px 18px; font-weight: 700; color: var(--text-primary);
+  border-bottom: 1px solid var(--border-light);
+}
+.sh-create-bd {
+  padding: 16px 18px; overflow: auto;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+}
+.sh-create-bar {
+  display: flex; justify-content: flex-end; gap: 8px;
+  padding: 14px 18px; border-top: 1px solid var(--border-light);
+}
+
+.sh-graph-toolbar { margin-top: 0; }
+.sh-graph-shell {
+  display: grid;
+  grid-template-columns: minmax(620px, 1fr) 280px;
+  gap: 14px;
+  align-items: stretch;
+}
+.sh-graph-canvas {
+  position: relative;
+  min-height: 560px;
+  border: 1px solid #E5E3EE;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #FFFFFF 0%, #FAF9FC 100%);
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(15, 15, 30, 0.04), 0 4px 12px rgba(15, 15, 30, 0.06);
+}
+.sh-graph-canvas::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(124, 77, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(124, 77, 255, 0.04) 1px, transparent 1px);
+  background-size: 42px 42px;
+  pointer-events: none;
+}
+.sh-graph-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.sh-graph-edge {
+  fill: none;
+  stroke: rgba(71, 85, 105, 0.24);
+  stroke-width: 0.36;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  transition: opacity .15s, stroke .15s, stroke-width .15s, filter .15s;
+}
+.sh-graph-edge.is-active {
+  stroke: rgba(15, 118, 110, 0.62);
+  stroke-width: 0.82;
+  filter: drop-shadow(0 1px 2px rgba(15, 118, 110, 0.14));
+}
+.sh-graph-edge.is-clue {
+  stroke: rgba(100, 116, 139, 0.28);
+  stroke-width: 0.32;
+  stroke-dasharray: 1.4 1.8;
+}
+.sh-graph-edge.is-clue.is-active {
+  stroke: rgba(79, 70, 229, 0.54);
+  stroke-width: 0.66;
+}
+.sh-graph-edge.is-dimmed { opacity: .08; }
+.sh-graph-node {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  border: 1px solid #D7D2E6;
+  border-radius: 999px;
+  background: #fff;
+  color: #1F2937;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(15, 15, 30, 0.08);
+  transition: transform .15s, opacity .15s, border-color .15s, box-shadow .15s, background .15s;
+  z-index: 2;
+}
+.sh-graph-node:hover,
+.sh-graph-node.is-active,
+.sh-graph-node.is-related {
+  transform: translate(-50%, -50%) scale(1.05);
+  border-color: rgba(20, 184, 166, 0.72);
+  box-shadow: 0 8px 22px rgba(20, 184, 166, 0.16), 0 2px 8px rgba(15, 15, 30, 0.08);
+}
+.sh-graph-node.is-dimmed { opacity: .24; }
+.sh-graph-node.is-match { outline: 3px solid rgba(245, 158, 11, 0.24); }
+.sh-graph-dim {
+  background: linear-gradient(135deg, #ECFEFF 0%, #F5F3FF 100%);
+  color: #0F766E;
+  font-weight: 700;
+}
+.sh-graph-dim.is-empty {
+  background: #F4F4F5;
+  color: #71717A;
+  border-style: dashed;
+}
+.sh-graph-person { background: #FFFFFF; }
+.sh-graph-person.has-rhythm {
+  border-color: rgba(20, 184, 166, 0.54);
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.08), 0 2px 8px rgba(15, 15, 30, 0.08);
+}
+.sh-graph-label {
+  max-width: 92px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  line-height: 1.15;
+}
+.sh-graph-meta {
+  max-width: 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #64748B;
+  font-size: 10px;
+  line-height: 1.1;
+  font-weight: 500;
+}
+.sh-graph-side {
+  border: 1px solid #E5E3EE;
+  border-radius: 8px;
+  background: #fff;
+  padding: 14px;
+  min-height: 560px;
+  box-shadow: 0 1px 2px rgba(15, 15, 30, 0.04), 0 4px 12px rgba(15, 15, 30, 0.06);
+}
+.sh-graph-side-title {
+  font-weight: 750;
+  color: #1F2937;
+  margin-bottom: 4px;
+}
+.sh-graph-side-sub,
+.sh-graph-side-empty {
+  color: #64748B;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.sh-graph-side-empty {
+  margin-top: 18px;
+  padding: 12px;
+  border: 1px dashed #E5E3EE;
+  border-radius: 8px;
+  background: #FAF9FC;
+}
+.sh-graph-action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+.sh-graph-action-grid div {
+  border: 1px solid #E5E3EE;
+  border-radius: 8px;
+  padding: 9px 10px;
+  background: #FAF9FC;
+}
+.sh-graph-action-grid span {
+  display: block;
+  color: #1F2937;
+  font-size: 18px;
+  font-weight: 760;
+  line-height: 1.1;
+}
+.sh-graph-action-grid small {
+  display: block;
+  margin-top: 3px;
+  color: #64748B;
+  font-size: 11px;
+}
+.sh-graph-risk,
+.sh-graph-ok,
+.sh-graph-clue-note {
+  margin-top: 10px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.sh-graph-risk {
+  border: 1px solid rgba(245, 158, 11, 0.28);
+  background: #FFFBEB;
+  color: #92400E;
+}
+.sh-graph-ok {
+  border: 1px solid rgba(20, 184, 166, 0.22);
+  background: #F0FDFA;
+  color: #0F766E;
+}
+.sh-graph-clue-note {
+  border: 1px solid #E5E3EE;
+  background: #FAF9FC;
+  color: #475569;
+}
+.sh-graph-section-title {
+  margin-top: 14px;
+  color: #1F2937;
+  font-size: 12px;
+  font-weight: 740;
+}
+.sh-graph-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.sh-graph-chip-row button {
+  border: 1px solid #D7D2E6;
+  border-radius: 999px;
+  background: #FFFFFF;
+  color: #334155;
+  padding: 5px 9px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.sh-graph-chip-row button:hover {
+  border-color: rgba(20, 184, 166, 0.54);
+  color: #0F766E;
+}
+.sh-graph-field-grid {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+.sh-graph-field {
+  border: 1px solid #E5E3EE;
+  border-radius: 8px;
+  background: #FAF9FC;
+  padding: 8px 10px;
+}
+.sh-graph-field small {
+  display: block;
+  color: #64748B;
+  font-size: 11px;
+  margin-bottom: 3px;
+}
+.sh-graph-field span {
+  display: block;
+  color: #1F2937;
+  font-size: 12px;
+  line-height: 1.42;
+  white-space: pre-wrap;
+}
+.sh-graph-field.is-long span {
+  max-height: 92px;
+  overflow: auto;
+}
+.sh-graph-clue-list {
+  display: grid;
+  gap: 7px;
+  margin-top: 8px;
+}
+.sh-graph-clue-item {
+  border: 1px dashed #D7D2E6;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #FFFFFF;
+}
+.sh-graph-clue-item span {
+  display: block;
+  color: #1F2937;
+  font-size: 12px;
+  font-weight: 650;
+}
+.sh-graph-clue-item small {
+  display: block;
+  margin-top: 3px;
+  color: #64748B;
+  font-size: 11px;
+}
+.sh-graph-detail-btn {
+  width: 100%;
+  margin-top: 14px;
+  border: 1px solid rgba(20, 184, 166, 0.45);
+  border-radius: 8px;
+  background: #F0FDFA;
+  color: #0F766E;
+  font-weight: 720;
+  padding: 9px 10px;
+  cursor: pointer;
+}
+.sh-graph-detail-btn:hover {
+  background: #CCFBF1;
+}
+.sh-graph-person-list {
+  margin-top: 12px;
+  display: grid;
+  gap: 8px;
+}
+.sh-graph-person-row {
+  width: 100%;
+  border: 1px solid #E5E3EE;
+  border-radius: 8px;
+  background: #FAF9FC;
+  padding: 9px 10px;
+  text-align: left;
+  cursor: pointer;
+}
+.sh-graph-person-row:hover {
+  border-color: rgba(124, 77, 255, 0.34);
+  background: #fff;
+}
+.sh-graph-person-row span {
+  display: block;
+  color: #1F2937;
+  font-weight: 650;
+}
+.sh-graph-person-row small {
+  display: block;
+  margin-top: 3px;
+  color: #64748B;
+  line-height: 1.35;
 }
 
 /* T-098: 时间镜头 Tab(全部 / 今日 / 本周 / 本月)—— 仿 todo 顶部 Tab 样式

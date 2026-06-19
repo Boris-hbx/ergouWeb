@@ -143,38 +143,7 @@ var WorkDistribution = (function() {
     // ── 按维度分组:returns [{ name, tasks:[{task,extra}], isUnmarked }] ──
     //   multi:同一任务在每个值都出现一次;extra = 该任务在此维度的总值数 - 1
     function _groupByDim(rows, col) {
-        var map = Object.create(null);
-        var order = [];   // 维持首次出现顺序,稳定排序
-        var unmarked = [];
-        rows.forEach(function(t) {
-            var values = _getValues(t, col);
-            if (values.length === 0) {
-                unmarked.push({ task: t, extra: 0 });
-                return;
-            }
-            values.forEach(function(v) {
-                var label = _valueLabel(col, v);
-                if (!map[label]) {
-                    map[label] = [];
-                    order.push(label);
-                }
-                map[label].push({ task: t, extra: values.length - 1 });
-            });
-        });
-        // 默认按任务数降序;并列时按首次出现顺序
-        order.sort(function(a, b) {
-            var d = map[b].length - map[a].length;
-            if (d !== 0) return d;
-            return order.indexOf(a) - order.indexOf(b);
-        });
-        var groups = order.map(function(n) {
-            return { name: n, tasks: map[n], isUnmarked: false };
-        });
-        // 未标记永远置末(spec § 6.5)
-        if (unmarked.length > 0) {
-            groups.push({ name: UNMARKED, tasks: unmarked, isUnmarked: true });
-        }
-        return groups;
+        return WorkGridEngine.groupByDimension(rows, col, _getValues, _valueLabel, UNMARKED);
     }
 
     // ── 气泡颜色:优先级 逾期 > P0 > 正常 > 仅低优 ──
@@ -284,29 +253,28 @@ var WorkDistribution = (function() {
     function _renderBubbles(groups) {
         var row = document.getElementById('wt-dist-bubble-row');
         if (!row) return;
-        row.innerHTML = '';
-        groups.forEach(function(g) {
-            var size = _bubbleSize(g.tasks.length);
-            var overdue = _overdueCount(g.tasks);
-            var b = document.createElement('div');
-            b.className = 'wt-bubble ' + _bubbleClass(g);
-            b.style.width = size + 'px';
-            b.style.height = size + 'px';
-            b.dataset.tag = g.name;
-            b.innerHTML = '<div class="wt-b-name">' + _esc(g.name) + '</div>'
-                + '<div class="wt-b-count">' + g.tasks.length + '</div>'
-                + (overdue ? '<div class="wt-b-badge">⏰ ' + overdue + '</div>' : '');
-            b.onclick = function() { _toggleCard(g.name, true); };
-            row.appendChild(b);
+        WorkGridEngine.renderBubbles({
+            host: row,
+            groups: groups,
+            size: function(g) { return _bubbleSize(g.tasks.length); },
+            className: function(g) { return 'wt-bubble ' + _bubbleClass(g); },
+            html: function(g) {
+                var overdue = _overdueCount(g.tasks);
+                return '<div class="wt-b-name">' + _esc(g.name) + '</div>'
+                    + '<div class="wt-b-count">' + g.tasks.length + '</div>'
+                    + (overdue ? '<div class="wt-b-badge">⏰ ' + overdue + '</div>' : '');
+            },
+            onClick: function(g) { _toggleCard(g.name, true); },
         });
     }
 
     function _renderCards(groups, col) {
         var grid = document.getElementById('wt-dist-tag-grid');
         if (!grid) return;
-        grid.innerHTML = '';
-        groups.forEach(function(g) {
-            grid.appendChild(_buildCard(g, col));
+        WorkGridEngine.renderCards({
+            host: grid,
+            groups: groups,
+            card: function(g) { return _buildCard(g, col); },
         });
         _bindCardInteractions();
     }
