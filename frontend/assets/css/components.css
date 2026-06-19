@@ -215,6 +215,63 @@
     }
 }
 
+/* ========== Table / List / Card Density Primitives (T-242) ========== */
+.eg-table-surface {
+    border: 1px solid var(--eg-border, #dfe5ee);
+    border-radius: var(--eg-radius-lg, 8px);
+    background: var(--eg-surface, #fff);
+    box-shadow: none;
+    overflow: hidden;
+}
+
+.eg-density-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: var(--eg-font-size-sm, 13px);
+}
+
+.eg-density-table th {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--eg-border, #dfe5ee);
+    background: var(--eg-surface-muted, #f7f9fc);
+    color: var(--eg-text-muted, #647084);
+    font-weight: 650;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.eg-density-table td {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--eg-border-subtle, #e8edf4);
+    color: var(--eg-text-body, #475569);
+    vertical-align: middle;
+}
+
+.eg-density-table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+.eg-density-table tbody tr:hover td {
+    background: var(--eg-surface-muted, #f7f9fc);
+}
+
+.eg-repeated-card {
+    border: 1px solid var(--eg-border, #dfe5ee);
+    border-radius: var(--eg-radius-lg, 8px);
+    background: var(--eg-surface, #fff);
+    box-shadow: none;
+}
+
+.eg-repeated-card:hover {
+    border-color: var(--eg-border-strong, #c7d0dd);
+    background: var(--eg-surface-muted, #f7f9fc);
+}
+
+.eg-list-divider {
+    border-color: var(--eg-border-subtle, #e8edf4);
+}
+
 /* ========== Unified Button Language (T-238) ========== */
 .eg-btn {
     --eg-btn-primary: var(--primary-color, #315bea);
