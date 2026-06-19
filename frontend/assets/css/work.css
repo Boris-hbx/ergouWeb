@@ -46,14 +46,14 @@ body:has(.sidebar.collapsed) { --sidebar-width: 0px; }
   cursor: pointer; font-size: 0.92rem; padding: 6px 0; margin-bottom: 6px;
 }
 .wt-toolbar {
-  display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 20px;
+  display: flex; align-items: center; gap: var(--eg-space-3, 12px); flex-wrap: wrap; margin-bottom: 20px;
 }
 .wt-toolbar h2 {
-  font-size: 1.45rem; margin: 0 6px 0 0; color: var(--text-primary); letter-spacing: .01em;
+  font-size: 1.45rem; margin: 0 6px 0 0; color: var(--eg-text-strong, var(--text-primary)); letter-spacing: 0;
 }
 .wt-total {
-  font-size: 0.82rem; color: #475569;
-  background: #F1F5F9; border: 1px solid #E2E8F0;
+  font-size: 0.82rem; color: var(--eg-text-muted, #475569);
+  background: var(--eg-surface-muted, #F1F5F9); border: 1px solid var(--eg-border-subtle, #E2E8F0);
   border-radius: 20px; padding: 4px 12px;
 }
 /* T-130:全局搜索框(紧贴「共 N 项」胶囊右侧;auto 外边距把后续控件推到右侧) */
@@ -61,11 +61,11 @@ body:has(.sidebar.collapsed) { --sidebar-width: 0px; }
   position: relative; display: inline-flex; align-items: center; margin-right: auto;
 }
 .wt-search {
-  width: 200px; background: var(--bg-input); color: var(--text-primary);
-  border: 1px solid var(--border-color); border-radius: 10px;
+  width: 200px; background: var(--eg-surface, var(--bg-input)); color: var(--eg-text-strong, var(--text-primary));
+  border: 1px solid var(--eg-border, var(--border-color)); border-radius: var(--eg-radius-lg, 10px);
   padding: 8px 28px 8px 13px; font-size: 0.88rem;
 }
-.wt-search:focus { outline: none; border-color: var(--primary-color, #7C4DFF); }
+.wt-search:focus { outline: none; border-color: var(--primary-color, #7C4DFF); box-shadow: var(--eg-focus-ring, none); }
 .wt-search-clear {
   position: absolute; right: 9px; cursor: pointer; color: var(--text-secondary);
   font-size: 0.8rem; line-height: 1; user-select: none;
@@ -85,11 +85,29 @@ body:has(.sidebar.collapsed) { --sidebar-width: 0px; }
 }
 .wt-seg button:hover { color: var(--text-primary); }
 .wt-seg button.active { background: var(--primary-gradient); color: #fff; }
+.wt-seg.eg-segment {
+  gap: 2px; padding: 3px; background: var(--eg-surface-muted, var(--bg-secondary));
+  border-color: var(--eg-border, var(--border-color)); border-radius: var(--eg-radius-lg, 10px);
+  overflow: auto;
+}
+.wt-seg.eg-segment button {
+  padding: 0 12px; border-radius: var(--eg-radius-md, 8px);
+  color: var(--eg-text-body, var(--text-secondary)); font-weight: 650;
+}
+.wt-seg.eg-segment button:hover {
+  background: var(--eg-surface, #fff); color: var(--eg-text-strong, var(--text-primary));
+}
+.wt-seg.eg-segment button.active {
+  background: var(--eg-surface-overlay, #fff);
+  color: var(--primary-color, #7C4DFF);
+  box-shadow: var(--eg-shadow-card, 0 1px 2px rgba(23, 32, 51, .08));
+}
 .wt-select {
-  background: var(--bg-input); color: var(--text-primary);
-  border: 1px solid var(--border-color); border-radius: 10px;
+  background: var(--eg-surface, var(--bg-input)); color: var(--eg-text-body, var(--text-primary));
+  border: 1px solid var(--eg-border, var(--border-color)); border-radius: var(--eg-radius-md, 10px);
   padding: 8px 13px; font-size: 0.88rem; cursor: pointer;
 }
+.wt-select.eg-control-select { padding: 0 12px; }
 .wt-newbtn {
   background: var(--primary-gradient); border: none; color: #fff; font-weight: 600;
   border-radius: 10px; padding: 9px 17px; font-size: 0.88rem; cursor: pointer;
@@ -97,10 +115,24 @@ body:has(.sidebar.collapsed) { --sidebar-width: 0px; }
 
 /* ============ T-223 干系人 ============ */
 .sh-toolbar {
-  display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 18px;
+  display: flex; align-items: center; gap: var(--eg-space-3, 12px); flex-wrap: wrap; margin-bottom: 18px;
 }
 .sh-toolbar h2 {
-  font-size: 1.45rem; margin: 0 6px 0 0; color: var(--text-primary); letter-spacing: .01em;
+  font-size: 1.45rem; margin: 0 6px 0 0; color: var(--eg-text-strong, var(--text-primary)); letter-spacing: 0;
+}
+@media (max-width: 760px) {
+  .wt-search-box.eg-toolbar__search {
+    margin-right: 0;
+  }
+
+  .wt-seg.eg-segment {
+    max-width: 100%;
+  }
+
+  .eg-toolbar__actions .eg-btn,
+  .eg-toolbar__actions .eg-control-select {
+    flex: 0 1 auto;
+  }
 }
 .sh-card .wt-card-title { font-size: 0.98rem; }
 .sh-bubble {

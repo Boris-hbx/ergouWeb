@@ -75,6 +75,146 @@
     box-shadow: var(--eg-shadow-popover);
 }
 
+/* ========== Toolbar / Segment Primitives (T-241) ========== */
+.eg-toolbar {
+    display: flex;
+    align-items: center;
+    gap: var(--eg-space-3, 12px);
+    flex-wrap: wrap;
+    margin-bottom: var(--eg-space-4, 16px);
+}
+
+.eg-toolbar__title {
+    margin: 0;
+    color: var(--eg-text-strong, var(--text-primary, #172033));
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 0;
+}
+
+.eg-toolbar__meta {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    padding: 0 10px;
+    border: 1px solid var(--eg-border-subtle, #e8edf4);
+    border-radius: 999px;
+    background: var(--eg-surface-muted, #f7f9fc);
+    color: var(--eg-text-muted, #647084);
+    font-size: var(--eg-font-size-xs, 12px);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.eg-toolbar__search {
+    margin-right: auto;
+}
+
+.eg-toolbar__view {
+    flex: 0 1 auto;
+}
+
+.eg-toolbar__actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--eg-space-2, 8px);
+    flex-wrap: wrap;
+    margin-left: auto;
+}
+
+.eg-toolbar__spacer {
+    flex: 1 1 auto;
+}
+
+.eg-segment {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 3px;
+    border: 1px solid var(--eg-border, #dfe5ee);
+    border-radius: var(--eg-radius-lg, 10px);
+    background: var(--eg-surface-muted, #f7f9fc);
+    overflow: auto;
+    scrollbar-width: none;
+}
+
+.eg-segment::-webkit-scrollbar {
+    display: none;
+}
+
+.eg-segment > button {
+    min-height: 30px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: var(--eg-radius-md, 8px);
+    background: transparent;
+    color: var(--eg-text-body, #475569);
+    font: inherit;
+    font-size: var(--eg-font-size-sm, 13px);
+    font-weight: 650;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background .15s ease, color .15s ease, box-shadow .15s ease;
+}
+
+.eg-segment > button:hover {
+    background: var(--eg-surface, #fff);
+    color: var(--eg-text-strong, #172033);
+}
+
+.eg-segment > button.active,
+.eg-segment > button.selected,
+.eg-segment > button[aria-selected="true"] {
+    background: var(--eg-surface-overlay, #fff);
+    color: var(--primary-color, #315bea);
+    box-shadow: var(--eg-shadow-card, 0 1px 2px rgba(23, 32, 51, .08));
+}
+
+.eg-control-select {
+    min-height: 36px;
+    padding: 0 12px;
+    border: 1px solid var(--eg-border, #dfe5ee);
+    border-radius: var(--eg-radius-md, 8px);
+    background: var(--eg-surface, #fff);
+    color: var(--eg-text-body, #475569);
+    font: inherit;
+    font-size: var(--eg-font-size-sm, 13px);
+    cursor: pointer;
+    box-sizing: border-box;
+}
+
+.eg-control-select:focus {
+    outline: 0;
+    border-color: var(--primary-color, #315bea);
+    box-shadow: var(--eg-focus-ring, 0 0 0 3px rgba(49, 91, 234, .18));
+}
+
+@media (max-width: 760px) {
+    .eg-toolbar {
+        align-items: stretch;
+    }
+
+    .eg-toolbar__search {
+        order: 2;
+        flex: 1 1 100%;
+        margin-right: 0;
+    }
+
+    .eg-toolbar__view {
+        order: 3;
+        max-width: 100%;
+    }
+
+    .eg-toolbar__actions {
+        order: 4;
+        width: 100%;
+        margin-left: 0;
+        justify-content: flex-start;
+    }
+}
+
 /* ========== Unified Button Language (T-238) ========== */
 .eg-btn {
     --eg-btn-primary: var(--primary-color, #315bea);

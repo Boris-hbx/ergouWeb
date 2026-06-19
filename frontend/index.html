@@ -8,17 +8,17 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Next">
     <title>Next - Focus on the Right Thing</title>
-    <link rel="stylesheet" href="assets/css/base.css?v=20260619f">
-    <link rel="stylesheet" href="assets/css/style.css?v=20260619f">
-    <link rel="stylesheet" href="assets/css/components.css?v=20260619f">
-    <link rel="stylesheet" href="assets/css/mobile.css?v=20260619f">
-    <link rel="stylesheet" href="assets/css/abao.css?v=20260619f">
-    <link rel="stylesheet" href="assets/css/english.css?v=20260619f">
-    <link rel="stylesheet" href="assets/css/health.css?v=20260619f">
-    <link rel="stylesheet" href="assets/css/patrol.css?v=20260619f">
-    <link rel="stylesheet" href="assets/css/admin-panel.css?v=20260619f">
-    <link rel="stylesheet" href="assets/css/work.css?v=20260619f">
-    <link rel="stylesheet" href="assets/css/insight.css?v=20260619f">
+    <link rel="stylesheet" href="assets/css/base.css?v=20260619g">
+    <link rel="stylesheet" href="assets/css/style.css?v=20260619g">
+    <link rel="stylesheet" href="assets/css/components.css?v=20260619g">
+    <link rel="stylesheet" href="assets/css/mobile.css?v=20260619g">
+    <link rel="stylesheet" href="assets/css/abao.css?v=20260619g">
+    <link rel="stylesheet" href="assets/css/english.css?v=20260619g">
+    <link rel="stylesheet" href="assets/css/health.css?v=20260619g">
+    <link rel="stylesheet" href="assets/css/patrol.css?v=20260619g">
+    <link rel="stylesheet" href="assets/css/admin-panel.css?v=20260619g">
+    <link rel="stylesheet" href="assets/css/work.css?v=20260619g">
+    <link rel="stylesheet" href="assets/css/insight.css?v=20260619g">
     <link rel="manifest" href="assets/manifest.json">
     <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
     <script>
@@ -1250,13 +1250,13 @@
                 </button>
                 <div class="wt-tab-indicator" id="wt-tab-indicator"></div>
             </div>
-            <div class="wt-toolbar">
-                <h2>任务表</h2>
+            <div class="wt-toolbar eg-toolbar">
+                <h2 class="eg-toolbar__title">任务表</h2>
                 <!-- T-118:心电图折叠切换按钮(展开/收起 30 天负载心电图) -->
                 <button class="wt-heart-toggle" id="wt-heart-toggle" onclick="Work.toggleHeartStrip()" title="30 天负载心电图(展开/收起)">📊 心电图</button>
-                <span class="wt-total" id="wt-total">共 0 项</span>
+                <span class="wt-total eg-toolbar__meta" id="wt-total">共 0 项</span>
                 <!-- T-130:全局搜索(实时 filter,跨 5 视图;不含已完成档案) -->
-                <span class="wt-search-box">
+                <span class="wt-search-box eg-toolbar__search">
                     <input type="text" id="wt-search" class="wt-search" placeholder="🔍 搜索任务…"
                            oninput="Work.onSearchInput(this.value)" onkeydown="Work.onSearchKey(event)">
                     <span class="wt-search-clear" id="wt-search-clear" style="display:none"
@@ -1267,7 +1267,7 @@
                     <span>📅 <span id="wt-dfc-date"></span></span>
                     <span class="wt-dfc-x" onclick="Work.clearDateFilter()" title="清除日期过滤">✕</span>
                 </span>
-                <div class="wt-seg">
+                <div class="wt-seg eg-segment eg-toolbar__view">
                     <button id="wt-seg-center" class="active" onclick="Work.setView('center')">中枢</button>
                     <button id="wt-seg-table" onclick="Work.setView('table')">▦ 表格</button>
                     <button id="wt-seg-board" onclick="Work.setView('board')">▤ 看板</button>
@@ -1279,18 +1279,20 @@
                     <button id="wt-seg-attention" onclick="Work.setView('attention')">注意力</button>
                 </div>
                 <!-- T-132:责任人下拉已移除,改由责任人列表头漏斗筛选(多选,等价且更强) -->
-                <a class="wt-clear-filters" id="wt-clear-filters" style="display:none"
-                   onclick="WorkTable.clearAllFilters()" title="清空所有表头列筛选">✕ 清除全部筛选</a>
-                <select class="wt-select" id="wt-group" onchange="Work.render()">
-                    <option value="">不分组</option>
-                    <option value="level">按层级分组</option>
-                    <option value="assignee">按责任人分组</option>
-                    <option value="status">按状态分组</option>
-                    <option value="area">按领域分组</option>
-                    <option value="engage">按参与模式分组</option>
-                </select>
-                <button class="eg-btn eg-btn--secondary" onclick="WorkColumnCfg.open()" title="编辑表头、列类型、增删列">⚙ 列设置</button>
-                <button class="eg-btn eg-btn--primary" data-track="work.task.create" onclick="WorkTable.addRow()">+ 新建任务</button>
+                <div class="eg-toolbar__actions">
+                    <a class="wt-clear-filters" id="wt-clear-filters" style="display:none"
+                       onclick="WorkTable.clearAllFilters()" title="清空所有表头列筛选">✕ 清除全部筛选</a>
+                    <select class="wt-select eg-control-select" id="wt-group" onchange="Work.render()">
+                        <option value="">不分组</option>
+                        <option value="level">按层级分组</option>
+                        <option value="assignee">按责任人分组</option>
+                        <option value="status">按状态分组</option>
+                        <option value="area">按领域分组</option>
+                        <option value="engage">按参与模式分组</option>
+                    </select>
+                    <button class="eg-btn eg-btn--secondary" onclick="WorkColumnCfg.open()" title="编辑表头、列类型、增删列">⚙ 列设置</button>
+                    <button class="eg-btn eg-btn--primary" data-track="work.task.create" onclick="WorkTable.addRow()">+ 新建任务</button>
+                </div>
             </div>
 
             <div id="wt-center-view" class="wt-hidden"></div>
@@ -1307,24 +1309,26 @@
         <!-- T-223:干系人独立页(表格 / 看板 / 分布) -->
         <div id="stakeholder-view" style="display:none;">
             <button class="wt-back-btn" onclick="Stakeholder.backToHub()">&larr; 工作</button>
-            <div class="sh-toolbar">
-                <h2>干系人</h2>
-                <span class="wt-total" id="sh-total">共 0 人</span>
-                <span class="wt-search-box">
+            <div class="sh-toolbar eg-toolbar">
+                <h2 class="eg-toolbar__title">干系人</h2>
+                <span class="wt-total eg-toolbar__meta" id="sh-total">共 0 人</span>
+                <span class="wt-search-box eg-toolbar__search">
                     <input type="text" id="sh-search" class="wt-search" placeholder="🔍 搜索姓名/部门/事项..."
                            oninput="Stakeholder.onSearchInput(this.value)" onkeydown="Stakeholder.onSearchKey(event)">
                     <span class="wt-search-clear" id="sh-search-clear" style="display:none"
                           onclick="Stakeholder.clearSearch()" title="清空(Esc)">✕</span>
                 </span>
-                <div class="wt-seg">
+                <div class="wt-seg eg-segment eg-toolbar__view">
                     <button id="sh-seg-table" class="active" onclick="Stakeholder.setView('table')">▦ 表格</button>
                     <button id="sh-seg-board" onclick="Stakeholder.setView('board')">▤ 看板</button>
                     <button id="sh-seg-distribution" onclick="Stakeholder.setView('distribution')">✦ 分布</button>
                     <button id="sh-seg-graph" onclick="Stakeholder.setView('graph')">◎ 关系图</button>
                 </div>
-                <select class="wt-select" id="sh-board-dim" onchange="Stakeholder.setBoardDim(this.value)" title="看板分列维度"></select>
-                <button class="eg-btn eg-btn--secondary" onclick="Stakeholder.openColumns()" title="编辑干系人表头、列类型、增删列">⚙ 列设置</button>
-                <button class="eg-btn eg-btn--primary" data-track="stakeholder.create" onclick="Stakeholder.openCreate()">+ 新建干系人</button>
+                <div class="eg-toolbar__actions">
+                    <select class="wt-select eg-control-select" id="sh-board-dim" onchange="Stakeholder.setBoardDim(this.value)" title="看板分列维度"></select>
+                    <button class="eg-btn eg-btn--secondary" onclick="Stakeholder.openColumns()" title="编辑干系人表头、列类型、增删列">⚙ 列设置</button>
+                    <button class="eg-btn eg-btn--primary" data-track="stakeholder.create" onclick="Stakeholder.openCreate()">+ 新建干系人</button>
+                </div>
             </div>
             <div id="sh-table-view" class="wt-table-wrap"></div>
             <div id="sh-board-view" class="wt-board wt-hidden"></div>
@@ -1850,75 +1854,75 @@
     </div>
 
     <!-- Markdown rendering (T-133: 本地自托管,CDN 仅作兜底——jsdelivr 国内常失败,失败则退化裸 markdown) -->
-    <script src="assets/vendor/marked.min.js?v=20260619f"></script>
+    <script src="assets/vendor/marked.min.js?v=20260619g"></script>
     <script>window.marked||document.write('<script src="https://cdn.jsdelivr.net/npm/marked@15/marked.min.js"><\/script>');</script>
-    <script src="assets/vendor/purify.min.js?v=20260619f"></script>
+    <script src="assets/vendor/purify.min.js?v=20260619g"></script>
     <script>window.DOMPurify||document.write('<script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"><\/script>');</script>
 
     <!-- JS Modules -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
-    <script src="assets/js/observability.js?v=20260619f"></script>
-    <script src="assets/js/api.js?v=20260619f"></script>
-    <script src="assets/js/utils.js?v=20260619f"></script>
+    <script src="assets/js/observability.js?v=20260619g"></script>
+    <script src="assets/js/api.js?v=20260619g"></script>
+    <script src="assets/js/utils.js?v=20260619g"></script>
     <!-- T-095: 通用弹窗组件 (openProgressDialog / openTextInputDialog),tasks.js 和 work-table.js 都依赖 -->
-    <script src="assets/js/dialogs.js?v=20260619f"></script>
-    <script src="assets/js/jelly-indicator.js?v=20260619f"></script>
-    <script src="assets/js/app.js?v=20260619f"></script>
-    <script src="assets/js/tasks.js?v=20260619f"></script>
-    <script src="assets/js/modal.js?v=20260619f"></script>
-    <script src="assets/js/datepicker.js?v=20260619f"></script>
-    <script src="assets/js/drag.js?v=20260619f"></script>
-    <script src="assets/js/actionsheet.js?v=20260619f"></script>
-    <script src="assets/js/share-modal.js?v=20260619f"></script>
-    <script src="assets/js/review.js?v=20260619f"></script>
-    <script src="assets/js/routines.js?v=20260619f"></script>
-    <script src="assets/js/features.js?v=20260619f"></script>
-    <script src="assets/js/particles.js?v=20260619f"></script>
-    <script src="assets/js/living-line.js?v=20260619f"></script>
-    <script src="assets/js/abao.js?v=20260619f"></script>
-    <script src="assets/js/english.js?v=20260619f"></script>
-    <script src="assets/js/life.js?v=20260619f"></script>
-    <script src="assets/js/expense.js?v=20260619f"></script>
-    <script src="assets/js/expense-analytics.js?v=20260619f"></script>
-    <script src="assets/js/trip.js?v=20260619f"></script>
-    <script src="assets/js/health-data.js?v=20260619f"></script>
-    <script src="assets/js/health-renderer.js?v=20260619f"></script>
-    <script src="assets/js/health.js?v=20260619f"></script>
-    <script src="assets/js/friends.js?v=20260619f"></script>
-    <script src="assets/js/notifications.js?v=20260619f"></script>
-    <script src="assets/js/settings.js?v=20260619f"></script>
-    <script src="assets/js/admin-panel.js?v=20260619f"></script>
+    <script src="assets/js/dialogs.js?v=20260619g"></script>
+    <script src="assets/js/jelly-indicator.js?v=20260619g"></script>
+    <script src="assets/js/app.js?v=20260619g"></script>
+    <script src="assets/js/tasks.js?v=20260619g"></script>
+    <script src="assets/js/modal.js?v=20260619g"></script>
+    <script src="assets/js/datepicker.js?v=20260619g"></script>
+    <script src="assets/js/drag.js?v=20260619g"></script>
+    <script src="assets/js/actionsheet.js?v=20260619g"></script>
+    <script src="assets/js/share-modal.js?v=20260619g"></script>
+    <script src="assets/js/review.js?v=20260619g"></script>
+    <script src="assets/js/routines.js?v=20260619g"></script>
+    <script src="assets/js/features.js?v=20260619g"></script>
+    <script src="assets/js/particles.js?v=20260619g"></script>
+    <script src="assets/js/living-line.js?v=20260619g"></script>
+    <script src="assets/js/abao.js?v=20260619g"></script>
+    <script src="assets/js/english.js?v=20260619g"></script>
+    <script src="assets/js/life.js?v=20260619g"></script>
+    <script src="assets/js/expense.js?v=20260619g"></script>
+    <script src="assets/js/expense-analytics.js?v=20260619g"></script>
+    <script src="assets/js/trip.js?v=20260619g"></script>
+    <script src="assets/js/health-data.js?v=20260619g"></script>
+    <script src="assets/js/health-renderer.js?v=20260619g"></script>
+    <script src="assets/js/health.js?v=20260619g"></script>
+    <script src="assets/js/friends.js?v=20260619g"></script>
+    <script src="assets/js/notifications.js?v=20260619g"></script>
+    <script src="assets/js/settings.js?v=20260619g"></script>
+    <script src="assets/js/admin-panel.js?v=20260619g"></script>
     <!-- T-219 行为分析采集：必须在 app.js / admin-panel.js 之后加载（要 hook 它们） -->
-    <script src="assets/js/tracker.js?v=20260619f"></script>
+    <script src="assets/js/tracker.js?v=20260619g"></script>
     <!-- Work module (T-094 / SPEC work-task-table) -->
-    <script src="assets/js/work-pick.js?v=20260619f"></script>
-    <script src="assets/js/work-grid-engine.js?v=20260619f"></script>
-    <script src="assets/js/work-table.js?v=20260619f"></script>
-    <script src="assets/js/work-column-cfg.js?v=20260619f"></script>
-    <script src="assets/js/work-board.js?v=20260619f"></script>
-    <script src="assets/js/work-calendar.js?v=20260619f"></script>
+    <script src="assets/js/work-pick.js?v=20260619g"></script>
+    <script src="assets/js/work-grid-engine.js?v=20260619g"></script>
+    <script src="assets/js/work-table.js?v=20260619g"></script>
+    <script src="assets/js/work-column-cfg.js?v=20260619g"></script>
+    <script src="assets/js/work-board.js?v=20260619g"></script>
+    <script src="assets/js/work-calendar.js?v=20260619g"></script>
     <!-- T-099 -->
-    <script src="assets/js/work-person.js?v=20260619f"></script>
+    <script src="assets/js/work-person.js?v=20260619g"></script>
     <!-- T-108 -->
-    <script src="assets/js/work-distribution.js?v=20260619f"></script>
-    <script src="assets/js/work-center.js?v=20260619f"></script>
-    <script src="assets/js/work-attention.js?v=20260619f"></script>
-    <script src="assets/js/work-detail.js?v=20260619f"></script>
-    <script src="assets/js/stakeholder.js?v=20260619f"></script>
-    <script src="assets/js/work.js?v=20260619f"></script>
+    <script src="assets/js/work-distribution.js?v=20260619g"></script>
+    <script src="assets/js/work-center.js?v=20260619g"></script>
+    <script src="assets/js/work-attention.js?v=20260619g"></script>
+    <script src="assets/js/work-detail.js?v=20260619g"></script>
+    <script src="assets/js/stakeholder.js?v=20260619g"></script>
+    <script src="assets/js/work.js?v=20260619g"></script>
     <!-- T-111:已完成档案(按月分组归档区) -->
-    <script src="assets/js/work-done.js?v=20260619f"></script>
+    <script src="assets/js/work-done.js?v=20260619g"></script>
     <!-- T-123 Insight v0.3:单层 insight_task + textarea 反馈。
          v0.2 的 capture/revise/annotations/citation/detail 已废弃(insight-citation.js 仅 share.js 公开页动态加载) -->
-    <script src="assets/js/insight-markdown.js?v=20260619f"></script>
-    <script src="assets/js/insight.js?v=20260619f"></script>
-    <script src="assets/js/insight-factory.js?v=20260619f"></script>
+    <script src="assets/js/insight-markdown.js?v=20260619g"></script>
+    <script src="assets/js/insight.js?v=20260619g"></script>
+    <script src="assets/js/insight-factory.js?v=20260619g"></script>
     <!-- T-116:个人访问令牌 (PAT) 管理 -->
-    <script src="assets/js/pat.js?v=20260619f"></script>
-    <script src="assets/js/patrol-utils.js?v=20260619f"></script>
-    <script src="assets/js/patrol-terrain.js?v=20260619f"></script>
-    <script src="assets/js/patrol-debug.js?v=20260619f"></script>
-    <script src="assets/js/patrol.js?v=20260619f"></script>
+    <script src="assets/js/pat.js?v=20260619g"></script>
+    <script src="assets/js/patrol-utils.js?v=20260619g"></script>
+    <script src="assets/js/patrol-terrain.js?v=20260619g"></script>
+    <script src="assets/js/patrol-debug.js?v=20260619g"></script>
+    <script src="assets/js/patrol.js?v=20260619g"></script>
 
     <script>
     // Initialize

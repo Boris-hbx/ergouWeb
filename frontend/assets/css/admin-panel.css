@@ -201,34 +201,48 @@
 /* ===== Filters Bar ===== */
 .admin-filters {
     display: flex;
-    gap: 10px;
+    gap: var(--eg-space-2, 8px);
     margin-bottom: 16px;
+    padding: 10px 12px;
     flex-wrap: wrap;
     align-items: center;
+    border: 1px solid var(--eg-border, var(--border-color, rgba(0,0,0,0.1)));
+    border-radius: var(--eg-radius-lg, 8px);
+    background: var(--eg-surface-subtle, var(--card-bg, #fff));
 }
 
 .admin-filter-input {
-    padding: 6px 12px;
-    border: 1px solid var(--border-color, rgba(0,0,0,0.15));
-    border-radius: 6px;
-    font-size: 13px;
-    background: var(--input-bg, #fff);
-    color: var(--text-color, #333);
+    min-height: 36px;
+    padding: 0 12px;
+    border: 1px solid var(--eg-border, var(--border-color, rgba(0,0,0,0.15)));
+    border-radius: var(--eg-radius-md, 8px);
+    font-size: var(--eg-font-size-sm, 13px);
+    background: var(--eg-surface, var(--input-bg, #fff));
+    color: var(--eg-text-body, var(--text-color, #333));
     outline: none;
+    box-sizing: border-box;
 }
 
 .admin-filter-input:focus {
     border-color: var(--primary-color, #667eea);
+    box-shadow: var(--eg-focus-ring, 0 0 0 3px rgba(102, 126, 234, .18));
 }
 
 .admin-filter-select {
-    padding: 6px 12px;
-    border: 1px solid var(--border-color, rgba(0,0,0,0.15));
-    border-radius: 6px;
-    font-size: 13px;
-    background: var(--input-bg, #fff);
-    color: var(--text-color, #333);
+    min-height: 36px;
+    padding: 0 12px;
+    border: 1px solid var(--eg-border, var(--border-color, rgba(0,0,0,0.15)));
+    border-radius: var(--eg-radius-md, 8px);
+    font-size: var(--eg-font-size-sm, 13px);
+    background: var(--eg-surface, var(--input-bg, #fff));
+    color: var(--eg-text-body, var(--text-color, #333));
     outline: none;
+    box-sizing: border-box;
+}
+
+.admin-filter-select:focus {
+    border-color: var(--primary-color, #667eea);
+    box-shadow: var(--eg-focus-ring, 0 0 0 3px rgba(102, 126, 234, .18));
 }
 
 /* ===== Badges ===== */
@@ -274,7 +288,7 @@
 
 .admin-btn-group {
     display: flex;
-    gap: 6px;
+    gap: var(--eg-space-2, 8px);
     flex-wrap: wrap;
     align-items: center;
 }
@@ -309,12 +323,12 @@
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 10px;
+    gap: var(--eg-space-2, 8px);
     margin-bottom: 16px;
     padding: 12px;
-    border: 1px solid var(--border-color, rgba(0,0,0,0.1));
-    border-radius: 8px;
-    background: var(--card-bg, #fff);
+    border: 1px solid var(--eg-border, var(--border-color, rgba(0,0,0,0.1)));
+    border-radius: var(--eg-radius-lg, 8px);
+    background: var(--eg-surface-subtle, var(--card-bg, #fff));
 }
 
 .admin-filter-group {
