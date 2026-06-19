@@ -1,7 +1,7 @@
 # TEST-ui-design-system: 统一按钮设计语言
 
-> 覆盖任务: T-238
-> 范围: Next Web 一期按钮层与首批迁移页面
+> 覆盖任务: T-238, T-239
+> 范围: Next Web 一期按钮层、基础视觉 token 与首批迁移页面
 
 ## S1 公共按钮层
 
@@ -9,6 +9,14 @@
 - `.eg-btn--primary|secondary|ghost|danger|danger-fill` 均可单独使用。
 - `.eg-btn--sm|md|lg|icon` 均保持稳定高度，不因文字变化挤压布局。
 - `.eg-actionbar--modal` 在桌面端右对齐，在窄屏端纵向排列且按钮占满宽度。
+
+## S1.1 清爽管理型基础 token
+
+- `base.css` 提供可复用的 `--eg-surface-*`、`--eg-border-*`、`--eg-radius-*`、`--eg-space-*`、`--eg-text-*`、`--eg-shadow-*` token。
+- 浅色、深色、系统自动深色主题下 token 都有可用值。
+- 管理界面默认可用边框和背景层级表达结构，overlay/popover 才使用更明显阴影。
+- T-238 的 `.eg-btn` 按钮层消费 `--eg-*` token，不继续扩散私有按钮色值。
+- `.eg-surface` / `.eg-surface--muted|raised|overlay`、`.eg-divider`、`.eg-text-*` 可作为后续 T-240/T-241/T-242 的基础类。
 
 ## S2 工作任务与干系人创建弹窗
 
