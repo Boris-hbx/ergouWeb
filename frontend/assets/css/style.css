@@ -4811,10 +4811,11 @@ body {
 }
 
 .toolbox-nav {
-    background: rgba(255, 255, 255, 0.9);
-    border-radius: 16px;
+    background: var(--eg-surface, rgba(255, 255, 255, 0.9));
+    border: 1px solid var(--eg-border, rgba(0, 0, 0, 0.08));
+    border-radius: var(--eg-radius-lg, 8px);
     padding: 0.8rem;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    box-shadow: none;
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
@@ -4829,10 +4830,10 @@ body {
     align-items: center;
     gap: 0.4rem;
     padding: 0.8rem 0.5rem;
-    border-radius: 12px;
+    border-radius: var(--eg-radius-md, 8px);
     cursor: pointer;
-    transition: all 0.2s ease;
-    border: 2px solid transparent;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+    border: 1px solid transparent;
 }
 
 .tool-item:hover {
@@ -4840,7 +4841,7 @@ body {
 }
 
 .tool-item.active {
-    background: linear-gradient(135deg, rgba(var(--primary-color-rgb), 0.15), rgba(118, 75, 162, 0.1));
+    background: var(--eg-surface-muted, rgba(var(--primary-color-rgb), 0.08));
     border-color: var(--primary-color);
 }
 
@@ -4874,10 +4875,11 @@ body {
 }
 
 .expense-sidebar {
-    background: rgba(255, 255, 255, 0.9);
-    border-radius: 16px;
+    background: var(--eg-surface, rgba(255, 255, 255, 0.9));
+    border: 1px solid var(--eg-border, rgba(0, 0, 0, 0.08));
+    border-radius: var(--eg-radius-lg, 8px);
     padding: 1rem;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    box-shadow: none;
     max-height: calc(100vh - 180px);
     overflow-y: auto;
     position: sticky;
@@ -4892,16 +4894,16 @@ body {
 
 .expense-item {
     padding: 0.8rem;
-    border-radius: 10px;
-    background: rgba(var(--primary-color-rgb), 0.05);
+    border-radius: var(--eg-radius-md, 8px);
+    background: var(--eg-surface-muted, rgba(var(--primary-color-rgb), 0.05));
     cursor: pointer;
-    transition: all 0.2s ease;
-    border: 2px solid transparent;
+    transition: background 0.2s ease, border-color 0.2s ease;
+    border: 1px solid var(--eg-border-subtle, transparent);
 }
 
 .expense-item:hover {
-    background: rgba(var(--primary-color-rgb), 0.1);
-    transform: translateX(3px);
+    background: var(--eg-surface-muted, rgba(var(--primary-color-rgb), 0.08));
+    border-color: var(--eg-border-strong, rgba(var(--primary-color-rgb), 0.22));
 }
 
 .expense-item.active {
@@ -4938,10 +4940,11 @@ body {
 }
 
 .expense-editor {
-    background: rgba(255, 255, 255, 0.9);
-    border-radius: 16px;
+    background: var(--eg-surface, rgba(255, 255, 255, 0.9));
+    border: 1px solid var(--eg-border, rgba(0, 0, 0, 0.08));
+    border-radius: var(--eg-radius-lg, 8px);
     padding: 1.5rem;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    box-shadow: none;
 }
 
 .expense-empty {
@@ -5161,25 +5164,27 @@ body {
 
 .btn-generate-summary {
     padding: 0.6rem 1.2rem;
-    background: var(--primary-gradient);
+    min-height: 36px;
+    background: var(--primary-color);
     color: white;
-    border: none;
-    border-radius: 8px;
+    border: 1px solid var(--primary-color);
+    border-radius: var(--eg-radius-md, 8px);
     font-size: 0.9rem;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: background 0.2s ease, border-color 0.2s ease;
 }
 
 .btn-generate-summary:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(var(--primary-color-rgb), 0.4);
+    background: var(--primary-hover, var(--primary-color));
+    border-color: var(--primary-hover, var(--primary-color));
 }
 
 .summary-output {
     margin-top: 1rem;
     padding: 1rem;
-    background: #f8f9fa;
-    border-radius: 8px;
+    background: var(--eg-surface-muted, #f8f9fa);
+    border: 1px solid var(--eg-border, rgba(0, 0, 0, 0.08));
+    border-radius: var(--eg-radius-md, 8px);
     position: relative;
 }
 
@@ -8809,10 +8814,10 @@ body.dark-mode .action-sheet-cancel {
 
 /* 设置分区卡片 */
 .settings-section {
-    background: var(--bg-card, rgba(255, 255, 255, 0.06));
-    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
-    border-radius: 12px;
-    padding: 16px;
+    background: var(--eg-surface, var(--bg-card, rgba(255, 255, 255, 0.06)));
+    border: 1px solid var(--eg-border, var(--border-color, rgba(255, 255, 255, 0.08)));
+    border-radius: var(--eg-radius-lg, 8px);
+    padding: 14px;
 }
 
 .settings-divider {
@@ -8908,13 +8913,13 @@ body.dark-mode .action-sheet-cancel {
     z-index: 1000;
 }
 .pwd-modal {
-    background: var(--bg-card, #fff);
-    border: 1px solid var(--border-color, rgba(0, 0, 0, 0.1));
-    border-radius: 12px;
+    background: var(--eg-surface-overlay, var(--bg-card, #fff));
+    border: 1px solid var(--eg-border, var(--border-color, rgba(0, 0, 0, 0.1)));
+    border-radius: var(--eg-radius-xl, 12px);
     width: 400px;
     max-width: 90vw;
     backdrop-filter: blur(20px);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    box-shadow: var(--eg-shadow-overlay, 0 8px 24px rgba(0, 0, 0, 0.16));
 }
 [data-theme="dark"] .pwd-modal {
     background: rgba(30, 30, 40, 0.95);
@@ -8957,14 +8962,15 @@ body.dark-mode .action-sheet-cancel {
     width: 100%;
     margin-top: 16px;
     padding: 10px 20px;
-    border: none;
-    border-radius: 8px;
+    min-height: 36px;
+    border: 1px solid var(--primary-color, #667eea);
+    border-radius: var(--eg-radius-md, 8px);
     background: var(--primary-color, #667eea);
     color: #fff;
     font-size: 0.9rem;
     font-weight: 500;
     cursor: pointer;
-    transition: opacity 0.2s;
+    transition: background 0.2s, border-color 0.2s;
 }
 #settings-account-section .settings-change-pwd-btn {
     margin-top: 12px;
@@ -8972,7 +8978,8 @@ body.dark-mode .action-sheet-cancel {
 }
 
 .settings-change-pwd-btn:hover {
-    opacity: 0.9;
+    background: var(--primary-hover, var(--primary-color, #667eea));
+    border-color: var(--primary-hover, var(--primary-color, #667eea));
 }
 
 .settings-password-hint {
@@ -9898,23 +9905,24 @@ body.dark-mode .action-sheet-cancel {
 }
 .memory-action-btn {
     width: 32px; height: 32px;
-    border: 1.5px solid var(--primary-color);
-    border-radius: 8px;
-    background: transparent;
-    color: var(--primary-color);
+    border: 1px solid var(--eg-border, var(--border-color));
+    border-radius: var(--eg-radius-md, 8px);
+    background: var(--eg-surface, transparent);
+    color: var(--eg-text-body, var(--text-secondary));
     font-size: 16px;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.15s;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 .memory-action-btn:hover {
-    background: var(--primary-color);
-    color: #fff;
+    background: var(--eg-surface-muted, rgba(var(--primary-color-rgb), 0.08));
+    border-color: var(--eg-border-strong, rgba(var(--primary-color-rgb), 0.24));
+    color: var(--primary-color);
 }
 .memory-clear-btn { border-color: var(--danger-color); color: var(--danger-color); }
-.memory-clear-btn:hover { background: var(--danger-color); color: #fff; }
+.memory-clear-btn:hover { background: rgba(231, 76, 60, 0.08); color: var(--danger-color); }
 
 .memory-search-box { margin-bottom: 8px; }
 .memory-search-input {
@@ -9941,20 +9949,20 @@ body.dark-mode .action-sheet-cancel {
 }
 .memory-tab {
     padding: 5px 12px;
-    border: 1.5px solid var(--border-color);
-    border-radius: 16px;
-    background: transparent;
+    border: 1px solid var(--eg-border, var(--border-color));
+    border-radius: var(--eg-radius-md, 8px);
+    background: var(--eg-surface, transparent);
     color: var(--text-secondary);
     font-size: 12px;
     cursor: pointer;
     white-space: nowrap;
-    transition: all 0.15s;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 .memory-tab:hover { border-color: var(--primary-color); color: var(--primary-color); }
 .memory-tab.active {
-    background: var(--primary-color);
+    background: var(--eg-surface-muted, rgba(var(--primary-color-rgb), 0.1));
     border-color: var(--primary-color);
-    color: #fff;
+    color: var(--primary-color);
 }
 
 .memory-stats {
@@ -9971,9 +9979,9 @@ body.dark-mode .action-sheet-cancel {
     gap: 8px;
     padding: 10px 12px;
     margin-bottom: 6px;
-    border: 1px solid var(--border-color);
-    border-radius: 10px;
-    background: var(--bg-card);
+    border: 1px solid var(--eg-border, var(--border-color));
+    border-radius: var(--eg-radius-lg, 8px);
+    background: var(--eg-surface, var(--bg-card));
     transition: border-color 0.15s;
 }
 .memory-item:hover {
@@ -10034,23 +10042,23 @@ body.dark-mode .action-sheet-cancel {
     background: transparent;
     font-size: 12px;
     cursor: pointer;
-    transition: all 0.15s;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 .memory-edit-btn {
     color: var(--primary-color);
     border-color: rgba(var(--primary-color-rgb), 0.3);
 }
 .memory-edit-btn:hover {
-    background: var(--primary-color);
-    color: #fff;
+    background: rgba(var(--primary-color-rgb), 0.08);
+    color: var(--primary-color);
 }
 .memory-delete-btn {
     color: var(--danger-color);
     border-color: rgba(231, 76, 60, 0.3);
 }
 .memory-delete-btn:hover {
-    background: var(--danger-color);
-    color: #fff;
+    background: rgba(231, 76, 60, 0.08);
+    color: var(--danger-color);
 }
 .memory-empty {
     text-align: center;
@@ -10085,13 +10093,13 @@ body.dark-mode .action-sheet-cancel {
     animation: abao-fade-in 0.15s ease;
 }
 .memory-modal {
-    background: var(--bg-card);
-    border: 1px solid var(--border-color);
-    border-radius: 16px;
+    background: var(--eg-surface-overlay, var(--bg-card));
+    border: 1px solid var(--eg-border, var(--border-color));
+    border-radius: var(--eg-radius-xl, 12px);
     padding: 24px;
     width: 420px;
     max-width: 92vw;
-    box-shadow: var(--shadow-medium);
+    box-shadow: var(--eg-shadow-overlay, var(--shadow-medium));
 }
 .memory-modal-title {
     font-size: 16px;
