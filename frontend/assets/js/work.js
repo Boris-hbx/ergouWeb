@@ -26,7 +26,8 @@ var Work = (function() {
     function init() {
         // 从 localStorage 恢复最后打开的子功能
         var last = localStorage.getItem('work_feature');
-        if (last === 'table') openFeature('table');
+        if (last === 'stakeholder' && typeof Stakeholder !== 'undefined') Stakeholder.openFeature();
+        else if (last === 'table') openFeature('table');
         else showHub();
     }
 
@@ -41,9 +42,11 @@ var Work = (function() {
         var insView = document.getElementById('work-insight-view');
         var factoryView = document.getElementById('work-insight-factory-view');
         var doneView = document.getElementById('work-done-view');
+        var stakeholderView = document.getElementById('stakeholder-view');
         if (insView) insView.style.display = 'none';
         if (factoryView) factoryView.style.display = 'none';
         if (doneView) doneView.style.display = 'none';
+        if (stakeholderView) stakeholderView.style.display = 'none';
         // T-100:回到 Hub 时关闭详情抽屉(任务表已隐藏,抽屉应一起退场)
         if (typeof WorkDetail !== 'undefined' && WorkDetail.isOpen()) {
             WorkDetail.closeDetail();
@@ -53,8 +56,10 @@ var Work = (function() {
     function openFeature(name) {
         var hub = document.getElementById('work-hub');
         var tableView = document.getElementById('work-table-view');
+        var stakeholderView = document.getElementById('stakeholder-view');
         if (hub) hub.style.display = 'none';
         if (tableView) tableView.style.display = 'none';
+        if (stakeholderView) stakeholderView.style.display = 'none';
 
         if (name === 'table') {
             _feature = 'table';

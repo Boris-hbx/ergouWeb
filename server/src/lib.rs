@@ -292,6 +292,8 @@ pub fn build_app(state: state::AppState) -> Router {
                 .route("/search", get(routes::memories::search_memories))
                 .route("/{id}", delete(routes::memories::delete_memory)),
         )
+        // T-218 行为分析:用户侧事件上报(必须双写 main.rs + lib.rs)
+        .route("/events/batch", post(routes::events::events_batch))
         .nest(
             "/admin",
             Router::new()
@@ -318,6 +320,22 @@ pub fn build_app(state: state::AppState) -> Router {
                     "/migrate-insight-v0.3",
                     post(routes::admin::migrate_insight_v0_3),
                 )
+                // T-218 行为分析聚合(必须双写 main.rs + lib.rs)
+                .route(
+                    "/analytics/overview",
+                    get(routes::admin::analytics_overview),
+                )
+                .route(
+                    "/analytics/top-targets",
+                    get(routes::admin::analytics_top_targets),
+                )
+                .route(
+                    "/analytics/feature-usage",
+                    get(routes::admin::analytics_feature_usage),
+                )
+                .route("/analytics/dwell", get(routes::admin::analytics_dwell))
+                .route("/analytics/trail", get(routes::admin::analytics_trail))
+                .route("/analytics/users", get(routes::admin::analytics_users))
                 // T-089 块2:30 req/min/user 限流(必须双写 main.rs + lib.rs)
                 .route_layer(axum::middleware::from_fn_with_state(
                     state.clone(),
@@ -357,6 +375,27 @@ pub fn build_app(state: state::AppState) -> Router {
         .route(
             "/work/columns/{key}",
             delete(routes::work_columns::delete_column),
+        )
+        // Stakeholder module (T-221 / SPEC stakeholder)
+        .route(
+            "/work/stakeholders",
+            get(routes::stakeholders::list_stakeholders)
+                .post(routes::stakeholders::create_stakeholder),
+        )
+        .route(
+            "/work/stakeholders/{id}",
+            axum::routing::patch(routes::stakeholders::update_stakeholder)
+                .delete(routes::stakeholders::delete_stakeholder),
+        )
+        .route(
+            "/work/stakeholder-columns",
+            get(routes::stakeholder_columns::list_columns)
+                .put(routes::stakeholder_columns::batch_save_columns)
+                .post(routes::stakeholder_columns::create_column),
+        )
+        .route(
+            "/work/stakeholder-columns/{key}",
+            delete(routes::stakeholder_columns::delete_column),
         )
         // T-105 SPEC insight — 注意此处必须与 main.rs 同步(memory:duplicate-build-app)
         .route(

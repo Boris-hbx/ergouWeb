@@ -345,6 +345,27 @@ pub fn build_app(state: AppState) -> Router {
             "/work/columns/{key}",
             delete(routes::work_columns::delete_column),
         )
+        // Stakeholder module (T-221 / SPEC stakeholder)
+        .route(
+            "/work/stakeholders",
+            get(routes::stakeholders::list_stakeholders)
+                .post(routes::stakeholders::create_stakeholder),
+        )
+        .route(
+            "/work/stakeholders/{id}",
+            axum::routing::patch(routes::stakeholders::update_stakeholder)
+                .delete(routes::stakeholders::delete_stakeholder),
+        )
+        .route(
+            "/work/stakeholder-columns",
+            get(routes::stakeholder_columns::list_columns)
+                .put(routes::stakeholder_columns::batch_save_columns)
+                .post(routes::stakeholder_columns::create_column),
+        )
+        .route(
+            "/work/stakeholder-columns/{key}",
+            delete(routes::stakeholder_columns::delete_column),
+        )
         // Insight module (T-105 / SPEC insight) — Hybrid 架构:Web 后端只做收件箱/抓取/存储,
         // 报告生成在 Claude Code(Boris 本机)写回,公开 /r/{token} 不在 /api 下,见 build_app 末尾。
         .route(
@@ -536,6 +557,8 @@ pub fn build_app(state: AppState) -> Router {
                     put(routes::memories::update_memory).delete(routes::memories::delete_memory),
                 ),
         )
+        // T-218 行为分析:用户侧事件上报(ActiveUserId, best-effort)
+        .route("/events/batch", post(routes::events::events_batch))
         .nest(
             "/admin",
             Router::new()
@@ -597,6 +620,22 @@ pub fn build_app(state: AppState) -> Router {
                     "/migrate-insight-v0.3",
                     post(routes::admin::migrate_insight_v0_3),
                 )
+                // T-218 行为分析聚合(AdminUserId)
+                .route(
+                    "/analytics/overview",
+                    get(routes::admin::analytics_overview),
+                )
+                .route(
+                    "/analytics/top-targets",
+                    get(routes::admin::analytics_top_targets),
+                )
+                .route(
+                    "/analytics/feature-usage",
+                    get(routes::admin::analytics_feature_usage),
+                )
+                .route("/analytics/dwell", get(routes::admin::analytics_dwell))
+                .route("/analytics/trail", get(routes::admin::analytics_trail))
+                .route("/analytics/users", get(routes::admin::analytics_users))
                 // T-089 块2:30 req/min/user 限流 —— 防暴力枚举 / DoS。
                 // route_layer 比 layer 更紧凑;仅作用于 admin 路由子树。
                 .route_layer(axum::middleware::from_fn_with_state(
