@@ -1,7 +1,7 @@
 # TEST-ui-design-system: 统一按钮设计语言
 
-> 覆盖任务: T-238, T-239
-> 范围: Next Web 一期按钮层、基础视觉 token 与首批迁移页面
+> 覆盖任务: T-238, T-239, T-240
+> 范围: Next Web 一期按钮层、基础视觉 token、弹窗/抽屉/浮层与首批迁移页面
 
 ## S1 公共按钮层
 
@@ -17,6 +17,14 @@
 - 管理界面默认可用边框和背景层级表达结构，overlay/popover 才使用更明显阴影。
 - T-238 的 `.eg-btn` 按钮层消费 `--eg-*` token，不继续扩散私有按钮色值。
 - `.eg-surface` / `.eg-surface--muted|raised|overlay`、`.eg-divider`、`.eg-text-*` 可作为后续 T-240/T-241/T-242 的基础类。
+
+## S1.2 弹窗/抽屉/浮层结构
+
+- `.eg-modal-overlay`、`.eg-modal`、`.eg-drawer`、`.eg-popover` 可复用 T-239 token。
+- 工作创建弹窗、长文本/列设置弹窗、任务详情抽屉、picker 使用 restrained overlay/popover shadow。
+- Admin 人物弹窗有明确 header/body/footer/action bar，不再依赖内联宽度。
+- Insight 创建/反馈区域使用 token 化边框、浅阴影和 footer 分隔线。
+- Review/Task 编辑 footer 使用 `eg-actionbar--modal`，取消为 secondary，保存为 primary。
 
 ## S2 工作任务与干系人创建弹窗
 

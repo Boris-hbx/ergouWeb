@@ -1316,7 +1316,7 @@ var AdminPanel = (function() {
             var isEdit = !!person;
             var overlay = document.createElement('div');
             overlay.className = 'admin-modal-overlay';
-            overlay.innerHTML = '<div class="admin-modal" style="max-width:480px;">' +
+            overlay.innerHTML = '<div class="admin-modal admin-modal--person">' +
                 '<div class="admin-modal-title">' + (isEdit ? '编辑人物' : '新增人物') + '</div>' +
                 '<div class="admin-form">' +
                 (isEdit ? '' : '<div class="admin-form-group"><label>所属用户</label>' +

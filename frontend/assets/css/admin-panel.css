@@ -5,6 +5,52 @@
     overflow: hidden;
 }
 
+/* ===== Modal / Drawer Surfaces ===== */
+.admin-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1085;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: var(--overlay-bg, rgba(28, 27, 31, 0.4));
+    backdrop-filter: blur(2px);
+}
+
+.admin-modal {
+    width: min(480px, 94vw);
+    max-height: 88vh;
+    overflow: auto;
+    background: var(--eg-surface-overlay, var(--bg-card, #fff));
+    border: 1px solid var(--eg-border, var(--border-color, rgba(0,0,0,0.1)));
+    border-radius: var(--eg-radius-xl, 12px);
+    box-shadow: var(--eg-shadow-overlay, 0 18px 48px rgba(0,0,0,0.22));
+    padding: 0;
+}
+
+.admin-modal-title {
+    padding: 16px 18px;
+    border-bottom: 1px solid var(--eg-border-subtle, var(--border-color, rgba(0,0,0,0.08)));
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.admin-modal .admin-form-grid,
+.admin-modal .admin-form-group {
+    padding-left: 18px;
+    padding-right: 18px;
+}
+
+.admin-modal .admin-form-grid {
+    padding-top: 16px;
+}
+
+.admin-modal-actions {
+    padding: 14px 18px;
+    background: var(--eg-surface-subtle, var(--bg-secondary, #f8fafc));
+}
+
 .admin-sidebar {
     width: 160px;
     min-width: 160px;
