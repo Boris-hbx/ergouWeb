@@ -98,9 +98,9 @@ var WorkPick = (function() {
           +   '<div class="wt-pick-opt wt-pick-all" data-all="1"><span class="wt-pick-check">' + (allChecked ? '☑' : '☐') + '</span><span>(全选)</span></div>'
           +   rows
           + '</div>'
-          + '<div class="wt-pick-actions">'
-          +   '<button class="wt-mbtn" data-act="clearcol">清除该列</button>'
-          +   '<button class="wt-mbtn primary" data-act="fconfirm">确认</button>'
+          + '<div class="wt-pick-actions eg-actionbar">'
+          +   '<button class="eg-btn eg-btn--secondary eg-btn--sm" data-act="clearcol">清除该列</button>'
+          +   '<button class="eg-btn eg-btn--primary eg-btn--sm" data-act="fconfirm">确认</button>'
           + '</div>';
         var si = document.getElementById('wt-pick-search-input');
         if (si) si.oninput = function() { _fstate.search = this.value; _renderFilter(); var n = document.getElementById('wt-pick-search-input'); if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); } };
@@ -180,9 +180,9 @@ var WorkPick = (function() {
                  +    '</div>';
         });
         html += '</div>';
-        html += '<div class="wt-pick-actions">'
-             +    '<button class="wt-mbtn" data-act="cancel">取消</button>'
-             +    '<button class="wt-mbtn primary" data-act="confirm">确认</button>'
+        html += '<div class="wt-pick-actions eg-actionbar">'
+             +    '<button class="eg-btn eg-btn--secondary eg-btn--sm" data-act="cancel">取消</button>'
+             +    '<button class="eg-btn eg-btn--primary eg-btn--sm" data-act="confirm">确认</button>'
              +  '</div>';
         var pop = document.getElementById('wt-pick');
         if (!pop) return;

@@ -775,7 +775,7 @@ var Stakeholder = (function() {
             + '</div>'
             + '<div class="sh-detail-title">' + _esc(row.name || '未命名干系人') + '</div>'
             + '<div class="sh-detail-grid">' + _columns.map(function(c) { return _detailField(row, c); }).join('') + '</div>'
-            + '<div class="sh-detail-actions"><button class="wt-newbtn" onclick="Stakeholder.saveDetail()">保存</button></div>';
+            + '<div class="sh-detail-actions"><button class="eg-btn eg-btn--primary" onclick="Stakeholder.saveDetail()">保存</button></div>';
     }
     function _detailField(row, col) {
         var v = _get(row, col.key);
@@ -843,8 +843,8 @@ var Stakeholder = (function() {
         ov.id = 'sh-create-ov';
         ov.className = 'sh-create-ov';
         ov.innerHTML = '<div class="sh-create-box"><div class="sh-create-hd">新建干系人</div><div class="sh-create-bd" id="sh-create-body"></div>'
-            + '<div class="sh-create-bar"><button class="wt-create-btn wt-create-cancel" onclick="Stakeholder.closeCreate()">取消</button>'
-            + '<button class="wt-create-btn wt-create-ok" onclick="Stakeholder.submitCreate()">创建</button></div></div>';
+            + '<div class="sh-create-bar eg-actionbar eg-actionbar--modal"><button class="eg-btn eg-btn--secondary" onclick="Stakeholder.closeCreate()">取消</button>'
+            + '<button class="eg-btn eg-btn--primary" onclick="Stakeholder.submitCreate()">创建</button></div></div>';
         document.body.appendChild(ov);
     }
     function submitCreate() {
@@ -916,7 +916,7 @@ var Stakeholder = (function() {
             + '<div class="wt-modal-title">干系人列设置</div>'
             + '<div class="wt-modal-sub">拖动 ≡ 调整列顺序 · 改列名 / 类型 / 选项 / 宽度 · 底部可新增自定义列</div>'
             + '<div id="sh-col-list"></div>'
-            + '<div class="wt-modal-actions"><button class="wt-mbtn primary" onclick="Stakeholder.closeColumns()">完成</button></div>'
+            + '<div class="wt-modal-actions eg-actionbar eg-actionbar--modal"><button class="eg-btn eg-btn--primary" onclick="Stakeholder.closeColumns()">完成</button></div>'
             + '</div>';
         document.body.appendChild(m);
     }

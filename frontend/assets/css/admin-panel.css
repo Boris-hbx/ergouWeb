@@ -229,6 +229,8 @@
 .admin-btn-group {
     display: flex;
     gap: 6px;
+    flex-wrap: wrap;
+    align-items: center;
 }
 
 /* ===== Pagination ===== */
