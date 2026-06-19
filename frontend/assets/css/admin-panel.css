@@ -122,26 +122,26 @@
 .admin-cards-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: 16px;
-    margin-bottom: 24px;
+    gap: 12px;
+    margin-bottom: 18px;
 }
 
 .admin-summary-card {
-    background: var(--card-bg, #fff);
-    border: 1px solid var(--border-color, rgba(0,0,0,0.1));
-    border-radius: 10px;
-    padding: 16px;
+    background: var(--eg-surface, var(--card-bg, #fff));
+    border: 1px solid var(--eg-border, var(--border-color, rgba(0,0,0,0.1)));
+    border-radius: var(--eg-radius-lg, 8px);
+    padding: 12px;
     cursor: pointer;
-    transition: box-shadow 0.15s, transform 0.1s;
+    transition: background 0.15s, border-color 0.15s;
 }
 
 .admin-summary-card:hover {
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-    transform: translateY(-1px);
+    background: var(--eg-surface-muted, var(--hover-bg, rgba(0,0,0,0.03)));
+    border-color: var(--eg-border-strong, var(--border-color, rgba(0,0,0,0.16)));
 }
 
 .admin-summary-card .card-value {
-    font-size: 28px;
+    font-size: 24px;
     font-weight: 700;
     color: var(--primary-color, #667eea);
 }
@@ -169,16 +169,23 @@
 /* ===== Tables ===== */
 .admin-panel-table {
     width: 100%;
-    border-collapse: collapse;
+    border-collapse: separate;
+    border-spacing: 0;
+    border: 1px solid var(--eg-border, var(--border-color, rgba(0,0,0,0.1)));
+    border-radius: var(--eg-radius-lg, 8px);
+    overflow: hidden;
+    background: var(--eg-surface, var(--card-bg, #fff));
     font-size: 13px;
 }
 
 .admin-panel-table th {
     text-align: left;
-    padding: 8px 12px;
-    border-bottom: 2px solid var(--border-color, rgba(0,0,0,0.1));
-    font-weight: 600;
-    opacity: 0.7;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--eg-border, var(--border-color, rgba(0,0,0,0.1)));
+    background: var(--eg-surface-muted, var(--hover-bg, rgba(0,0,0,0.03)));
+    color: var(--eg-text-muted, var(--text-color, #333));
+    font-weight: 650;
+    opacity: 0.78;
     white-space: nowrap;
     cursor: pointer;
     user-select: none;
@@ -189,13 +196,13 @@
 }
 
 .admin-panel-table td {
-    padding: 8px 12px;
-    border-bottom: 1px solid var(--border-color, rgba(0,0,0,0.06));
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--eg-border-subtle, var(--border-color, rgba(0,0,0,0.06)));
     vertical-align: middle;
 }
 
 .admin-panel-table tr:hover td {
-    background: var(--hover-bg, rgba(0,0,0,0.02));
+    background: var(--eg-surface-muted, var(--hover-bg, rgba(0,0,0,0.02)));
 }
 
 /* ===== Filters Bar ===== */
@@ -545,9 +552,9 @@
 }
 
 .admin-provider-card {
-    border: 1px solid var(--border-color, rgba(0,0,0,0.1));
-    border-radius: 8px;
-    padding: 12px 16px;
+    border: 1px solid var(--eg-border, var(--border-color, rgba(0,0,0,0.1)));
+    border-radius: var(--eg-radius-lg, 8px);
+    padding: 10px 12px;
     display: flex;
     align-items: center;
     gap: 10px;
@@ -565,16 +572,21 @@
 /* ===== Token Grid Table ===== */
 .admin-token-grid {
     width: 100%;
-    border-collapse: collapse;
+    border-collapse: separate;
+    border-spacing: 0;
+    border: 1px solid var(--eg-border, var(--border-color, rgba(0,0,0,0.1)));
+    border-radius: var(--eg-radius-lg, 8px);
+    overflow: hidden;
+    background: var(--eg-surface, var(--card-bg, #fff));
     font-size: 13px;
     margin-bottom: 20px;
 }
 
 .admin-token-grid th,
 .admin-token-grid td {
-    padding: 8px 12px;
+    padding: 7px 10px;
     text-align: right;
-    border-bottom: 1px solid var(--border-color, rgba(0,0,0,0.06));
+    border-bottom: 1px solid var(--eg-border-subtle, var(--border-color, rgba(0,0,0,0.06)));
 }
 
 .admin-token-grid th:first-child,
@@ -585,7 +597,8 @@
 .admin-token-grid th {
     font-weight: 600;
     opacity: 0.7;
-    border-bottom-width: 2px;
+    background: var(--eg-surface-muted, var(--hover-bg, rgba(0,0,0,0.03)));
+    border-bottom-width: 1px;
 }
 
 .admin-token-grid .total-row {
@@ -602,9 +615,10 @@
 }
 
 .admin-system-card {
-    border: 1px solid var(--border-color, rgba(0,0,0,0.1));
-    border-radius: 10px;
-    padding: 16px;
+    border: 1px solid var(--eg-border, var(--border-color, rgba(0,0,0,0.1)));
+    border-radius: var(--eg-radius-lg, 8px);
+    padding: 12px;
+    background: var(--eg-surface, var(--card-bg, #fff));
 }
 
 .admin-system-card h4 {
@@ -632,10 +646,11 @@
 }
 
 .admin-risk-user-card {
-    border: 1px solid var(--border-color, rgba(0,0,0,0.1));
+    border: 1px solid var(--eg-border, var(--border-color, rgba(0,0,0,0.1)));
     border-left: 3px solid #da3633;
-    border-radius: 8px;
-    padding: 12px;
+    border-radius: var(--eg-radius-lg, 8px);
+    padding: 10px;
+    background: var(--eg-surface, var(--card-bg, #fff));
 }
 
 .admin-risk-user-card .risk-name {

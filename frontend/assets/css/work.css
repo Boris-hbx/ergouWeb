@@ -231,11 +231,11 @@ body:has(.sidebar.collapsed) { --sidebar-width: 0px; }
 .sh-graph-canvas {
   position: relative;
   min-height: 560px;
-  border: 1px solid #E5E3EE;
-  border-radius: 8px;
-  background: linear-gradient(180deg, #FFFFFF 0%, #FAF9FC 100%);
+  border: 1px solid var(--eg-border, #E5E3EE);
+  border-radius: var(--eg-radius-lg, 8px);
+  background: var(--eg-surface, #fff);
   overflow: hidden;
-  box-shadow: 0 1px 2px rgba(15, 15, 30, 0.04), 0 4px 12px rgba(15, 15, 30, 0.06);
+  box-shadow: none;
 }
 .sh-graph-canvas::before {
   content: "";
@@ -339,12 +339,12 @@ body:has(.sidebar.collapsed) { --sidebar-width: 0px; }
   font-weight: 500;
 }
 .sh-graph-side {
-  border: 1px solid #E5E3EE;
-  border-radius: 8px;
-  background: #fff;
-  padding: 14px;
+  border: 1px solid var(--eg-border, #E5E3EE);
+  border-radius: var(--eg-radius-lg, 8px);
+  background: var(--eg-surface, #fff);
+  padding: 12px;
   min-height: 560px;
-  box-shadow: 0 1px 2px rgba(15, 15, 30, 0.04), 0 4px 12px rgba(15, 15, 30, 0.06);
+  box-shadow: none;
 }
 .sh-graph-side-title {
   font-weight: 750;
@@ -584,36 +584,36 @@ body:has(.sidebar.collapsed) { --sidebar-width: 0px; }
 
 /* ============ 表格视图 ============ */
 .wt-table-wrap {
-  border: 1px solid var(--border-color); border-radius: 16px;
-  overflow: hidden; background: var(--bg-card); box-shadow: var(--shadow-medium);
+  border: 1px solid var(--eg-border, var(--border-color)); border-radius: var(--eg-radius-lg, 8px);
+  overflow: hidden; background: var(--eg-surface, var(--bg-card)); box-shadow: none;
 }
 .wt-table-scroll { overflow-x: auto; }
 table.wt-table {
   /* width 由 JS 算 sum(col widths) 写到 inline style;
      table-layout:fixed 才严格按 col 宽走 —— 见 spec § 6.1。
      字号 T-095 收紧:0.95rem → 0.84rem(~13.4px),配合行高 padding 9/14 ≈ 36px 行高。 */
-  border-collapse: collapse; table-layout: fixed; font-size: 0.84rem;
+  border-collapse: collapse; table-layout: fixed; font-size: 0.82rem;
 }
 .wt-table th {
-  text-align: left; padding: 8px 14px;
-  color: var(--text-muted); font-weight: 600; font-size: 0.72rem; letter-spacing: .03em;
-  background: #FAF9FC; border-bottom: 1px solid var(--border-color);
+  text-align: left; padding: 7px 12px;
+  color: var(--eg-text-muted, var(--text-muted)); font-weight: 650; font-size: 0.72rem; letter-spacing: .02em;
+  background: var(--eg-surface-muted, #FAF9FC); border-bottom: 1px solid var(--eg-border, var(--border-color));
   /* T-095: 每列右侧 1px 浅灰竖线作为列分界,最右列在下方规则中去掉 */
-  border-right: 1px solid #E5E3EE;
+  border-right: 1px solid var(--eg-border-subtle, #E5E3EE);
   position: relative;
 }
 .wt-table thead tr th:last-child { border-right: none; }
 .wt-table td {
-  padding: 9px 14px; border-bottom: 1px solid var(--border-light);
-  color: var(--text-primary); vertical-align: middle;
+  padding: 8px 12px; border-bottom: 1px solid var(--eg-border-subtle, var(--border-light));
+  color: var(--eg-text-strong, var(--text-primary)); vertical-align: middle;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .wt-table tbody tr:last-child td { border-bottom: none; }
-.wt-table tbody tr:hover td { background: rgba(var(--primary-rgb), 0.055); }
+.wt-table tbody tr:hover td { background: var(--eg-surface-muted, rgba(var(--primary-rgb), 0.045)); }
 .wt-table tr.wt-group-row td {
-  background: #F5F2FB; font-weight: 700;
-  color: var(--text-secondary); font-size: 0.82rem; cursor: pointer;
-  border-left: 3px solid var(--primary-color); padding-top: 10px; padding-bottom: 10px;
+  background: var(--eg-surface-muted, #F5F2FB); font-weight: 700;
+  color: var(--eg-text-body, var(--text-secondary)); font-size: 0.8rem; cursor: pointer;
+  border-left: 3px solid var(--primary-color); padding-top: 9px; padding-bottom: 9px;
 }
 
 /* 列宽拖动条 —— 表头右边缘 7px,鼠标过去出 col-resize 光标。
@@ -634,9 +634,9 @@ table.wt-table {
   text-align: center !important; padding-left: 8px !important; padding-right: 8px !important;
   position: sticky; left: 0; z-index: 1;
 }
-.wt-table thead th.wt-num-th { background: #FAF9FC; z-index: 3; }
-.wt-table tbody td.wt-num    { background: var(--bg-card); }
-.wt-table tbody tr:hover td.wt-num { background: #F6F4FB; }
+.wt-table thead th.wt-num-th { background: var(--eg-surface-muted, #FAF9FC); z-index: 3; }
+.wt-table tbody td.wt-num    { background: var(--eg-surface, var(--bg-card)); }
+.wt-table tbody tr:hover td.wt-num { background: var(--eg-surface-muted, #F6F4FB); }
 .wt-num { color: var(--text-muted); font-size: 0.74rem; font-variant-numeric: tabular-nums; }
 
 .wt-cell-title {
@@ -915,8 +915,8 @@ table.wt-table {
 .wt-board { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 8px; }
 .wt-col {
   flex: 1 1 0; min-width: 250px;
-  background: #F6F4FA; border: 1px solid #E8E4F0;
-  border-radius: 14px; padding: 12px;
+  background: var(--eg-surface-muted, #F6F4FA); border: 1px solid var(--eg-border, #E8E4F0);
+  border-radius: var(--eg-radius-lg, 8px); padding: 10px;
 }
 .wt-col-head {
   display: flex; align-items: center; gap: 7px; padding: 2px 5px 0;
@@ -931,8 +931,8 @@ table.wt-table {
   outline: 2px dashed rgba(var(--primary-rgb), .5); border-radius: 10px;
 }
 .wt-card {
-  background: var(--bg-card); border: 1px solid var(--border-color);
-  border-radius: 12px; padding: 12px 13px; cursor: grab; box-shadow: var(--shadow-soft);
+  background: var(--eg-surface, var(--bg-card)); border: 1px solid var(--eg-border, var(--border-color));
+  border-radius: var(--eg-radius-lg, 8px); padding: 10px 11px; cursor: grab; box-shadow: none;
 }
 .wt-card.dragging { opacity: .4; }
 .wt-card-title {
@@ -1052,11 +1052,11 @@ table.wt-table {
 
 /* ── 气泡总览 ── */
 .wt-bubble-wrap {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
+  background: var(--eg-surface, var(--bg-card));
+  border: 1px solid var(--eg-border, var(--border-color));
+  border-radius: var(--eg-radius-lg, 8px);
   padding: 18px 20px 22px;
-  box-shadow: var(--shadow-soft);
+  box-shadow: none;
 }
 .wt-bubble-row {
   display: flex; flex-wrap: wrap; gap: 14px;
@@ -1135,24 +1135,24 @@ table.wt-table {
   gap: 14px;
 }
 .wt-person-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  padding: 14px 14px 6px;
-  box-shadow: var(--shadow-soft);
+  background: var(--eg-surface, var(--bg-card));
+  border: 1px solid var(--eg-border, var(--border-color));
+  border-radius: var(--eg-radius-lg, 8px);
+  padding: 12px 12px 6px;
+  box-shadow: none;
   transition: border-color .2s, box-shadow .2s;
   min-height: 220px;
   display: flex; flex-direction: column;
 }
 .wt-person-highlight {
   border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.18), var(--shadow-soft);
+  box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.14);
 }
 /* T-138:卡激活态 = 持久高亮(紫框 + 轻紫光,非 1.4s 闪);人员卡 + 分布卡共用此态 */
 .wt-person-card.wt-person-active,
 .wt-tag-card.wt-person-active {
   border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.18), var(--shadow-soft);
+  box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.14);
 }
 /* T-138:默认折叠——未激活卡隐藏第 6 条起的任务(人员视图 + 分布视图同款)*/
 .wt-person-card:not(.wt-person-active) .wt-person-task-extra,
@@ -1559,8 +1559,8 @@ table.wt-table {
 }
 
 /* —— 看板/日历/人员视图里的「可点开详情」hover 暗示 —— */
-.wt-board .wt-card { transition: box-shadow .12s, transform .12s; }
-.wt-board .wt-card:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+.wt-board .wt-card { transition: background .12s, border-color .12s; }
+.wt-board .wt-card:hover { border-color: var(--eg-border-strong, #C7D0DD); background: var(--eg-surface-muted, #FAF9FC); }
 .wt-cal-task { cursor: pointer; transition: background .12s; }
 .wt-cal-task:hover { background: rgba(var(--primary-color-rgb), 0.10); }
 
@@ -1760,11 +1760,11 @@ table.wt-table {
    ========================================================================= */
 
 .wt-dim-bar {
-  background: #fff;
-  border: 1px solid #E5E3EE;
-  border-radius: 12px;
-  padding: 12px 18px;
-  box-shadow: 0 1px 2px rgba(15, 15, 30, 0.04), 0 4px 12px rgba(15, 15, 30, 0.06);
+  background: var(--eg-surface, #fff);
+  border: 1px solid var(--eg-border, #E5E3EE);
+  border-radius: var(--eg-radius-lg, 8px);
+  padding: 10px 14px;
+  box-shadow: none;
   margin: 18px 0 18px;
   display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
 }
@@ -1780,8 +1780,8 @@ table.wt-table {
 }
 .wt-dim-btn:hover { background: rgba(124, 77, 255, 0.06); color: #1F2937; }
 .wt-dim-btn.active {
-  background: var(--primary-color, #7C4DFF); color: #fff; font-weight: 600;
-  box-shadow: 0 1px 4px rgba(124, 77, 255, 0.3);
+  background: var(--eg-surface-overlay, #fff); color: var(--primary-color, #7C4DFF); font-weight: 650;
+  box-shadow: var(--eg-shadow-card, 0 1px 2px rgba(23, 32, 51, .08));
 }
 .wt-dim-typ {
   font-size: 10px; opacity: 0.6; margin-left: 4px;
@@ -1812,18 +1812,18 @@ table.wt-table {
   gap: 14px;
 }
 .wt-tag-card {
-  background: #fff;
-  border: 1px solid #E5E3EE;
-  border-radius: 12px;
-  padding: 14px 14px 8px;
-  box-shadow: 0 1px 2px rgba(15, 15, 30, 0.04), 0 4px 12px rgba(15, 15, 30, 0.06);
+  background: var(--eg-surface, #fff);
+  border: 1px solid var(--eg-border, #E5E3EE);
+  border-radius: var(--eg-radius-lg, 8px);
+  padding: 12px 12px 8px;
+  box-shadow: none;
   transition: border-color .2s, box-shadow .2s;
   min-height: 180px;
   display: flex; flex-direction: column;
 }
 .wt-tag-card-unmarked {
   border-style: dashed;
-  background: #F5F2FB;
+  background: var(--eg-surface-muted, #F5F2FB);
 }
 .wt-tag-head {
   display: flex; align-items: center; gap: 10px;
@@ -1942,17 +1942,16 @@ table.wt-table {
   gap: 10px;
 }
 .wt-center-card {
-  background: #fff;
-  border: 1px solid #E5E3EE;
+  background: var(--eg-surface, #fff);
+  border: 1px solid var(--eg-border, #E5E3EE);
   border-radius: 8px;
   padding: 10px 11px;
   cursor: pointer;
-  transition: box-shadow .12s, transform .12s, border-color .12s;
+  transition: background .12s, border-color .12s;
 }
 .wt-center-card:hover {
-  transform: translateY(-1px);
   border-color: rgba(var(--primary-rgb), .28);
-  box-shadow: 0 4px 12px rgba(0,0,0,.07);
+  background: var(--eg-surface-muted, #FAF9FC);
 }
 .wt-center-title {
   font-weight: 650;
