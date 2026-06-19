@@ -184,6 +184,161 @@ body:has(.sidebar.collapsed) { --sidebar-width: 0px; }
   padding: 14px 18px; border-top: 1px solid var(--border-light);
 }
 
+.sh-graph-toolbar { margin-top: 0; }
+.sh-graph-shell {
+  display: grid;
+  grid-template-columns: minmax(620px, 1fr) 280px;
+  gap: 14px;
+  align-items: stretch;
+}
+.sh-graph-canvas {
+  position: relative;
+  min-height: 560px;
+  border: 1px solid #E5E3EE;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #FFFFFF 0%, #FAF9FC 100%);
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(15, 15, 30, 0.04), 0 4px 12px rgba(15, 15, 30, 0.06);
+}
+.sh-graph-canvas::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(124, 77, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(124, 77, 255, 0.04) 1px, transparent 1px);
+  background-size: 42px 42px;
+  pointer-events: none;
+}
+.sh-graph-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.sh-graph-edge {
+  stroke: rgba(100, 116, 139, 0.34);
+  stroke-width: 0.45;
+  transition: opacity .15s, stroke .15s, stroke-width .15s;
+}
+.sh-graph-edge.is-active {
+  stroke: rgba(20, 184, 166, 0.78);
+  stroke-width: 0.9;
+}
+.sh-graph-edge.is-dimmed { opacity: .12; }
+.sh-graph-node {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  border: 1px solid #D7D2E6;
+  border-radius: 999px;
+  background: #fff;
+  color: #1F2937;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(15, 15, 30, 0.08);
+  transition: transform .15s, opacity .15s, border-color .15s, box-shadow .15s, background .15s;
+  z-index: 2;
+}
+.sh-graph-node:hover,
+.sh-graph-node.is-active,
+.sh-graph-node.is-related {
+  transform: translate(-50%, -50%) scale(1.05);
+  border-color: rgba(20, 184, 166, 0.72);
+  box-shadow: 0 8px 22px rgba(20, 184, 166, 0.16), 0 2px 8px rgba(15, 15, 30, 0.08);
+}
+.sh-graph-node.is-dimmed { opacity: .24; }
+.sh-graph-node.is-match { outline: 3px solid rgba(245, 158, 11, 0.24); }
+.sh-graph-dim {
+  background: linear-gradient(135deg, #ECFEFF 0%, #F5F3FF 100%);
+  color: #0F766E;
+  font-weight: 700;
+}
+.sh-graph-dim.is-empty {
+  background: #F4F4F5;
+  color: #71717A;
+  border-style: dashed;
+}
+.sh-graph-person { background: #FFFFFF; }
+.sh-graph-label {
+  max-width: 92px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  line-height: 1.15;
+}
+.sh-graph-meta {
+  max-width: 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #64748B;
+  font-size: 10px;
+  line-height: 1.1;
+  font-weight: 500;
+}
+.sh-graph-side {
+  border: 1px solid #E5E3EE;
+  border-radius: 8px;
+  background: #fff;
+  padding: 14px;
+  min-height: 560px;
+  box-shadow: 0 1px 2px rgba(15, 15, 30, 0.04), 0 4px 12px rgba(15, 15, 30, 0.06);
+}
+.sh-graph-side-title {
+  font-weight: 750;
+  color: #1F2937;
+  margin-bottom: 4px;
+}
+.sh-graph-side-sub,
+.sh-graph-side-empty {
+  color: #64748B;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.sh-graph-side-empty {
+  margin-top: 18px;
+  padding: 12px;
+  border: 1px dashed #E5E3EE;
+  border-radius: 8px;
+  background: #FAF9FC;
+}
+.sh-graph-person-list {
+  margin-top: 12px;
+  display: grid;
+  gap: 8px;
+}
+.sh-graph-person-row {
+  width: 100%;
+  border: 1px solid #E5E3EE;
+  border-radius: 8px;
+  background: #FAF9FC;
+  padding: 9px 10px;
+  text-align: left;
+  cursor: pointer;
+}
+.sh-graph-person-row:hover {
+  border-color: rgba(124, 77, 255, 0.34);
+  background: #fff;
+}
+.sh-graph-person-row span {
+  display: block;
+  color: #1F2937;
+  font-weight: 650;
+}
+.sh-graph-person-row small {
+  display: block;
+  margin-top: 3px;
+  color: #64748B;
+  line-height: 1.35;
+}
+
 /* T-098: 时间镜头 Tab(全部 / 今日 / 本周 / 本月)—— 仿 todo 顶部 Tab 样式
    T-103 B.2:加 spring 指示条(absolute 滑块),移除 per-tab border-bottom 改用统一指示条 */
 .wt-time-tabs {

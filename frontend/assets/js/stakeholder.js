@@ -9,6 +9,8 @@ var Stakeholder = (function() {
     var _search = '';
     var _searchTimer = null;
     var _boardDim = 'team';
+    var _graphMode = 'topic';
+    var _graphFocus = null;
     var _drag = { id: null };
     var _detailId = null;
     var _detailIds = [];
@@ -132,7 +134,7 @@ var Stakeholder = (function() {
         render();
     }
     function _syncViewButtons() {
-        ['table', 'board', 'distribution'].forEach(function(v) {
+        ['table', 'board', 'distribution', 'graph'].forEach(function(v) {
             var el = document.getElementById('sh-seg-' + v);
             if (el) el.classList.toggle('active', _view === v);
         });
@@ -164,16 +166,19 @@ var Stakeholder = (function() {
         _showOnly(_view);
         if (_view === 'table') renderTable(rows);
         else if (_view === 'board') renderBoard(rows);
-        else renderDistribution(rows);
+        else if (_view === 'distribution') renderDistribution(rows);
+        else renderGraph(rows);
         refreshDetailIfOpen();
     }
     function _showOnly(view) {
         var tv = document.getElementById('sh-table-view');
         var bv = document.getElementById('sh-board-view');
         var dv = document.getElementById('sh-distribution-view');
+        var gv = document.getElementById('sh-graph-view');
         if (tv) tv.classList.toggle('wt-hidden', view !== 'table');
         if (bv) bv.classList.toggle('wt-hidden', view !== 'board');
         if (dv) dv.classList.toggle('wt-hidden', view !== 'distribution');
+        if (gv) gv.classList.toggle('wt-hidden', view !== 'graph');
     }
 
     function renderTable(rows) {
@@ -351,6 +356,211 @@ var Stakeholder = (function() {
                 break;
             }
         }
+    }
+
+    function setGraphMode(mode) {
+        _graphMode = mode || 'topic';
+        _graphFocus = null;
+        render();
+    }
+
+    function renderGraph(rows) {
+        var host = document.getElementById('sh-graph-view');
+        if (!host) return;
+        if (!rows.length) {
+            host.innerHTML = '<div class="wt-search-empty">还没有干系人，先新建一条再看关系图</div>';
+            return;
+        }
+        var graph = _buildGraph(rows, _graphMode);
+        var seg = [
+            { key: 'team', label: '按部门' },
+            { key: 'topic', label: '按事项' },
+            { key: 'region', label: '按地域' },
+        ].map(function(m) {
+            return '<button class="wt-dim-btn' + (_graphMode === m.key ? ' active' : '') + '" onclick="Stakeholder.setGraphMode(\'' + m.key + '\')">' + m.label + '</button>';
+        }).join('');
+
+        if (!graph.edges.length) {
+            host.innerHTML = '<div class="wt-dim-bar"><span class="wt-dim-lbl">关系图模式</span><div class="wt-dim-seg">' + seg + '</div></div>'
+                + '<div class="wt-search-empty">' + _graphEmptyMessage(_graphMode) + '</div>';
+            return;
+        }
+
+        var lines = graph.edges.map(function(e) {
+            var a = graph.nodeMap[e.from];
+            var b = graph.nodeMap[e.to];
+            if (!a || !b) return '';
+            return '<line class="sh-graph-edge" data-from="' + _attr(e.from) + '" data-to="' + _attr(e.to) + '" x1="' + a.x + '%" y1="' + a.y + '%" x2="' + b.x + '%" y2="' + b.y + '%"></line>';
+        }).join('');
+        var nodes = graph.nodes.map(function(n) {
+            var size = n.kind === 'dim' ? Math.round(54 + Math.min(44, Math.log2(n.count + 1) * 18)) : 46;
+            var style = 'left:' + n.x + '%;top:' + n.y + '%;width:' + size + 'px;height:' + size + 'px;';
+            var meta = n.kind === 'dim' ? (n.count + ' 人') : (n.meta || '');
+            var classes = 'sh-graph-node sh-graph-' + n.kind + (n.isEmpty ? ' is-empty' : '') + (_nodeMatchesSearch(n) ? ' is-match' : '');
+            return '<button type="button" class="' + classes + '" style="' + style + '" data-node="' + _attr(n.id) + '" title="' + _attr(n.label) + '">'
+                + '<span class="sh-graph-label">' + _esc(n.label) + '</span>'
+                + (meta ? '<span class="sh-graph-meta">' + _esc(meta) + '</span>' : '')
+                + '</button>';
+        }).join('');
+        host.innerHTML = '<div class="wt-dim-bar sh-graph-toolbar">'
+            + '<span class="wt-dim-lbl">关系图模式</span><div class="wt-dim-seg">' + seg + '</div>'
+            + '<span class="wt-dim-spacer"></span><span class="wt-dim-stats">点击人员看详情，点击维度看关联名单</span></div>'
+            + '<div class="sh-graph-shell">'
+            + '<div class="sh-graph-canvas" id="sh-graph-canvas"><svg class="sh-graph-svg" viewBox="0 0 100 100" preserveAspectRatio="none">' + lines + '</svg>' + nodes + '</div>'
+            + '<aside class="sh-graph-side" id="sh-graph-side">' + _graphSideHtml(graph) + '</aside>'
+            + '</div>';
+        _bindGraph(graph);
+    }
+
+    function _buildGraph(rows, mode) {
+        var dimMap = Object.create(null);
+        var personMap = Object.create(null);
+        var edges = [];
+        rows.forEach(function(r) {
+            var vals = _graphValues(r, mode);
+            if (!vals.length) return;
+            var personId = 'p:' + r.id;
+            if (!personMap[personId]) {
+                personMap[personId] = { id: personId, kind: 'person', row: r, label: r.name || '(未命名)', meta: [r.title, r.team, r.region].filter(Boolean).slice(0, 2).join(' · '), count: 1 };
+            }
+            vals.forEach(function(v) {
+                var dimId = 'd:' + mode + ':' + v.value;
+                if (!dimMap[dimId]) dimMap[dimId] = { id: dimId, kind: 'dim', label: v.label, value: v.value, count: 0, people: [], isEmpty: !!v.isEmpty };
+                if (dimMap[dimId].people.indexOf(r.id) < 0) {
+                    dimMap[dimId].people.push(r.id);
+                    dimMap[dimId].count++;
+                }
+                edges.push({ from: dimId, to: personId });
+            });
+        });
+        var dims = Object.keys(dimMap).map(function(k) { return dimMap[k]; }).sort(function(a, b) {
+            if (a.isEmpty !== b.isEmpty) return a.isEmpty ? 1 : -1;
+            return b.count - a.count || a.label.localeCompare(b.label);
+        });
+        var people = Object.keys(personMap).map(function(k) { return personMap[k]; }).sort(function(a, b) {
+            return a.label.localeCompare(b.label);
+        });
+        _placeGraphNodes(dims, people);
+        var nodes = dims.concat(people);
+        var nodeMap = {};
+        nodes.forEach(function(n) { nodeMap[n.id] = n; });
+        return { mode: mode, dims: dims, people: people, nodes: nodes, edges: edges, nodeMap: nodeMap };
+    }
+
+    function _graphValues(row, mode) {
+        if (mode === 'team') {
+            var team = (row.team || '').trim();
+            return [{ value: team || UNMARKED, label: team || UNMARKED, isEmpty: !team }];
+        }
+        if (mode === 'region') {
+            var region = (row.region || '').trim();
+            return [{ value: region || UNMARKED, label: region || UNMARKED, isEmpty: !region }];
+        }
+        var seen = {};
+        var values = _arr(row.duty).concat(_arr(row.liaison)).map(function(v) { return v.trim(); }).filter(function(v) {
+            if (!v || seen[v]) return false;
+            seen[v] = 1;
+            return true;
+        }).map(function(v) { return { value: v, label: v }; });
+        return values.length ? values : [{ value: UNMARKED, label: UNMARKED, isEmpty: true }];
+    }
+
+    function _placeGraphNodes(dims, people) {
+        var dimCount = Math.max(1, dims.length);
+        var personCount = Math.max(1, people.length);
+        dims.forEach(function(n, i) {
+            var y = dimCount === 1 ? 50 : 16 + (68 * i / (dimCount - 1));
+            n.x = 22 + (i % 2) * 6;
+            n.y = Math.round(y);
+        });
+        people.forEach(function(n, i) {
+            var y = personCount === 1 ? 50 : 14 + (72 * i / (personCount - 1));
+            n.x = 70 + (i % 3) * 7;
+            n.y = Math.round(y);
+        });
+    }
+
+    function _bindGraph(graph) {
+        var canvas = document.getElementById('sh-graph-canvas');
+        if (!canvas) return;
+        canvas.querySelectorAll('.sh-graph-node').forEach(function(el) {
+            el.addEventListener('mouseenter', function() { _highlightGraphNode(el.dataset.node); });
+            el.addEventListener('mouseleave', function() { _highlightGraphNode(_graphFocus); });
+            el.addEventListener('click', function() { _clickGraphNode(el.dataset.node, graph); });
+        });
+        _highlightGraphNode(_graphFocus);
+    }
+
+    function _clickGraphNode(id, graph) {
+        var node = graph.nodeMap[id];
+        if (!node) return;
+        if (node.kind === 'person') {
+            openDetail(node.row.id, graph.people.map(function(p) { return p.row.id; }));
+            return;
+        }
+        _graphFocus = _graphFocus === id ? null : id;
+        _highlightGraphNode(_graphFocus);
+        var side = document.getElementById('sh-graph-side');
+        if (side) side.innerHTML = _graphSideHtml(graph);
+    }
+
+    function _highlightGraphNode(id) {
+        var related = {};
+        if (id) {
+            related[id] = 1;
+            document.querySelectorAll('#sh-graph-canvas .sh-graph-edge').forEach(function(edge) {
+                if (edge.dataset.from === id || edge.dataset.to === id) {
+                    related[edge.dataset.from] = 1;
+                    related[edge.dataset.to] = 1;
+                }
+            });
+        }
+        document.querySelectorAll('#sh-graph-canvas .sh-graph-node').forEach(function(node) {
+            var on = !id || related[node.dataset.node];
+            node.classList.toggle('is-dimmed', !on);
+            node.classList.toggle('is-active', !!id && node.dataset.node === id);
+            node.classList.toggle('is-related', !!id && on && node.dataset.node !== id);
+        });
+        document.querySelectorAll('#sh-graph-canvas .sh-graph-edge').forEach(function(edge) {
+            var on = !id || edge.dataset.from === id || edge.dataset.to === id;
+            edge.classList.toggle('is-dimmed', !on);
+            edge.classList.toggle('is-active', !!id && on);
+        });
+    }
+
+    function _graphSideHtml(graph) {
+        var node = _graphFocus && graph.nodeMap[_graphFocus];
+        if (!node || node.kind !== 'dim') {
+            return '<div class="sh-graph-side-title">关系图</div>'
+                + '<div class="sh-graph-side-sub">' + _graphModeLabel(graph.mode) + ' · ' + graph.dims.length + ' 个维度节点 · ' + graph.people.length + ' 人</div>'
+                + '<div class="sh-graph-side-empty">点击左侧部门、事项或地域节点，查看关联人员。</div>';
+        }
+        var people = node.people.map(rowById).filter(Boolean);
+        return '<div class="sh-graph-side-title">' + _esc(node.label) + '</div>'
+            + '<div class="sh-graph-side-sub">' + people.length + ' 个关联人员</div>'
+            + '<div class="sh-graph-person-list">' + people.map(function(r) {
+                return '<button type="button" class="sh-graph-person-row" onclick="Stakeholder.openDetail(' + r.id + ')">'
+                    + '<span>' + _esc(r.name || '(未命名)') + '</span>'
+                    + '<small>' + _esc([r.title, r.team, r.region].filter(Boolean).join(' · ') || '未补充职务/部门') + '</small>'
+                    + '</button>';
+            }).join('') + '</div>';
+    }
+
+    function _graphModeLabel(mode) {
+        if (mode === 'team') return '按部门';
+        if (mode === 'region') return '按地域';
+        return '按事项';
+    }
+    function _graphEmptyMessage(mode) {
+        if (mode === 'team') return '当前没有可连接的部门字段，请回表格补充部门/团队。';
+        if (mode === 'region') return '当前没有可连接的地域字段，请回表格补充地域。';
+        return '当前没有可连接的负责事项或相关工作标签，请回表格补充事项字段。';
+    }
+    function _nodeMatchesSearch(node) {
+        return !!_search && _hay(node.label, _search);
+    }
+    function _attr(s) {
+        return _esc(s).replace(/`/g, '&#96;');
     }
 
     function updateRow(id, patch) {
@@ -745,6 +955,7 @@ var Stakeholder = (function() {
         setView: setView,
         setBoardDim: setBoardDim,
         setDistributionDim: setDistributionDim,
+        setGraphMode: setGraphMode,
         onSearchInput: onSearchInput,
         onSearchKey: onSearchKey,
         clearSearch: clearSearch,
