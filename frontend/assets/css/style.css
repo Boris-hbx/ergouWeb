@@ -122,7 +122,7 @@ body {
 
 /* 在侧边栏右边 - 直线贴着分界线，圆角向右凸出 */
 .pet.at-sidebar {
-    left: 190px;
+    left: 160px;
     background: linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.05) 100%);
     border-radius: 0 16px 16px 0;
     box-shadow: 2px 0 15px rgba(0, 0, 0, 0.1);
@@ -622,7 +622,7 @@ body {
 
 /* Sidebar */
 .sidebar {
-    width: 190px;
+    width: 160px;
     background: var(--eg-surface-subtle, var(--bg-card));
     border-right: 1px solid var(--eg-border, var(--border-color));
     padding: 0;
@@ -793,10 +793,10 @@ body {
 /* Main content */
 .main-content {
     flex: 1;
-    margin-left: 190px;
+    margin-left: 160px;
     padding: calc(48px + 2rem) 1rem 2rem 1rem;
-    width: calc(100vw - 190px);
-    max-width: calc(100vw - 190px);
+    width: calc(100vw - 160px);
+    max-width: calc(100vw - 160px);
     transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
     overflow-x: hidden;
     overflow-y: auto;
@@ -4643,12 +4643,12 @@ body {
 /* Responsive design */
 @media (max-width: 1024px) {
     .sidebar {
-        width: 180px;
+        width: 160px;
     }
 
     .main-content {
-        margin-left: 180px;
-        max-width: calc(100vw - 180px);
+        margin-left: 160px;
+        max-width: calc(100vw - 160px);
         padding: calc(48px + 1.5rem) 1.5rem 1.5rem 1.5rem;
     }
     

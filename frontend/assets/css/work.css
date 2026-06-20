@@ -24,9 +24,9 @@
  *   这里定义 --sidebar-width 是为了后续视图(看板/日历)若需独立计算时直接复用,
  *   并通过 :has() 选择器在侧栏收起时实时同步,无需 JS 监听。
  */
-:root { --sidebar-width: 190px; }
+:root { --sidebar-width: 160px; }
 body:has(.sidebar.collapsed) { --sidebar-width: 0px; }
-@media (max-width: 1024px) { :root { --sidebar-width: 180px; } body:has(.sidebar.collapsed) { --sidebar-width: 0px; } }
+@media (max-width: 1024px) { :root { --sidebar-width: 160px; } body:has(.sidebar.collapsed) { --sidebar-width: 0px; } }
 @media (max-width: 768px)  { :root { --sidebar-width: 160px; } body:has(.sidebar.collapsed) { --sidebar-width: 0px; } }
 
 .work-main-layout {
