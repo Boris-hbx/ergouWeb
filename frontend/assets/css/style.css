@@ -597,8 +597,9 @@ body {
 .timezone-panel {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    padding: 0 1rem;
+    gap: 6px;
+    padding: 10px 8px 12px;
+    border-top: 1px solid var(--eg-border-subtle, var(--border-light));
     transition: all 0.4s ease;
 }
 
@@ -635,14 +636,16 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 8px 12px;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
+    min-height: 34px;
+    padding: 0 10px;
+    background: var(--eg-surface, var(--bg-card));
+    border: 1px solid var(--eg-border-subtle, var(--border-light));
+    border-radius: var(--eg-radius-md, 8px);
 }
 
 .tz-city {
-    font-size: 0.75rem;
-    color: rgba(255, 255, 255, 0.9);
+    font-size: 0.72rem;
+    color: var(--eg-text-muted, var(--text-muted));
     font-weight: 600;
 }
 
@@ -653,27 +656,28 @@ body {
 }
 
 .tz-datetime {
-    font-size: 0.75rem;
-    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.72rem;
+    color: var(--eg-text-faint, var(--text-muted));
 }
 
 .tz-time {
-    font-size: 0.9rem;
+    font-size: 0.82rem;
     font-weight: 700;
-    color: white;
+    color: var(--eg-text-strong, var(--text-primary));
     font-family: "SF Mono", "Monaco", monospace;
 }
 
 /* Sidebar */
 .sidebar {
     width: 220px;
-    background: linear-gradient(180deg, var(--primary-color) 0%, var(--primary-color) 100%);
-    padding: 1rem 0;
+    background: var(--eg-surface-subtle, var(--bg-card));
+    border-right: 1px solid var(--eg-border, var(--border-color));
+    padding: 0;
     position: fixed;
     height: calc(100vh - 48px);
     left: 0;
     top: 48px;
-    box-shadow: 4px 0 25px rgba(var(--primary-color-rgb), 0.3);
+    box-shadow: none;
     z-index: 1000;
     transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
     overflow: hidden;
@@ -684,6 +688,7 @@ body {
 .sidebar.collapsed {
     width: 0;
     padding: 0;
+    border-right: none;
     box-shadow: none;
 }
 
@@ -693,34 +698,35 @@ body {
     transform: translateX(-20px);
 }
 
-.nav-links {
+.sidebar .nav-links {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
-    padding: 0.5rem 1.5rem 0;
+    gap: 4px;
+    padding: 12px 8px 0;
     transition: all 0.4s ease;
 }
 
-.nav-link {
+.sidebar .nav-link {
     display: block;
-    padding: 1rem 1.5rem;
-    color: rgba(255, 255, 255, 0.9);
+    min-height: 36px;
+    padding: 0 12px;
+    color: var(--eg-text-body, var(--text-secondary));
     text-decoration: none;
-    border-radius: 12px;
-    transition: color 0.3s ease, font-weight 0.3s ease, transform 0.3s ease;
-    font-weight: 500;
-    font-size: 1.1rem;
-    backdrop-filter: blur(10px);
+    border-radius: var(--eg-radius-md, 8px);
+    transition: background 0.2s ease, color 0.2s ease, font-weight 0.2s ease, box-shadow 0.2s ease;
+    font-weight: 560;
+    font-size: 0.9rem;
+    line-height: 36px;
     white-space: nowrap;
     position: relative;
     overflow: hidden;
-    background: rgba(255, 255, 255, 0.08);
+    background: transparent;
     cursor: pointer;
     z-index: 1;
 }
 
 /* 所有nav-link的光晕效果 */
-.nav-link::before {
+.sidebar .nav-link::before {
     content: '';
     position: absolute;
     top: 0;
@@ -736,7 +742,7 @@ body {
     transition: none;
 }
 
-.nav-link:hover::before {
+.sidebar .nav-link:hover::before {
     animation: navGlowSweep 1.2s ease-in-out infinite;
 }
 
@@ -745,17 +751,25 @@ body {
     50% { transform: translateX(100%); }
 }
 
-.nav-link:hover {
-    background-color: rgba(255, 255, 255, 0.1);
-    color: #ffffff;
-    transform: translateX(5px);
+.sidebar .nav-link:hover {
+    background: var(--eg-surface-muted, rgba(var(--primary-color-rgb), 0.06));
+    color: var(--eg-text-strong, var(--text-primary));
 }
 
-.nav-link.active {
-    background: transparent;
-    color: #ffffff;
-    font-weight: 600;
-    box-shadow: none;
+.sidebar .nav-link.active {
+    background: rgba(var(--primary-color-rgb), 0.08);
+    color: var(--primary-color);
+    font-weight: 650;
+    box-shadow: inset 3px 0 0 var(--primary-color);
+}
+
+.sidebar:not(.collapsed) .nav-link::before {
+    display: none;
+}
+
+.sidebar:not(.collapsed) .nav-link:focus-visible {
+    outline: none;
+    box-shadow: inset 3px 0 0 var(--primary-color), var(--eg-focus-ring);
 }
 
 /* ========== Jelly Pill Indicator ========== */
@@ -770,9 +784,9 @@ body {
 
 /* Sidebar nav pill */
 .jelly-pill-sidebar {
-    background: linear-gradient(135deg, #ff6b6b, #feca57);
-    box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3);
-    border-radius: 12px;
+    background: rgba(var(--primary-color-rgb), 0.08);
+    box-shadow: inset 3px 0 0 var(--primary-color);
+    border-radius: var(--eg-radius-md, 8px);
 }
 
 /* Matrix tab pill — solid primary like expense period tabs */
