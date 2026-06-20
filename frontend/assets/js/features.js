@@ -388,22 +388,30 @@ window.toggleFocusMode = function() {
     }
 
     function updateTimezones() {
+        var bjDateEl = document.getElementById('tz-beijing-date');
+        var bjTimeEl = document.getElementById('tz-beijing-time');
+        var wtDateEl = document.getElementById('tz-waterloo-date');
+        var wtTimeEl = document.getElementById('tz-waterloo-time');
+        var vcDateEl = document.getElementById('tz-vancouver-date');
+        var vcTimeEl = document.getElementById('tz-vancouver-time');
+        if (!bjDateEl || !bjTimeEl || !wtDateEl || !wtTimeEl || !vcDateEl || !vcTimeEl) return;
+
         var now = new Date();
 
         var beijing = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Shanghai' }));
         var bjFmt = formatTz(beijing);
-        document.getElementById('tz-beijing-date').textContent = bjFmt.date;
-        document.getElementById('tz-beijing-time').textContent = bjFmt.time;
+        bjDateEl.textContent = bjFmt.date;
+        bjTimeEl.textContent = bjFmt.time;
 
         var waterloo = new Date(now.toLocaleString('en-US', { timeZone: 'America/Toronto' }));
         var wtFmt = formatTz(waterloo);
-        document.getElementById('tz-waterloo-date').textContent = wtFmt.date;
-        document.getElementById('tz-waterloo-time').textContent = wtFmt.time;
+        wtDateEl.textContent = wtFmt.date;
+        wtTimeEl.textContent = wtFmt.time;
 
         var vancouver = new Date(now.toLocaleString('en-US', { timeZone: 'America/Vancouver' }));
         var vcFmt = formatTz(vancouver);
-        document.getElementById('tz-vancouver-date').textContent = vcFmt.date;
-        document.getElementById('tz-vancouver-time').textContent = vcFmt.time;
+        vcDateEl.textContent = vcFmt.date;
+        vcTimeEl.textContent = vcFmt.time;
     }
 
     updateTimezones();
