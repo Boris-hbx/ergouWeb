@@ -30,7 +30,7 @@
     }
 
     .platform-desktop .main-content {
-        margin-left: 220px;
+        margin-left: 190px;
         margin-top: 48px;
         padding: 2rem; /* 覆盖 style.css 中的 padding-top，避免双重间距 */
         flex: 1;

@@ -591,18 +591,6 @@ body {
     50% { opacity: 0.6; }
 }
 
-/* 天气面板跟随时区面板隐藏 */
-
-/* 时区面板 - 侧边栏底部 */
-.timezone-panel {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    padding: 10px 8px 12px;
-    border-top: 1px solid var(--eg-border-subtle, var(--border-light));
-    transition: all 0.4s ease;
-}
-
 /* Boris Huai 签名 */
 .signature-section {
     position: absolute;
@@ -632,44 +620,9 @@ body {
     transform: translateX(-20px);
 }
 
-.timezone-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    min-height: 34px;
-    padding: 0 10px;
-    background: var(--eg-surface, var(--bg-card));
-    border: 1px solid var(--eg-border-subtle, var(--border-light));
-    border-radius: var(--eg-radius-md, 8px);
-}
-
-.tz-city {
-    font-size: 0.72rem;
-    color: var(--eg-text-muted, var(--text-muted));
-    font-weight: 600;
-}
-
-.tz-info {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.tz-datetime {
-    font-size: 0.72rem;
-    color: var(--eg-text-faint, var(--text-muted));
-}
-
-.tz-time {
-    font-size: 0.82rem;
-    font-weight: 700;
-    color: var(--eg-text-strong, var(--text-primary));
-    font-family: "SF Mono", "Monaco", monospace;
-}
-
 /* Sidebar */
 .sidebar {
-    width: 220px;
+    width: 190px;
     background: var(--eg-surface-subtle, var(--bg-card));
     border-right: 1px solid var(--eg-border, var(--border-color));
     padding: 0;
@@ -692,8 +645,7 @@ body {
     box-shadow: none;
 }
 
-.sidebar.collapsed .nav-links,
-.sidebar.collapsed .timezone-panel {
+.sidebar.collapsed .nav-links {
     opacity: 0;
     transform: translateX(-20px);
 }
@@ -840,10 +792,10 @@ body {
 /* Main content */
 .main-content {
     flex: 1;
-    margin-left: 220px;
+    margin-left: 190px;
     padding: calc(48px + 2rem) 1rem 2rem 1rem;
-    width: calc(100vw - 220px);
-    max-width: calc(100vw - 220px);
+    width: calc(100vw - 190px);
+    max-width: calc(100vw - 190px);
     transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
     overflow-x: hidden;
     overflow-y: auto;

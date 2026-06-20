@@ -608,7 +608,7 @@ input, textarea, select {
 .quick-add-bar {
     position: fixed;
     bottom: 0;
-    left: 220px;
+    left: 190px;
     right: 0;
     padding: 12px 16px;
     padding-bottom: max(12px, env(safe-area-inset-bottom));
