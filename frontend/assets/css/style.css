@@ -660,7 +660,10 @@ body {
 }
 
 .sidebar .nav-link {
-    display: block;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
     min-height: 36px;
     width: 94px;
     padding: 0 14px;
@@ -672,6 +675,7 @@ body {
     font-weight: 560;
     font-size: 0.9rem;
     line-height: 36px;
+    text-align: center;
     white-space: nowrap;
     position: relative;
     overflow: hidden;
