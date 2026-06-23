@@ -53,6 +53,7 @@ var WorkDone = (function() {
         if (tableView) tableView.style.display = 'none';
         if (insView) insView.style.display = 'none';
         if (doneView) doneView.style.display = '';
+        localStorage.setItem('work_feature', 'done');
         _ensureLoaded().then(function() {
             _renderStagger = true;  // 进入页面 = 大动作
             render();
@@ -64,6 +65,7 @@ var WorkDone = (function() {
         var doneView = document.getElementById('work-done-view');
         if (doneView) doneView.style.display = 'none';
         if (hub) hub.style.display = '';
+        localStorage.removeItem('work_feature');
         // 关抽屉(如果开着)
         if (typeof WorkDetail !== 'undefined' && WorkDetail.isOpen && WorkDetail.isOpen()) {
             WorkDetail.closeDetail();

@@ -75,6 +75,7 @@ var Insight = (function() {
         if (hub) hub.style.display = 'none';
         if (tableView) tableView.style.display = 'none';
         if (insView) insView.style.display = '';
+        localStorage.setItem('work_feature', 'insight');
         _showDetail(false);
         _renderList();
         refreshList();
@@ -95,6 +96,7 @@ var Insight = (function() {
         var hub = document.getElementById('work-hub');
         if (insView) insView.style.display = 'none';
         if (hub) hub.style.display = '';
+        localStorage.removeItem('work_feature');
     }
 
     function _showDetail(on) {
