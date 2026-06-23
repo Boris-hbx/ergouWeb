@@ -109,6 +109,12 @@ var WorkDetail = (function() {
                 duePill.style.display = 'none';
             }
         }
+        var sourceHint = document.getElementById('wt-d-source-hint');
+        if (sourceHint) {
+            var isTodoSource = t.sourceType === 'todo' && t.sourceTodoId;
+            sourceHint.style.display = isTodoSource ? 'inline-flex' : 'none';
+            sourceHint.dataset.todoId = isTodoSource ? t.sourceTodoId : '';
+        }
 
         // 字段网格
         var avaEl = document.getElementById('wt-d-avatar');
@@ -361,6 +367,33 @@ var WorkDetail = (function() {
         _syncSelectedRow();
     }
 
+    function openSourceTodo() {
+        var t = _currentId === null ? null : Work.rowById(_currentId);
+        var todoId = t && t.sourceTodoId;
+        if (!todoId) return;
+        closeDetail();
+        if (typeof switchPage === 'function') switchPage('todo');
+        API.getTodo(todoId).then(function(resp) {
+            if (!resp || !resp.item) {
+                if (typeof showToast === 'function') showToast('来源 Todo 不存在', 'warning');
+                return;
+            }
+            if (Array.isArray(window.allItems)) {
+                var found = false;
+                window.allItems = window.allItems.map(function(i) {
+                    if (i.id === todoId) { found = true; return resp.item; }
+                    return i;
+                });
+                if (!found) window.allItems.push(resp.item);
+                if (typeof renderItems === 'function') renderItems();
+            }
+            if (typeof showTaskCard === 'function') showTaskCard(todoId);
+        }).catch(function(err) {
+            console.error('[WorkDetail] open source todo', err);
+            if (typeof showToast === 'function') showToast('打开来源 Todo 失败', 'error');
+        });
+    }
+
     return {
         openDetail: openDetail,
         closeDetail: closeDetail,
@@ -369,5 +402,6 @@ var WorkDetail = (function() {
         currentId: currentId,
         openFromRowEvent: openFromRowEvent,
         refreshIfOpen: refreshIfOpen,
+        openSourceTodo: openSourceTodo,
     };
 })();

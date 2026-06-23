@@ -11,6 +11,15 @@ function shareCurrentTask() {
     }
 }
 
+function handleModalUpgradeToWork() {
+    if (!modalTaskId) return;
+    if (modalTaskItem && modalTaskItem.upgradedToWork) {
+        openWorkTaskFromTodo(modalTaskId);
+    } else {
+        upgradeTodoToWork(modalTaskId);
+    }
+}
+
 function showAddModal() {
     openTaskModal('create', null, currentTab, 'important-urgent');
 }
@@ -195,6 +204,20 @@ function setModalMode(mode) {
     document.getElementById('modal-footer-edit').style.display = (mode !== 'view') ? 'flex' : 'none';
     var shareBtn = document.getElementById('header-share-btn');
     if (shareBtn) shareBtn.style.display = (mode === 'view' && modalTaskId) ? 'inline-block' : 'none';
+    var upgradeBtn = document.getElementById('header-upgrade-work-btn');
+    if (upgradeBtn) {
+        var showUpgrade = mode === 'view' && modalTaskId;
+        upgradeBtn.style.display = showUpgrade ? 'inline-block' : 'none';
+        if (modalTaskItem && modalTaskItem.upgradedToWork) {
+            upgradeBtn.title = '打开工作任务';
+            upgradeBtn.textContent = '已升级';
+            upgradeBtn.classList.add('is-upgraded');
+        } else {
+            upgradeBtn.title = '升级到工作任务';
+            upgradeBtn.textContent = '↗';
+            upgradeBtn.classList.remove('is-upgraded');
+        }
+    }
 
     var saveBtn = document.getElementById('modal-save-btn');
     saveBtn.textContent = (mode === 'create') ? '创建' : '保存';

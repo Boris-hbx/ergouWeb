@@ -1334,6 +1334,15 @@ html.sidebar-will-collapse .sidebar-hint {
     background: var(--bg-hover, rgba(99,179,237,0.1));
     color: var(--primary-color, #58a6ff);
 }
+.header-btn.todo-upgrade-btn {
+    min-width: 34px;
+    padding: 6px 10px;
+}
+.header-btn.todo-upgrade-btn.is-upgraded {
+    min-width: 58px;
+    color: #0f766e;
+    background: rgba(20, 184, 166, .1);
+}
 .task-modal-body {
     display: flex;
     flex: 1;
@@ -2528,6 +2537,40 @@ html.sidebar-will-collapse .sidebar-hint {
     border-radius: 0 0 16px 16px;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
     margin-bottom: 1rem;
+}
+.todo-upgrade-filter {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    width: fit-content;
+    margin: 8px 0 10px 1.5rem;
+    padding: 4px 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-secondary);
+    font-size: 12px;
+    background: var(--surface-color, #fff);
+}
+.todo-upgrade-filter input {
+    margin: 0;
+}
+.todo-work-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 22px;
+    padding: 2px 7px;
+    border: 1px solid rgba(20, 184, 166, .32);
+    border-radius: 6px;
+    background: rgba(20, 184, 166, .1);
+    color: #0f766e;
+    font-size: 12px;
+    line-height: 1.2;
+    white-space: nowrap;
+    cursor: pointer;
+}
+.todo-work-badge:hover {
+    background: rgba(20, 184, 166, .16);
 }
 
 .assignee-divider {

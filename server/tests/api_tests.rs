@@ -171,6 +171,96 @@ async fn test_create_todo() {
 }
 
 #[tokio::test]
+async fn test_upgrade_todo_to_work_is_idempotent_and_recreates_after_soft_delete() {
+    let state = test_state();
+    let (_, token) = create_test_user(&state, "todo_upgrade", "Upgrade123");
+    let cookie = auth_cookie(&token);
+
+    let app = build_app(state.clone());
+    let req = Request::post("/api/todos")
+        .header("content-type", "application/json")
+        .header("cookie", &cookie)
+        .body(Body::from(
+            serde_json::to_string(&serde_json::json!({
+                "text": "Prepare project brief",
+                "content": "Bring notes into the formal tracker",
+                "quadrant": "important-urgent",
+                "progress": 40,
+                "due_date": "2026-06-30",
+                "tags": ["planning", "todo-source"]
+            }))
+            .unwrap(),
+        ))
+        .unwrap();
+    let (_, body) = send(app, req).await;
+    let todo_id = body["item"]["id"].as_str().unwrap().to_string();
+    assert_eq!(body["item"]["upgradedToWork"], false);
+
+    let app = build_app(state.clone());
+    let req = Request::post(&format!("/api/todos/{todo_id}/upgrade-to-work"))
+        .header("cookie", &cookie)
+        .body(Body::empty())
+        .unwrap();
+    let (status, body) = send(app, req).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["success"], true);
+    assert_eq!(body["todo"]["upgradedToWork"], true);
+    assert_eq!(body["workTask"]["title"], "Prepare project brief");
+    assert_eq!(
+        body["workTask"]["desc"],
+        "Bring notes into the formal tracker"
+    );
+    assert_eq!(body["workTask"]["priority"], "high");
+    assert_eq!(body["workTask"]["progress"], 40);
+    assert_eq!(body["workTask"]["sourceType"], "todo");
+    assert_eq!(body["workTask"]["sourceTodoId"], todo_id);
+    let first_work_id = body["workTask"]["id"].as_i64().unwrap();
+
+    let app = build_app(state.clone());
+    let req = Request::post(&format!("/api/todos/{todo_id}/upgrade-to-work"))
+        .header("cookie", &cookie)
+        .body(Body::empty())
+        .unwrap();
+    let (_, body) = send(app, req).await;
+    assert_eq!(body["workTask"]["id"].as_i64().unwrap(), first_work_id);
+
+    let app = build_app(state.clone());
+    let req = Request::delete(&format!("/api/work/tasks/{first_work_id}"))
+        .header("cookie", &cookie)
+        .body(Body::empty())
+        .unwrap();
+    let (status, _) = send(app, req).await;
+    assert_eq!(status, StatusCode::OK);
+
+    let app = build_app(state.clone());
+    let req = Request::post(&format!("/api/todos/{todo_id}/upgrade-to-work"))
+        .header("cookie", &cookie)
+        .body(Body::empty())
+        .unwrap();
+    let (_, body) = send(app, req).await;
+    let second_work_id = body["workTask"]["id"].as_i64().unwrap();
+    assert_ne!(second_work_id, first_work_id);
+    assert_eq!(
+        body["todo"]["workTaskId"].as_str().unwrap(),
+        second_work_id.to_string()
+    );
+
+    let app = build_app(state);
+    let req = Request::get("/api/work/tasks?source_type=todo")
+        .header("cookie", &cookie)
+        .body(Body::empty())
+        .unwrap();
+    let (_, body) = send(app, req).await;
+    let ids: Vec<i64> = body["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|v| v["id"].as_i64())
+        .collect();
+    assert_eq!(ids, vec![second_work_id]);
+}
+
+#[tokio::test]
 async fn test_create_todo_too_long() {
     let state = test_state();
     let (_, token) = create_test_user(&state, "grace", "Grace123");
@@ -1052,9 +1142,7 @@ async fn test_get_soul_state_lazy_create() {
 #[tokio::test]
 async fn test_soul_state_unauthenticated_401() {
     let app = build_app(test_state());
-    let req = Request::get("/api/soul-state")
-        .body(Body::empty())
-        .unwrap();
+    let req = Request::get("/api/soul-state").body(Body::empty()).unwrap();
     let (status, _) = send(app, req).await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
 }
@@ -1169,7 +1257,10 @@ async fn test_put_soul_state_logs_changes() {
             |r| r.get(0),
         )
         .unwrap();
-    assert!(log_count >= 1, "Should have at least 1 manual evolution log entry");
+    assert!(
+        log_count >= 1,
+        "Should have at least 1 manual evolution log entry"
+    );
 }
 
 // ──────────────────── Soul Evolution ────────────────────
@@ -1292,13 +1383,25 @@ async fn test_soul_prompt_building() {
     );
 
     // Check soul state section is present
-    assert!(prompt.contains("灵魂状态"), "Prompt should contain soul state section");
+    assert!(
+        prompt.contains("灵魂状态"),
+        "Prompt should contain soul state section"
+    );
     // Check dynamic personality (high warmth+trust → caring)
-    assert!(prompt.contains("关心") || prompt.contains("关怀"), "High warmth should show caring personality");
+    assert!(
+        prompt.contains("关心") || prompt.contains("关怀"),
+        "High warmth should show caring personality"
+    );
     // Check relationship stage behavior
-    assert!(prompt.contains("熟悉"), "Familiar stage should be mentioned");
+    assert!(
+        prompt.contains("熟悉"),
+        "Familiar stage should be mentioned"
+    );
     // Check tone examples exist
-    assert!(prompt.contains("语气参考"), "Tone examples should be present");
+    assert!(
+        prompt.contains("语气参考"),
+        "Tone examples should be present"
+    );
 }
 
 // ──────────────────── Registration creates soul state ────────────────────

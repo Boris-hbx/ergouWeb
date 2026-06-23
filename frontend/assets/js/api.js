@@ -153,6 +153,10 @@ var API = (function() {
             return await request('GET', '/todos/counts?tab=' + encodeURIComponent(tab));
         },
 
+        upgradeTodoToWork: async function(id) {
+            return await request('POST', '/todos/' + encodeURIComponent(id) + '/upgrade-to-work');
+        },
+
         // ===== Routine APIs =====
         getRoutines: async function() {
             return await request('GET', '/routines');
