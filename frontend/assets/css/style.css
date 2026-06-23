@@ -653,7 +653,7 @@ body {
 .sidebar .nav-links {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
     padding: 12px 0 0 18px;
     transition: all 0.4s ease;
 }
@@ -666,14 +666,17 @@ body {
     color: var(--eg-text-body, var(--text-secondary));
     text-decoration: none;
     border-radius: var(--eg-radius-md, 8px);
-    transition: background 0.2s ease, color 0.2s ease, font-weight 0.2s ease, box-shadow 0.2s ease;
+    border: 1px solid var(--eg-border-subtle, rgba(0, 0, 0, 0.06));
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, font-weight 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
     font-weight: 560;
     font-size: 0.9rem;
     line-height: 36px;
     white-space: nowrap;
     position: relative;
     overflow: hidden;
-    background: transparent;
+    background: var(--eg-surface, rgba(255, 255, 255, 0.72));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
+    transform: translateX(0);
     cursor: pointer;
     z-index: 1;
 }
@@ -705,15 +708,20 @@ body {
 }
 
 .sidebar .nav-link:hover {
-    background: var(--eg-surface-muted, rgba(var(--primary-color-rgb), 0.06));
+    background: rgba(var(--primary-color-rgb), 0.06);
+    border-color: rgba(var(--primary-color-rgb), 0.22);
     color: var(--eg-text-strong, var(--text-primary));
+    box-shadow: inset 0 0 0 1px rgba(var(--primary-color-rgb), 0.08);
+    transform: translateX(2px);
 }
 
 .sidebar .nav-link.active {
-    background: rgba(var(--primary-color-rgb), 0.08);
+    background: rgba(var(--primary-color-rgb), 0.12);
+    border-color: rgba(var(--primary-color-rgb), 0.34);
     color: var(--primary-color);
     font-weight: 650;
-    box-shadow: inset 3px 0 0 var(--primary-color);
+    box-shadow: inset 3px 0 0 var(--primary-color), inset 0 0 0 1px rgba(var(--primary-color-rgb), 0.08);
+    transform: translateX(0);
 }
 
 .sidebar:not(.collapsed) .nav-link::before {
@@ -722,6 +730,7 @@ body {
 
 .sidebar:not(.collapsed) .nav-link:focus-visible {
     outline: none;
+    border-color: rgba(var(--primary-color-rgb), 0.42);
     box-shadow: inset 3px 0 0 var(--primary-color), var(--eg-focus-ring);
 }
 
