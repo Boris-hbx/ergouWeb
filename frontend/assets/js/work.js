@@ -27,6 +27,9 @@ var Work = (function() {
         // 从 localStorage 恢复最后打开的子功能
         var last = localStorage.getItem('work_feature');
         if (last === 'stakeholder' && typeof Stakeholder !== 'undefined') Stakeholder.openFeature();
+        else if (last === 'insight' && typeof Insight !== 'undefined') Insight.openHub();
+        else if (last === 'insight_factory' && typeof InsightFactory !== 'undefined') InsightFactory.openHub();
+        else if (last === 'done' && typeof WorkDone !== 'undefined') WorkDone.openFeature();
         else if (last === 'table') openFeature('table');
         else showHub();
     }
@@ -47,6 +50,9 @@ var Work = (function() {
         if (factoryView) factoryView.style.display = 'none';
         if (doneView) doneView.style.display = 'none';
         if (stakeholderView) stakeholderView.style.display = 'none';
+        if (window.location.pathname.indexOf('/insight-factory') === 0) {
+            window.history.pushState(null, '', '/');
+        }
         // T-100:回到 Hub 时关闭详情抽屉(任务表已隐藏,抽屉应一起退场)
         if (typeof WorkDetail !== 'undefined' && WorkDetail.isOpen()) {
             WorkDetail.closeDetail();

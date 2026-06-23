@@ -121,6 +121,7 @@ var InsightFactory = (function() {
         if (insightView) insightView.style.display = 'none';
         if (doneView) doneView.style.display = 'none';
         if (factoryView) factoryView.style.display = '';
+        localStorage.setItem('work_feature', 'insight_factory');
     }
 
     function openHub(opts) {
@@ -150,6 +151,7 @@ var InsightFactory = (function() {
         var hub = document.getElementById('work-hub');
         if (factoryView) factoryView.style.display = 'none';
         if (hub) hub.style.display = '';
+        localStorage.removeItem('work_feature');
         if (window.location.pathname.indexOf('/insight-factory') === 0) _setUrl('/', false);
     }
 
