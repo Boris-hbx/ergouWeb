@@ -661,7 +661,7 @@ body {
 .sidebar .nav-link {
     display: block;
     min-height: 36px;
-    width: 86px;
+    width: 94px;
     padding: 0 14px;
     color: var(--eg-text-body, var(--text-secondary));
     text-decoration: none;
