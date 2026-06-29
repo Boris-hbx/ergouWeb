@@ -44,6 +44,7 @@ pub struct QueryFilters {
     pub has_overdue: Option<bool>,
     /// T-119:按协作者筛选(模糊 JSON LIKE);精确单值
     pub collaborator: Option<String>,
+    pub source_type: Option<String>,
     /// 默认 None → 不限制(返回全部,与 GET /api/work/tasks 原始行为兼容);
     /// LLM 工具默认填 10;上限 50。
     pub limit: Option<i64>,
@@ -121,12 +122,14 @@ fn row_to_task(row: &rusqlite::Row) -> rusqlite::Result<WorkTask> {
         updated_at: row.get(15)?,
         tags,
         collaborators,
+        source_type: row.get(18)?,
+        source_todo_id: row.get(19)?,
     })
 }
 
 // T-110:SELECT_COLS 末尾追加 tags;T-119:再追加 collaborators(末尾保持向前兼容)
 const SELECT_COLS: &str =
-    "id, title, desc, assignee, level, freq, status, priority, area, engage, due_date, progress, sort_order, custom_fields, created_at, updated_at, tags, collaborators";
+    "id, title, desc, assignee, level, freq, status, priority, area, engage, due_date, progress, sort_order, custom_fields, created_at, updated_at, tags, collaborators, source_type, source_todo_id";
 
 // ============ impl 函数(给 HTTP + 工具复用) ============
 
@@ -204,7 +207,11 @@ pub fn query_tasks_impl(
         // JSON 数组里搜 "name" 字面(带引号定界,避免 substr 误匹配)
         conditions.push(format!("collaborators LIKE ?{idx}"));
         params_v.push(Box::new(format!("%\"{}\"%", v.replace('"', "\\\""))));
-        // idx not used after this
+        idx += 1;
+    }
+    if let Some(v) = f.source_type.as_deref().filter(|s| !s.is_empty()) {
+        conditions.push(format!("source_type = ?{idx}"));
+        params_v.push(Box::new(v.to_string()));
     }
 
     let limit = f.limit.unwrap_or(0).clamp(0, 50);
@@ -296,8 +303,9 @@ pub fn create_task_impl(
     db.execute(
         "INSERT INTO work_tasks
            (user_id, title, desc, assignee, level, freq, status, priority, area, engage,
-            due_date, progress, custom_fields, tags, collaborators, sort_order, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?17)",
+            due_date, progress, custom_fields, tags, collaborators, source_type, source_todo_id,
+            sort_order, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?19)",
         params![
             user_id,
             &req.title,
@@ -314,6 +322,12 @@ pub fn create_task_impl(
             &custom_str,
             &tags_str,
             &collab_str,
+            if req.source_type.is_empty() {
+                "manual"
+            } else {
+                req.source_type.as_str()
+            },
+            &req.source_todo_id,
             next_sort,
             &now,
         ],
@@ -499,7 +513,7 @@ pub fn update_task_impl(
 }
 
 /// 内部:加载某条任务(给 create/update 后回查用)。
-fn load_task(db: &Connection, user_id: &str, id: i64) -> Option<WorkTask> {
+pub(crate) fn load_task(db: &Connection, user_id: &str, id: i64) -> Option<WorkTask> {
     let sql = format!(
         "SELECT {SELECT_COLS} FROM work_tasks WHERE id = ?1 AND user_id = ?2 AND deleted = 0"
     );

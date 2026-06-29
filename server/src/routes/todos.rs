@@ -10,6 +10,8 @@ use serde_json::json;
 
 use crate::auth::{ActiveUserId, UserId};
 use crate::models::todo::*;
+use crate::models::work_task::{CreateWorkTaskRequest, WorkTask};
+use crate::routes::work_tasks::{create_task_impl, load_task};
 use crate::services::collaboration;
 use crate::state::AppState;
 
@@ -39,6 +41,16 @@ pub struct TodoResponse {
 }
 
 #[derive(Debug, Serialize)]
+pub struct TodoUpgradeResponse {
+    pub success: bool,
+    pub todo: Todo,
+    #[serde(rename = "workTask")]
+    pub work_task: WorkTask,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
 pub struct SimpleResponse {
     pub success: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -49,6 +61,9 @@ pub struct SimpleResponse {
 pub struct ListQuery {
     pub tab: Option<String>,
 }
+
+const TODO_SELECT_COLS: &str = "id, text, content, tab, quadrant, progress, completed_at, completed, due_date, deleted, assignee, tags, created_at, updated_at, deleted_at, upgraded_to_work, work_task_id, upgraded_at";
+const TODO_SELECT_COLS_COLLAB: &str = "t.id, t.text, t.content, tc.tab, tc.quadrant, t.progress, t.completed_at, t.completed, t.due_date, t.deleted, t.assignee, t.tags, t.created_at, t.updated_at, t.deleted_at, t.upgraded_to_work, t.work_task_id, t.upgraded_at";
 
 /// Load the next pending/triggered reminder for a todo
 fn load_next_reminder(
@@ -107,6 +122,7 @@ fn row_to_todo(row: &rusqlite::Row) -> rusqlite::Result<Todo> {
     let tags: Vec<String> = serde_json::from_str(&tags_json).unwrap_or_default();
     let completed_int: i32 = row.get(7)?;
     let deleted_int: i32 = row.get(9)?;
+    let upgraded_to_work_int: i32 = row.get(15)?;
 
     Ok(Todo {
         id: row.get(0)?,
@@ -124,6 +140,9 @@ fn row_to_todo(row: &rusqlite::Row) -> rusqlite::Result<Todo> {
         created_at: row.get(12)?,
         updated_at: row.get(13)?,
         deleted_at: row.get(14)?,
+        upgraded_to_work: upgraded_to_work_int != 0,
+        work_task_id: row.get(16)?,
+        upgraded_at: row.get(17)?,
         changelog: Vec::new(), // loaded separately
         next_reminder: None,   // loaded separately
     })
@@ -155,32 +174,32 @@ pub async fn list_todos(
     let mut items: Vec<Todo> = if let Some(tab) = &query.tab {
         query_todos!(
             db,
-            "SELECT id, text, content, tab, quadrant, progress, completed_at, completed, due_date, deleted, assignee, tags, created_at, updated_at, deleted_at FROM todos WHERE user_id = ?1 AND tab = ?2 AND deleted = 0 ORDER BY completed ASC, created_at ASC",
+            &format!("SELECT {TODO_SELECT_COLS} FROM todos WHERE user_id = ?1 AND tab = ?2 AND deleted = 0 ORDER BY completed ASC, created_at ASC"),
             rusqlite::params![user_id.0, tab],
             "todos/list"
         )
     } else {
         query_todos!(
             db,
-            "SELECT id, text, content, tab, quadrant, progress, completed_at, completed, due_date, deleted, assignee, tags, created_at, updated_at, deleted_at FROM todos WHERE user_id = ?1 AND deleted = 0 ORDER BY completed ASC, created_at ASC",
+            &format!("SELECT {TODO_SELECT_COLS} FROM todos WHERE user_id = ?1 AND deleted = 0 ORDER BY completed ASC, created_at ASC"),
             [&user_id.0],
             "todos/list"
         )
     };
 
     // Collaborative todos (from todo_collaborators) - use collaborator view settings
-    let collab_sql_tab = "SELECT t.id, t.text, t.content, tc.tab, tc.quadrant, t.progress, t.completed_at, t.completed, t.due_date, t.deleted, t.assignee, t.tags, t.created_at, t.updated_at, t.deleted_at FROM todos t JOIN todo_collaborators tc ON t.id = tc.todo_id WHERE tc.user_id = ?1 AND tc.status = 'active' AND t.deleted = 0 AND tc.tab = ?2 ORDER BY t.completed ASC, t.created_at ASC";
-    let collab_sql_all = "SELECT t.id, t.text, t.content, tc.tab, tc.quadrant, t.progress, t.completed_at, t.completed, t.due_date, t.deleted, t.assignee, t.tags, t.created_at, t.updated_at, t.deleted_at FROM todos t JOIN todo_collaborators tc ON t.id = tc.todo_id WHERE tc.user_id = ?1 AND tc.status = 'active' AND t.deleted = 0 ORDER BY t.completed ASC, t.created_at ASC";
+    let collab_sql_tab = format!("SELECT {TODO_SELECT_COLS_COLLAB} FROM todos t JOIN todo_collaborators tc ON t.id = tc.todo_id WHERE tc.user_id = ?1 AND tc.status = 'active' AND t.deleted = 0 AND tc.tab = ?2 ORDER BY t.completed ASC, t.created_at ASC");
+    let collab_sql_all = format!("SELECT {TODO_SELECT_COLS_COLLAB} FROM todos t JOIN todo_collaborators tc ON t.id = tc.todo_id WHERE tc.user_id = ?1 AND tc.status = 'active' AND t.deleted = 0 ORDER BY t.completed ASC, t.created_at ASC");
 
     let collab_items: Vec<Todo> = if let Some(tab) = &query.tab {
         query_todos!(
             db,
-            collab_sql_tab,
+            &collab_sql_tab,
             rusqlite::params![user_id.0, tab],
             "todos/list-collab"
         )
     } else {
-        query_todos!(db, collab_sql_all, [&user_id.0], "todos/list-collab")
+        query_todos!(db, &collab_sql_all, [&user_id.0], "todos/list-collab")
     };
 
     // Merge and deduplicate (own todos take priority)
@@ -229,7 +248,7 @@ pub async fn get_todo(
 
     // Try owner first, then collaborator
     let result = db.query_row(
-        "SELECT id, text, content, tab, quadrant, progress, completed_at, completed, due_date, deleted, assignee, tags, created_at, updated_at, deleted_at FROM todos WHERE id = ?1 AND user_id = ?2",
+        &format!("SELECT {TODO_SELECT_COLS} FROM todos WHERE id = ?1 AND user_id = ?2"),
         rusqlite::params![id, user_id.0],
         row_to_todo,
     );
@@ -238,7 +257,7 @@ pub async fn get_todo(
         Ok(todo) => Ok(todo),
         Err(_) => {
             db.query_row(
-                "SELECT t.id, t.text, t.content, tc.tab, tc.quadrant, t.progress, t.completed_at, t.completed, t.due_date, t.deleted, t.assignee, t.tags, t.created_at, t.updated_at, t.deleted_at FROM todos t JOIN todo_collaborators tc ON t.id = tc.todo_id WHERE t.id = ?1 AND tc.user_id = ?2 AND tc.status = 'active' AND t.deleted = 0",
+                &format!("SELECT {TODO_SELECT_COLS_COLLAB} FROM todos t JOIN todo_collaborators tc ON t.id = tc.todo_id WHERE t.id = ?1 AND tc.user_id = ?2 AND tc.status = 'active' AND t.deleted = 0"),
                 rusqlite::params![id, user_id.0],
                 row_to_todo,
             )
@@ -347,6 +366,9 @@ pub async fn create_todo(
         changelog: Vec::new(),
         deleted: false,
         deleted_at: None,
+        upgraded_to_work: false,
+        work_task_id: None,
+        upgraded_at: None,
         next_reminder: None,
     };
 
@@ -374,13 +396,13 @@ pub async fn update_todo(
 
     let current = if is_collaborator {
         db.query_row(
-            "SELECT t.id, t.text, t.content, tc.tab, tc.quadrant, t.progress, t.completed_at, t.completed, t.due_date, t.deleted, t.assignee, t.tags, t.created_at, t.updated_at, t.deleted_at FROM todos t JOIN todo_collaborators tc ON t.id = tc.todo_id WHERE t.id = ?1 AND tc.user_id = ?2 AND tc.status = 'active'",
+            &format!("SELECT {TODO_SELECT_COLS_COLLAB} FROM todos t JOIN todo_collaborators tc ON t.id = tc.todo_id WHERE t.id = ?1 AND tc.user_id = ?2 AND tc.status = 'active'"),
             rusqlite::params![id, user_id.0],
             row_to_todo,
         )
     } else {
         db.query_row(
-            "SELECT id, text, content, tab, quadrant, progress, completed_at, completed, due_date, deleted, assignee, tags, created_at, updated_at, deleted_at FROM todos WHERE id = ?1 AND user_id = ?2",
+            &format!("SELECT {TODO_SELECT_COLS} FROM todos WHERE id = ?1 AND user_id = ?2"),
             rusqlite::params![id, user_id.0],
             row_to_todo,
         )
@@ -643,6 +665,110 @@ fn insert_changelog(
     .ok();
 }
 
+fn todo_quadrant_to_work_priority(q: &Quadrant) -> &'static str {
+    match q {
+        Quadrant::ImportantUrgent => "high",
+        Quadrant::ImportantNotUrgent => "mid",
+        Quadrant::NotImportantUrgent => "mid",
+        Quadrant::NotImportantNotUrgent => "low",
+    }
+}
+
+pub async fn upgrade_todo_to_work(
+    State(state): State<AppState>,
+    user_id: ActiveUserId,
+    Path(id): Path<String>,
+) -> (StatusCode, Json<serde_json::Value>) {
+    let db = state.db.lock();
+    let mut todo = match db.query_row(
+        &format!(
+            "SELECT {TODO_SELECT_COLS} FROM todos WHERE id = ?1 AND user_id = ?2 AND deleted = 0"
+        ),
+        rusqlite::params![id, user_id.0],
+        row_to_todo,
+    ) {
+        Ok(t) => t,
+        Err(_) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({ "success": false, "message": format!("任务不存在: {}", id) })),
+            );
+        }
+    };
+
+    if todo.upgraded_to_work {
+        if let Some(existing_id) = todo
+            .work_task_id
+            .as_deref()
+            .and_then(|v| v.parse::<i64>().ok())
+        {
+            if let Some(work_task) = load_task(&db, &user_id.0, existing_id) {
+                return (
+                    StatusCode::OK,
+                    Json(json!(TodoUpgradeResponse {
+                        success: true,
+                        todo,
+                        work_task,
+                        message: Some("已升级，已返回关联工作任务".into()),
+                    })),
+                );
+            }
+        }
+    }
+
+    let req = CreateWorkTaskRequest {
+        title: todo.text.clone(),
+        desc: todo.content.clone(),
+        assignee: todo.assignee.clone(),
+        status: if todo.completed {
+            "done".to_string()
+        } else {
+            "todo".to_string()
+        },
+        priority: todo_quadrant_to_work_priority(&todo.quadrant).to_string(),
+        due_date: todo.due_date.clone(),
+        progress: todo.progress as i32,
+        tags: todo.tags.clone(),
+        source_type: "todo".to_string(),
+        source_todo_id: Some(todo.id.clone()),
+        ..Default::default()
+    };
+
+    let work_task = match create_task_impl(&db, &user_id.0, &req) {
+        Ok(t) => t,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "success": false, "message": format!("升级失败: {e}") })),
+            );
+        }
+    };
+
+    let now = chrono::Utc::now().to_rfc3339();
+    let work_task_id = work_task.id.to_string();
+    if let Err(e) = db.execute(
+        "UPDATE todos SET upgraded_to_work = 1, work_task_id = ?1, upgraded_at = ?2, updated_at = ?2 WHERE id = ?3 AND user_id = ?4",
+        rusqlite::params![work_task_id, now, todo.id, user_id.0],
+    ) {
+        return db_error("todos/upgrade-to-work", e);
+    }
+
+    todo.upgraded_to_work = true;
+    todo.work_task_id = Some(work_task.id.to_string());
+    todo.upgraded_at = Some(now.clone());
+    todo.updated_at = now;
+
+    (
+        StatusCode::OK,
+        Json(json!(TodoUpgradeResponse {
+            success: true,
+            todo,
+            work_task,
+            message: Some("已升级到工作任务".into()),
+        })),
+    )
+}
+
 pub async fn delete_todo(
     State(state): State<AppState>,
     user_id: ActiveUserId,
@@ -722,12 +848,11 @@ pub async fn restore_todo(
         );
     }
 
-    let todo = db
-        .query_row(
-            "SELECT id, text, content, tab, quadrant, progress, completed_at, completed, due_date, deleted, assignee, tags, created_at, updated_at, deleted_at FROM todos WHERE id = ?1",
-            [&id],
-            row_to_todo,
-        );
+    let todo = db.query_row(
+        &format!("SELECT {TODO_SELECT_COLS} FROM todos WHERE id = ?1"),
+        [&id],
+        row_to_todo,
+    );
     match todo {
         Ok(mut t) => {
             t.changelog = load_changelog(&db, &id);

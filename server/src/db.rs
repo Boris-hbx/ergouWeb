@@ -51,6 +51,29 @@ fn run_migrations(conn: &Connection) {
             .ok();
     }
 
+    // T-273: Todo -> work task table one-way upgrade markers.
+    let has_todo_upgraded_to_work: bool = conn
+        .prepare("SELECT upgraded_to_work FROM todos LIMIT 1")
+        .is_ok();
+    if !has_todo_upgraded_to_work {
+        conn.execute_batch("ALTER TABLE todos ADD COLUMN upgraded_to_work INTEGER DEFAULT 0;")
+            .ok();
+    }
+    let has_todo_work_task_id: bool = conn
+        .prepare("SELECT work_task_id FROM todos LIMIT 1")
+        .is_ok();
+    if !has_todo_work_task_id {
+        conn.execute_batch("ALTER TABLE todos ADD COLUMN work_task_id TEXT;")
+            .ok();
+    }
+    let has_todo_upgraded_at: bool = conn
+        .prepare("SELECT upgraded_at FROM todos LIMIT 1")
+        .is_ok();
+    if !has_todo_upgraded_at {
+        conn.execute_batch("ALTER TABLE todos ADD COLUMN upgraded_at TEXT;")
+            .ok();
+    }
+
     // Add is_collaborative to routines
     let has_routine_collab: bool = conn
         .prepare("SELECT is_collaborative FROM routines LIMIT 1")
@@ -359,6 +382,22 @@ fn run_migrations(conn: &Connection) {
         conn.execute_batch("ALTER TABLE work_tasks ADD COLUMN engage TEXT NOT NULL DEFAULT '';")
             .ok();
     }
+    let has_work_source_type: bool = conn
+        .prepare("SELECT source_type FROM work_tasks LIMIT 1")
+        .is_ok();
+    if !has_work_source_type {
+        conn.execute_batch(
+            "ALTER TABLE work_tasks ADD COLUMN source_type TEXT NOT NULL DEFAULT 'manual';",
+        )
+        .ok();
+    }
+    let has_work_source_todo_id: bool = conn
+        .prepare("SELECT source_todo_id FROM work_tasks LIMIT 1")
+        .is_ok();
+    if !has_work_source_todo_id {
+        conn.execute_batch("ALTER TABLE work_tasks ADD COLUMN source_todo_id TEXT;")
+            .ok();
+    }
 
     // T-107 v0.2:status enum 迁移 'drafting' → 'collecting'(无报告) / 'editing'(有报告)。
     // 幂等:跑过后 drafting 已被替换,WHERE 不再命中。
@@ -404,6 +443,9 @@ fn create_tables(conn: &Connection) {
             assignee TEXT DEFAULT '',
             tags TEXT DEFAULT '[]',
             sort_order REAL DEFAULT 0.0,
+            upgraded_to_work INTEGER DEFAULT 0,
+            work_task_id TEXT,
+            upgraded_at TEXT,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
             deleted_at TEXT
@@ -942,6 +984,8 @@ fn create_tables(conn: &Connection) {
             progress      INTEGER NOT NULL DEFAULT 0,
             tags          TEXT    NOT NULL DEFAULT '[]',
             collaborators TEXT    NOT NULL DEFAULT '[]',
+            source_type   TEXT    NOT NULL DEFAULT 'manual',
+            source_todo_id TEXT,
             custom_fields TEXT    NOT NULL DEFAULT '{}',
             sort_order    REAL    NOT NULL DEFAULT 0,
             created_at    TEXT    NOT NULL,

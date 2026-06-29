@@ -41,6 +41,17 @@ var _collabAPI = {
 // ========== 任务渲染、CRUD、象限逻辑 ==========
 
 var _loadingItems = false;
+var _hideUpgradedTodos = false;
+
+function shouldHideTodoItem(item) {
+    return _hideUpgradedTodos && item && item.upgradedToWork;
+}
+
+function setHideUpgradedTodos(checked) {
+    _hideUpgradedTodos = !!checked;
+    updateCounts();
+    renderItems();
+}
 
 function loadItems() {
     if (_loadingItems) return;
@@ -71,6 +82,7 @@ function updateCounts() {
         'not-important-not-urgent': 0
     };
     allItems.forEach(function(item) {
+        if (shouldHideTodoItem(item)) return;
         if (!item.completed && !item.deleted) {
             counts[item.tab] = (counts[item.tab] || 0) + 1;
             if (item.tab === currentTab) {
@@ -109,6 +121,7 @@ function renderMatrix() {
 
     allItems.forEach(function(item) {
         if (item.deleted) return;
+        if (shouldHideTodoItem(item)) return;
         if (item.tab !== currentTab) return;
         if (item.completed) return;
         if (currentAssigneeFilter && item.assignee !== currentAssigneeFilter) return;
@@ -121,6 +134,7 @@ function renderMatrix() {
 
     allItems.forEach(function(item) {
         if (item.deleted) return;
+        if (shouldHideTodoItem(item)) return;
         if (item.completed) {
             completedHtml += createCompletedItemHtml(item);
         }
@@ -154,7 +168,12 @@ function renderMatrix() {
             if (container) {
                 ActionSheet.bindAll(container, '.task-item:not(.completed)', function(el) {
                     var id = el.dataset.id;
+                    var item = allItems.find(function(i) { return i.id === id; });
+                    var upgradeAction = item && item.upgradedToWork
+                        ? { icon: '↗', label: '打开工作任务', action: function() { openWorkTaskFromTodo(id); } }
+                        : { icon: '↗', label: '升级到工作任务', action: function() { upgradeTodoToWork(id); } };
                     return [
+                        upgradeAction,
                         { icon: '📤', label: '分享给好友', action: function() { Friends.openShareModal('todo', id); } },
                         { icon: '✏️', label: '编辑', action: function() { showTaskCard(id); } },
                         { icon: '🗑️', label: '删除', action: function() { deleteTask(id); }, danger: true }
@@ -184,6 +203,7 @@ function renderFlatList() {
 
     allItems.forEach(function(item) {
         if (item.deleted) return;
+        if (shouldHideTodoItem(item)) return;
         if (item.tab !== currentTab) return;
         if (currentAssigneeFilter && item.assignee !== currentAssigneeFilter) return;
         if (item.completed) {
@@ -205,12 +225,13 @@ function renderFlatList() {
                 ? '<span class="task-due ' + getDueDateClass(item.due_date) + '">' + formatRelativeDate(item.due_date) + '</span>'
                 : '';
             var flatReminderHtml = getReminderBadgeHtml(item);
+            var flatUpgradeBadgeHtml = getTodoUpgradeBadgeHtml(item);
             var flatTriggeredClass = (item.next_reminder && item.next_reminder.status === 'triggered') ? ' task-item-triggered' : '';
             html += '<div class="flat-task-item' + flatTriggeredClass + '" data-id="' + item.id + '" onclick="showTaskCard(\'' + item.id + '\')">' +
                 '<div class="task-checkbox" onclick="event.stopPropagation(); toggleComplete(\'' + item.id + '\')"></div>' +
                 '<div class="flat-task-content">' +
                     '<div class="task-text">' + escapeHtml(item.text) + '</div>' +
-                    ((dueDateHtml || flatReminderHtml) ? '<div class="flat-task-meta">' + flatReminderHtml + dueDateHtml + '</div>' : '') +
+                    ((dueDateHtml || flatReminderHtml || flatUpgradeBadgeHtml) ? '<div class="flat-task-meta">' + flatReminderHtml + flatUpgradeBadgeHtml + dueDateHtml + '</div>' : '') +
                 '</div>' +
                 '<span class="flat-task-badge ' + badge.cls + '">' + badge.icon + '</span>' +
             '</div>';
@@ -241,7 +262,12 @@ function renderFlatList() {
     if (typeof ActionSheet !== 'undefined') {
         ActionSheet.bindAll(flatView, '.flat-task-item:not(.completed)', function(el) {
             var id = el.dataset.id;
+            var item = allItems.find(function(i) { return i.id === id; });
+            var upgradeAction = item && item.upgradedToWork
+                ? { icon: '↗', label: '打开工作任务', action: function() { openWorkTaskFromTodo(id); } }
+                : { icon: '↗', label: '升级到工作任务', action: function() { upgradeTodoToWork(id); } };
             return [
+                upgradeAction,
                 { icon: '📤', label: '分享给好友', action: function() { Friends.openShareModal('todo', id); } },
                 { icon: '✏️', label: '编辑', action: function() { showTaskCard(id); } },
                 { icon: '🗑️', label: '删除', action: function() { deleteTask(id); }, danger: true }
@@ -254,6 +280,7 @@ function renderFlatList() {
     var deletedHtml = '';
     allItems.forEach(function(item) {
         if (item.deleted) return;
+        if (shouldHideTodoItem(item)) return;
         if (item.completed) completedHtml += createCompletedItemHtml(item);
     });
     allItems.forEach(function(item) {
@@ -313,6 +340,7 @@ function renderAssigneeFilter() {
     var assignees = {};
     allItems.forEach(function(item) {
         if (item.deleted || item.completed || item.tab !== currentTab) return;
+        if (shouldHideTodoItem(item)) return;
         if (item.assignee) {
             assignees[item.assignee] = (assignees[item.assignee] || 0) + 1;
         }
@@ -506,6 +534,55 @@ function getReminderBadgeHtml(item) {
     return '<span class="' + cls + '" title="提醒: ' + timeStr + '">🔔' + (timeStr ? timeStr : '') + '</span>';
 }
 
+function getTodoUpgradeBadgeHtml(item) {
+    if (!item || !item.upgradedToWork) return '';
+    return '<button class="todo-work-badge" onclick="event.stopPropagation(); openWorkTaskFromTodo(\'' + item.id + '\')" title="打开关联工作任务">已升级</button>';
+}
+
+function openWorkTaskFromTodo(todoId) {
+    var item = allItems.find(function(i) { return i.id === todoId; });
+    if (!item || !item.workTaskId) {
+        showToast('关联工作任务已删除，可重新升级', 'warning');
+        return;
+    }
+    if (typeof closeTaskModal === 'function') closeTaskModal();
+    if (typeof switchPage === 'function') switchPage('work');
+    if (typeof Work !== 'undefined' && Work.openTaskById) {
+        Work.openTaskById(item.workTaskId);
+    }
+}
+
+function upgradeTodoToWork(todoId) {
+    var item = allItems.find(function(i) { return i.id === todoId; });
+    if (item && item.upgradedToWork && item.workTaskId) {
+        openWorkTaskFromTodo(todoId);
+        return;
+    }
+    API.upgradeTodoToWork(todoId).then(function(data) {
+        if (!data || data.success === false) {
+            showToast((data && (data.message || data.error)) || '升级失败', 'error');
+            return;
+        }
+        if (data.todo) {
+            allItems = allItems.map(function(i) { return i.id === todoId ? data.todo : i; });
+            if (typeof modalTaskId !== 'undefined' && modalTaskId === todoId) {
+                modalTaskItem = data.todo;
+            }
+        }
+        updateCounts();
+        renderItems();
+        showToast('已升级到工作任务', 'success');
+        if (data.workTask && typeof switchPage === 'function') {
+            if (typeof closeTaskModal === 'function') closeTaskModal();
+            switchPage('work');
+            if (typeof Work !== 'undefined' && Work.openTaskById) Work.openTaskById(data.workTask.id);
+        }
+    }).catch(function(err) {
+        console.error('[todo-upgrade]', err);
+        showToast('升级失败，请稍后重试', 'error');
+    });
+}
+
 function createItemHtml(item) {
     var progress = item.progress || 0;
     var progressRing = '<div class="progress-ring" style="--progress:' + progress + '" onclick="event.stopPropagation(); showProgressPopup(\'' + item.id + '\', this)" onmousedown="event.stopPropagation()" title="点击更新进度">' +
@@ -529,6 +606,7 @@ function createItemHtml(item) {
     }
 
     var reminderHtml = getReminderBadgeHtml(item);
+    var upgradeBadgeHtml = getTodoUpgradeBadgeHtml(item);
     var triggeredClass = (item.next_reminder && item.next_reminder.status === 'triggered') ? ' task-item-triggered' : '';
 
     return '<div class="task-item' + collabClass + triggeredClass + '" data-id="' + item.id + '" onmousedown="startCustomDrag(event)">' +
@@ -539,6 +617,7 @@ function createItemHtml(item) {
             '<div class="task-text">' + escapeHtml(item.text) + '</div>' +
         '</div>' +
         reminderHtml +
+        upgradeBadgeHtml +
         dueDateHtml +
         collabMeta +
         assigneeHtml +
