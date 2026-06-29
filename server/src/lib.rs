@@ -44,6 +44,10 @@ pub fn build_app(state: state::AppState) -> Router {
         .route("/counts", get(routes::todos::get_todo_counts))
         .route("/batch", put(routes::todos::batch_update_todos))
         .route(
+            "/{id}/upgrade-to-work",
+            post(routes::todos::upgrade_todo_to_work),
+        )
+        .route(
             "/{id}",
             get(routes::todos::get_todo)
                 .put(routes::todos::update_todo)

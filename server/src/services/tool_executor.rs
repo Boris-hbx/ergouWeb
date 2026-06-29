@@ -3284,6 +3284,8 @@ fn tool_create_work_task(db: &Connection, user_id: &str, input: &Value) -> Value
             .as_array()
             .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
             .unwrap_or_default(),
+        source_type: "manual".to_string(),
+        source_todo_id: None,
         custom_fields: None,
     };
     match create_task_impl(db, user_id, &req) {
@@ -3352,6 +3354,7 @@ fn tool_query_work_tasks(db: &Connection, user_id: &str, input: &Value) -> Value
         has_overdue: input["has_overdue"].as_bool(),
         // T-119:按协作者筛选
         collaborator: opt_string(input, "collaborator"),
+        source_type: None,
         // LLM 默认拿 10 条,避免回复过长(spec § A.1)
         limit: Some(input["limit"].as_i64().unwrap_or(10).clamp(1, 50)),
     };

@@ -142,6 +142,22 @@ var Work = (function() {
         openFeature(cfg.name);
     }
 
+    function openTaskById(taskId) {
+        openFeature('table');
+        return _ensureLoaded().then(function() {
+            var numericId = +taskId;
+            if (!rowById(numericId)) return reload();
+        }).then(function() {
+            setView('table');
+            var numericId = +taskId;
+            if (typeof WorkDetail !== 'undefined' && rowById(numericId)) {
+                WorkDetail.openDetail(numericId, rows().map(function(r) { return r.id; }));
+            } else if (typeof showToast === 'function') {
+                showToast('关联工作任务已删除', 'warning');
+            }
+        });
+    }
+
     // 视图切换 (table / board / cal / person / distribution)
     function setView(v, skipBtnSync) {
         // T-100:切视图自动关闭详情抽屉(spec § 7.6 关闭方式之一)
@@ -665,6 +681,7 @@ var Work = (function() {
         openFeature: openFeature,
         openWipFeature: openWipFeature,
         refreshFeatureGates: refreshFeatureGates,
+        openTaskById: openTaskById,
         setView: setView,
         // T-098
         setTimeTab: setTimeTab,
