@@ -1170,15 +1170,15 @@
                     <div class="life-hub-card-desc">表格 · 看板 · 日历 多视图</div>
                 </div>
                 <div class="life-hub-card life-hub-card-disabled work-wip-card work-wip-card-locked"
-                     id="work-iteration-card"
-                     data-track="work.iteration"
+                     id="work-compound-card"
+                     data-track="work.compound"
                      aria-disabled="true"
-                     onclick="Work.openWipFeature('work.iteration')">
+                     onclick="Work.openWipFeature('work.compound')">
                     <div class="life-hub-card-icon">
                         🔁
                         <span class="work-wip-lock" aria-hidden="true">🔒</span>
                     </div>
-                    <div class="life-hub-card-title">迭代</div>
+                    <div class="life-hub-card-title">复利</div>
                     <div class="life-hub-card-desc">开发中</div>
                 </div>
                 <div class="life-hub-card" data-track="work.stakeholders" onclick="Stakeholder.openFeature()">
@@ -1290,11 +1290,11 @@
             <div id="wt-attention-view" class="wt-hidden"></div>
         </div>
 
-        <div id="work-iteration-view" class="work-placeholder-view" style="display:none;">
+        <div id="work-compound-view" class="work-placeholder-view" style="display:none;">
             <button class="wt-back-btn" onclick="Work.showHub()">&larr; 工作</button>
             <div class="work-placeholder-panel">
-                <h2>迭代</h2>
-                <p>迭代功能开发中</p>
+                <h2>复利</h2>
+                <p>复利功能开发中</p>
             </div>
         </div>
 

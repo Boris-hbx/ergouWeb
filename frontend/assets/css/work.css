@@ -38,7 +38,7 @@ body:has(.sidebar.collapsed) { --sidebar-width: 0px; }
   min-width: 0;
 }
 #work-table-view { width: 100%; min-width: 0; }
-#work-iteration-view { width: 100%; min-width: 0; }
+#work-compound-view { width: 100%; min-width: 0; }
 #stakeholder-view { width: 100%; min-width: 0; }
 
 .work-wip-card .life-hub-card-icon {

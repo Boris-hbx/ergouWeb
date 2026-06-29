@@ -21,12 +21,12 @@ var Work = (function() {
     var _renderFrozen = false; // T-103 B.3:完成动画期间冻结 render,避免动画被打断
     var _searchQuery = '';     // T-130:全局搜索词(已 trim + lowercase),跨 5 视图;空 = 不过滤
     var _searchTimer = null;   // T-130:debounce 150ms 计时器
-    // Future /api/iteration/* endpoints must use AdminUserId; this front-end gate is UX only.
+    // Future compound APIs must use AdminUserId; this front-end gate is UX only.
     var WIP_FEATURES = {
-        'work.iteration': {
-            name: 'iteration',
-            cardId: 'work-iteration-card',
-            viewId: 'work-iteration-view',
+        'work.compound': {
+            name: 'compound',
+            cardId: 'work-compound-card',
+            viewId: 'work-compound-view',
             unlockedRoles: ['owner', 'admin'],
             lockedHint: '请联系管理员 Boris'
         }
@@ -42,7 +42,7 @@ var Work = (function() {
         else if (last === 'insight_factory' && typeof InsightFactory !== 'undefined') InsightFactory.openHub();
         else if (last === 'done' && typeof WorkDone !== 'undefined') WorkDone.openFeature();
         else if (last === 'table') openFeature('table');
-        else if (last === 'iteration') openWipFeature('work.iteration', { restore: true });
+        else if (last === 'compound' || last === 'iteration') openWipFeature('work.compound', { restore: true });
         else showHub();
     }
 
@@ -52,10 +52,10 @@ var Work = (function() {
         refreshFeatureGates();
         var hub = document.getElementById('work-hub');
         var tableView = document.getElementById('work-table-view');
-        var iterationView = document.getElementById('work-iteration-view');
+        var compoundView = document.getElementById('work-compound-view');
         if (hub) hub.style.display = '';
         if (tableView) tableView.style.display = 'none';
-        if (iterationView) iterationView.style.display = 'none';
+        if (compoundView) compoundView.style.display = 'none';
         // 回 Hub 时一并收起其它子视图(洞察 / 已完成档案),避免导航往返后残留覆盖
         var insView = document.getElementById('work-insight-view');
         var factoryView = document.getElementById('work-insight-factory-view');
@@ -77,11 +77,11 @@ var Work = (function() {
     function openFeature(name) {
         var hub = document.getElementById('work-hub');
         var tableView = document.getElementById('work-table-view');
-        var iterationView = document.getElementById('work-iteration-view');
+        var compoundView = document.getElementById('work-compound-view');
         var stakeholderView = document.getElementById('stakeholder-view');
         if (hub) hub.style.display = 'none';
         if (tableView) tableView.style.display = 'none';
-        if (iterationView) iterationView.style.display = 'none';
+        if (compoundView) compoundView.style.display = 'none';
         if (stakeholderView) stakeholderView.style.display = 'none';
 
         if (name === 'table') {
@@ -99,10 +99,10 @@ var Work = (function() {
                 _updateTabIndicator();
             });
         }
-        if (name === 'iteration') {
-            _feature = 'iteration';
-            localStorage.setItem('work_feature', 'iteration');
-            if (iterationView) iterationView.style.display = '';
+        if (name === 'compound') {
+            _feature = 'compound';
+            localStorage.setItem('work_feature', 'compound');
+            if (compoundView) compoundView.style.display = '';
         }
     }
 
