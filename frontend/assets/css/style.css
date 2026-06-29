@@ -666,14 +666,14 @@ body {
     gap: 6px;
     min-height: 36px;
     width: 94px;
-    padding: 0 14px;
+    padding: 0 8px;
     color: var(--eg-text-body, var(--text-secondary));
     text-decoration: none;
     border-radius: var(--eg-radius-md, 8px);
     border: 1px solid var(--eg-border-subtle, rgba(0, 0, 0, 0.06));
     transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, font-weight 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
-    font-weight: 560;
-    font-size: 0.9rem;
+    font-weight: 650;
+    font-size: 15.5px;
     line-height: 36px;
     text-align: center;
     white-space: nowrap;
