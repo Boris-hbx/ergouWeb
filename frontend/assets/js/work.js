@@ -21,9 +21,20 @@ var Work = (function() {
     var _renderFrozen = false; // T-103 B.3:完成动画期间冻结 render,避免动画被打断
     var _searchQuery = '';     // T-130:全局搜索词(已 trim + lowercase),跨 5 视图;空 = 不过滤
     var _searchTimer = null;   // T-130:debounce 150ms 计时器
+    // Future /api/iteration/* endpoints must use AdminUserId; this front-end gate is UX only.
+    var WIP_FEATURES = {
+        'work.iteration': {
+            name: 'iteration',
+            cardId: 'work-iteration-card',
+            viewId: 'work-iteration-view',
+            unlockedRoles: ['owner', 'admin'],
+            lockedHint: '请联系管理员 Boris'
+        }
+    };
 
     // ============ 生命周期 ============
     function init() {
+        refreshFeatureGates();
         // 从 localStorage 恢复最后打开的子功能
         var last = localStorage.getItem('work_feature');
         if (last === 'stakeholder' && typeof Stakeholder !== 'undefined') Stakeholder.openFeature();
@@ -31,16 +42,20 @@ var Work = (function() {
         else if (last === 'insight_factory' && typeof InsightFactory !== 'undefined') InsightFactory.openHub();
         else if (last === 'done' && typeof WorkDone !== 'undefined') WorkDone.openFeature();
         else if (last === 'table') openFeature('table');
+        else if (last === 'iteration') openWipFeature('work.iteration', { restore: true });
         else showHub();
     }
 
     function showHub() {
         _feature = null;
         localStorage.removeItem('work_feature');
+        refreshFeatureGates();
         var hub = document.getElementById('work-hub');
         var tableView = document.getElementById('work-table-view');
+        var iterationView = document.getElementById('work-iteration-view');
         if (hub) hub.style.display = '';
         if (tableView) tableView.style.display = 'none';
+        if (iterationView) iterationView.style.display = 'none';
         // 回 Hub 时一并收起其它子视图(洞察 / 已完成档案),避免导航往返后残留覆盖
         var insView = document.getElementById('work-insight-view');
         var factoryView = document.getElementById('work-insight-factory-view');
@@ -62,9 +77,11 @@ var Work = (function() {
     function openFeature(name) {
         var hub = document.getElementById('work-hub');
         var tableView = document.getElementById('work-table-view');
+        var iterationView = document.getElementById('work-iteration-view');
         var stakeholderView = document.getElementById('stakeholder-view');
         if (hub) hub.style.display = 'none';
         if (tableView) tableView.style.display = 'none';
+        if (iterationView) iterationView.style.display = 'none';
         if (stakeholderView) stakeholderView.style.display = 'none';
 
         if (name === 'table') {
@@ -82,6 +99,47 @@ var Work = (function() {
                 _updateTabIndicator();
             });
         }
+        if (name === 'iteration') {
+            _feature = 'iteration';
+            localStorage.setItem('work_feature', 'iteration');
+            if (iterationView) iterationView.style.display = '';
+        }
+    }
+
+    function _currentRole() {
+        return (window._currentUser && window._currentUser.role) ? window._currentUser.role : '';
+    }
+
+    function _isWipUnlocked(cfg) {
+        var role = _currentRole();
+        return cfg.unlockedRoles.indexOf(role) >= 0;
+    }
+
+    function refreshFeatureGates() {
+        Object.keys(WIP_FEATURES).forEach(function(key) {
+            var cfg = WIP_FEATURES[key];
+            var card = document.getElementById(cfg.cardId);
+            if (!card) return;
+            var unlocked = _isWipUnlocked(cfg);
+            card.classList.toggle('life-hub-card-disabled', !unlocked);
+            card.classList.toggle('work-wip-card-locked', !unlocked);
+            card.setAttribute('aria-disabled', unlocked ? 'false' : 'true');
+        });
+    }
+
+    function openWipFeature(key, opts) {
+        var cfg = WIP_FEATURES[key];
+        if (!cfg) return;
+        refreshFeatureGates();
+        if (!_isWipUnlocked(cfg)) {
+            if (opts && opts.restore) {
+                showHub();
+            } else if (typeof showToast === 'function') {
+                showToast(cfg.lockedHint, 'warning');
+            }
+            return;
+        }
+        openFeature(cfg.name);
     }
 
     // 视图切换 (table / board / cal / person / distribution)
@@ -605,6 +663,8 @@ var Work = (function() {
         showHub: showHub,
         cycleChip: cycleChip,
         openFeature: openFeature,
+        openWipFeature: openWipFeature,
+        refreshFeatureGates: refreshFeatureGates,
         setView: setView,
         // T-098
         setTimeTab: setTimeTab,

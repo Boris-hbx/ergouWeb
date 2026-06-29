@@ -29,6 +29,9 @@
 
             // Store current user info for cross-module use
             window._currentUser = data.user;
+            if (window.Work && typeof Work.refreshFeatureGates === 'function') {
+                Work.refreshFeatureGates();
+            }
 
             // Show admin nav link for admin/owner roles
             var adminNavLink = document.getElementById('admin-nav-link');
