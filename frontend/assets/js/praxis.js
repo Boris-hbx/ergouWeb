@@ -27,10 +27,14 @@ var Praxis = (function() {
         // 进入驾驶舱时复位到八板块视图（隐藏今日经营页，spec §5.4 入口）。
         var cockpit = document.getElementById('praxis-cockpit');
         var entry = document.getElementById('praxis-today-entry');
+        var reviewEntry = document.getElementById('praxis-review-entry');
         var jview = document.getElementById('praxis-journal-view');
+        var rview = document.getElementById('praxis-review-view');
         if (cockpit) cockpit.style.display = '';
         if (entry) entry.style.display = '';
+        if (reviewEntry) reviewEntry.style.display = '';
         if (jview) jview.style.display = 'none';
+        if (rview) rview.style.display = 'none';
         renderBoards();
         if (!_loaded) {
             _loaded = true;
