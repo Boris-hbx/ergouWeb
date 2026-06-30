@@ -671,6 +671,30 @@ var API = (function() {
             return await request('DELETE', '/praxis/contacts/' + encodeURIComponent(id));
         },
 
+        // ===== Praxis 今日经营记录 v0.2 (T-285) =====
+        praxisJournalList: async function(params) {
+            var q = '';
+            if (params) {
+                Object.keys(params).forEach(function(k) {
+                    if (params[k] === undefined || params[k] === null || params[k] === '') return;
+                    q += (q ? '&' : '?') + encodeURIComponent(k) + '=' + encodeURIComponent(params[k]);
+                });
+            }
+            return await request('GET', '/praxis/journal' + q);
+        },
+        praxisJournalCreate: async function(data) {
+            return await request('POST', '/praxis/journal', data);
+        },
+        praxisJournalUpdate: async function(id, patch) {
+            return await request('PATCH', '/praxis/journal/' + encodeURIComponent(id), patch);
+        },
+        praxisJournalDelete: async function(id) {
+            return await request('DELETE', '/praxis/journal/' + encodeURIComponent(id));
+        },
+        praxisJournalAnalyze: async function(id) {
+            return await request('POST', '/praxis/journal/' + encodeURIComponent(id) + '/analyze');
+        },
+
         // ===== Insight Tasks v0.3 (T-122 后端 / T-123 前端) =====
         // 单层 insight_task。claim / create-report 由 Claude Code 调,前端不用。
         // v0.2 的 insight/source/annotation/publish API 已废弃(后端保留只读 30 天)。

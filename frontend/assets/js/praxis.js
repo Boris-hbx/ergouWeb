@@ -24,12 +24,38 @@ var Praxis = (function() {
     };
 
     function open() {
+        // 进入驾驶舱时复位到八板块视图（隐藏今日经营页，spec §5.4 入口）。
+        var cockpit = document.getElementById('praxis-cockpit');
+        var entry = document.getElementById('praxis-today-entry');
+        var jview = document.getElementById('praxis-journal-view');
+        if (cockpit) cockpit.style.display = '';
+        if (entry) entry.style.display = '';
+        if (jview) jview.style.display = 'none';
         renderBoards();
         if (!_loaded) {
             _loaded = true;
             loadContacts();
         } else {
             render();
+        }
+        refreshJournalStatus();
+    }
+
+    // 刷新驾驶舱顶部「今日经营」入口的状态徽标（未记录/已记录/已分析）。
+    async function refreshJournalStatus() {
+        var pill = document.getElementById('praxis-today-status');
+        if (!pill) return;
+        try {
+            var d = new Date();
+            var p = function(n) { return n < 10 ? '0' + n : '' + n; };
+            var ds = d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+            var res = await API.praxisJournalList({ date: ds, limit: 1 });
+            var e = res && res.items && res.items[0];
+            var s = !e ? '未记录' : (e.structured && typeof e.structured === 'object' ? '已分析' : '已记录');
+            pill.textContent = s;
+            pill.className = 'praxis-today-status pj-status-' + (s === '已分析' ? 'analyzed' : s === '已记录' ? 'saved' : 'empty');
+        } catch (err) {
+            console.error('[Praxis] refresh journal status', err);
         }
     }
 
@@ -325,6 +351,7 @@ var Praxis = (function() {
         setHealthScore: setHealthScore,
         startCreate: startCreate,
         selectContact: selectContact,
-        deleteSelected: deleteSelected
+        deleteSelected: deleteSelected,
+        refreshJournalStatus: refreshJournalStatus
     };
 })();
