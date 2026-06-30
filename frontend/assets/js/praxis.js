@@ -256,7 +256,7 @@ var Praxis = (function() {
         var editor = document.getElementById('praxis-editor');
         if (!editor) return;
         var isNew = !contact.id;
-        editor.innerHTML = '<form class="praxis-form" id="praxis-contact-form">' +
+        var html = '<form class="praxis-form" id="praxis-contact-form">' +
             '<div class="praxis-form-head"><h3>' + (isNew ? '新建关系人' : '关系详情') + '</h3>' +
             (isNew ? '' : '<button type="button" class="praxis-danger" onclick="Praxis.deleteSelected()">删除</button>') + '</div>' +
             field('姓名', '<input name="name" maxlength="60" required value="' + escAttr(contact.name || '') + '">') +
@@ -268,12 +268,122 @@ var Praxis = (function() {
             field('备注', '<textarea name="note" rows="4">' + esc(contact.note || '') + '</textarea>') +
             '<button class="eg-btn eg-btn--primary" type="submit">' + (isNew ? '创建' : '保存') + '</button>' +
             '</form>';
+        if (!isNew) html += logsSectionHtml();
+        editor.innerHTML = html;
         var form = document.getElementById('praxis-contact-form');
         if (form) {
             form.addEventListener('submit', function(ev) {
                 ev.preventDefault();
                 saveContact(contact.id, form);
             });
+        }
+        if (!isNew) {
+            var logForm = document.getElementById('praxis-log-form');
+            if (logForm) {
+                logForm.addEventListener('submit', function(ev) {
+                    ev.preventDefault();
+                    saveLog(contact.id, logForm);
+                });
+            }
+            loadLogs(contact.id);
+        }
+    }
+
+    // ===== T-287:关系人交流记录 =====
+    var LOG_METHODS = ['面对面', '电话', '微信', '会议', '邮件', '其他'];
+
+    function logsSectionHtml() {
+        var methodOpts = '<option value="">方式</option>' + LOG_METHODS.map(function(m) {
+            return '<option value="' + esc(m) + '">' + esc(m) + '</option>';
+        }).join('');
+        var qualityOpts = '<option value="">质量</option>' +
+            option('shallow', '浅触达', '') + option('effective', '有效', '') + option('deep', '深度', '');
+        return '<div class="praxis-logs">' +
+            '<div class="praxis-logs-head"><h4>交流记录</h4>' +
+            '<button type="button" class="eg-btn" onclick="Praxis.toggleLogForm()">+ 记录交流</button></div>' +
+            '<div class="praxis-log-form-wrap" id="praxis-log-form-wrap" style="display:none;">' +
+            '<form class="praxis-log-form" id="praxis-log-form">' +
+            '<div class="praxis-log-form-row">' +
+            '<input name="at" type="date" value="' + todayStr() + '" required>' +
+            '<select name="method">' + methodOpts + '</select>' +
+            '<select name="quality">' + qualityOpts + '</select>' +
+            '</div>' +
+            '<textarea name="content" rows="2" placeholder="聊了什么（摘要）"></textarea>' +
+            '<textarea name="note" rows="2" placeholder="我的心得（可选）"></textarea>' +
+            '<button class="eg-btn eg-btn--primary" type="submit">保存交流</button>' +
+            '</form></div>' +
+            '<div class="praxis-logs-timeline" id="praxis-logs-timeline"><div class="praxis-logs-empty">加载中…</div></div>' +
+            '</div>';
+    }
+
+    function toggleLogForm() {
+        var f = document.getElementById('praxis-log-form-wrap');
+        if (f) f.style.display = f.style.display === 'none' ? '' : 'none';
+    }
+
+    async function loadLogs(contactId) {
+        var box = document.getElementById('praxis-logs-timeline');
+        if (!box) return;
+        try {
+            var res = await API.praxisContactLogList(contactId);
+            if (!res || res.success === false) throw new Error((res && res.error) || '加载失败');
+            renderLogs(res.items || []);
+        } catch (err) {
+            console.error('[Praxis] load logs failed', err);
+            box.innerHTML = '<div class="praxis-logs-empty">交流记录加载失败</div>';
+        }
+    }
+
+    function qualityLabel(q) {
+        return { shallow: '浅触达', effective: '有效', deep: '深度' }[q] || '';
+    }
+
+    function renderLogs(logs) {
+        var box = document.getElementById('praxis-logs-timeline');
+        if (!box) return;
+        if (!logs.length) {
+            box.innerHTML = '<div class="praxis-logs-empty">还没有交流记录，点「+ 记录交流」开始。</div>';
+            return;
+        }
+        box.innerHTML = logs.map(function(l) {
+            var m = l.method ? '<span class="praxis-log-method">' + esc(l.method) + '</span>' : '';
+            var q = l.quality ? '<span class="praxis-log-q q-' + esc(l.quality) + '">' + esc(qualityLabel(l.quality)) + '</span>' : '';
+            var note = l.note ? '<details class="praxis-log-note"><summary>心得</summary>' + esc(l.note) + '</details>' : '';
+            return '<div class="praxis-log-item">' +
+                '<div class="praxis-log-head"><b>' + esc(dateOnly(l.at)) + '</b>' + m + q + '</div>' +
+                (l.content ? '<p class="praxis-log-content">' + esc(l.content) + '</p>' : '') +
+                note + '</div>';
+        }).join('');
+    }
+
+    async function saveLog(contactId, form) {
+        var data = {
+            at: form.at.value || todayStr(),
+            method: form.method.value || null,
+            quality: form.quality.value || null,
+            content: form.content.value || '',
+            note: form.note.value || ''
+        };
+        if (!data.at) {
+            if (typeof showToast === 'function') showToast('选个交流时间', 'info');
+            return;
+        }
+        try {
+            var res = await API.praxisContactLogCreate(contactId, data);
+            if (!res || res.success === false) throw new Error((res && res.error) || '保存失败');
+            // 回写驱动节点状态：把本地 contact 的最近联系时间/质量同步后重渲弧。
+            if (res.contactUpdated) {
+                _contacts = _contacts.map(function(c) {
+                    return c.id === contactId
+                        ? Object.assign({}, c, { lastContactAt: data.at, lastQuality: data.quality })
+                        : c;
+                });
+            }
+            render();   // 重渲弧 + 节点状态；重开该 contact 详情会重新拉 logs
+            if (typeof showToast === 'function') showToast('已记录交流', 'success');
+        } catch (err) {
+            console.error('[Praxis] save log failed', err);
+            if (typeof showToast === 'function') showToast(err.message || '保存失败', 'error');
         }
     }
 
@@ -336,6 +446,12 @@ var Praxis = (function() {
         return value ? String(value).slice(0, 10) : '';
     }
 
+    function todayStr() {
+        var d = new Date();
+        var p = function(n) { return n < 10 ? '0' + n : '' + n; };
+        return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+    }
+
     function esc(value) {
         return String(value == null ? '' : value)
             .replace(/&/g, '&amp;')
@@ -356,6 +472,7 @@ var Praxis = (function() {
         startCreate: startCreate,
         selectContact: selectContact,
         deleteSelected: deleteSelected,
-        refreshJournalStatus: refreshJournalStatus
+        refreshJournalStatus: refreshJournalStatus,
+        toggleLogForm: toggleLogForm
     };
 })();

@@ -526,6 +526,32 @@ body:has(.sidebar.collapsed) { --sidebar-width: 0px; }
 .pr-detail-sec li { font-size: 0.86rem; line-height: 1.55; color: #334155; }
 .pr-raw { white-space: pre-wrap; }
 
+/* ============ 关系人交流记录 (T-287 / SPEC praxis §7) ============ */
+.praxis-logs { margin-top: 18px; border-top: 1px solid #eef0f4; padding-top: 14px; }
+.praxis-logs-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.praxis-logs-head h4 { margin: 0; font-size: 0.95rem; color: #1f2433; }
+.praxis-log-form-wrap { margin-bottom: 12px; }
+.praxis-log-form { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid #ebedf2; border-radius: 10px; background: #fbfbfd; }
+.praxis-log-form-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.praxis-log-form input[type="date"], .praxis-log-form select, .praxis-log-form textarea {
+  border: 1px solid #d8dbe3; border-radius: 8px; padding: 6px 8px; font: inherit;
+}
+.praxis-log-form input[type="date"], .praxis-log-form select { flex: 1; min-width: 90px; }
+.praxis-log-form textarea { width: 100%; box-sizing: border-box; resize: vertical; }
+.praxis-logs-timeline { display: flex; flex-direction: column; gap: 10px; }
+.praxis-logs-empty { color: #94a3b8; font-size: 0.84rem; padding: 12px 0; }
+.praxis-log-item { border-left: 2px solid #e6e1f3; padding: 2px 0 2px 12px; }
+.praxis-log-head { display: flex; align-items: center; gap: 8px; }
+.praxis-log-head b { font-size: 0.84rem; color: #1f2433; }
+.praxis-log-method { font-size: 0.74rem; color: #64748b; background: #f1f5f9; border-radius: 10px; padding: 2px 8px; }
+.praxis-log-q { font-size: 0.72rem; border-radius: 10px; padding: 2px 8px; }
+.praxis-log-q.q-deep { background: #ece4ff; color: #6d28d9; }
+.praxis-log-q.q-effective { background: #e7f0ff; color: #2563eb; }
+.praxis-log-q.q-shallow { background: #f1f5f9; color: #64748b; }
+.praxis-log-content { margin: 4px 0 0; font-size: 0.85rem; line-height: 1.5; color: #334155; }
+.praxis-log-note { margin-top: 4px; font-size: 0.8rem; color: #64748b; }
+.praxis-log-note summary { cursor: pointer; color: var(--primary-color); }
+
 /* ============ 工具栏 ============ */
 .wt-back-btn {
   background: none; border: none; color: var(--primary-color);

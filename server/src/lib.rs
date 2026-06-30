@@ -404,6 +404,12 @@ pub fn build_app(state: state::AppState) -> Router {
             "/praxis/journal/{id}/analyze",
             post(routes::praxis_journal::analyze_journal),
         )
+        // Praxis 关系人交流记录 (T-287 / SPEC praxis §7) - guarded by AdminUserId in handlers.
+        .route(
+            "/praxis/contacts/{id}/logs",
+            get(routes::praxis_contact_logs::list_logs)
+                .post(routes::praxis_contact_logs::create_log),
+        )
         // T-105 SPEC insight — 注意此处必须与 main.rs 同步(memory:duplicate-build-app)
         .route(
             "/insights",

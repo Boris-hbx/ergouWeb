@@ -26,4 +26,5 @@ pub mod insight_task;
 // T-204 SPEC insight-factory P0
 pub mod factory;
 pub mod praxis_contact;
+pub mod praxis_contact_log;
 pub mod praxis_journal;

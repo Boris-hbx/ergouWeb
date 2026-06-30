@@ -41,4 +41,5 @@ pub mod insight_factory;
 // T-218 SPEC analytics — user behavior events ingest
 pub mod events;
 pub mod praxis_contacts;
+pub mod praxis_contact_logs;
 pub mod praxis_journal;
