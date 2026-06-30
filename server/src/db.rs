@@ -1071,6 +1071,21 @@ fn create_tables(conn: &Connection) {
         );
         CREATE INDEX IF NOT EXISTS idx_praxis_contacts_user ON praxis_contacts(user_id, deleted);
 
+        -- Praxis daily-operation journal (T-285 / SPEC praxis §5)
+        CREATE TABLE IF NOT EXISTS praxis_journal (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            entry_date TEXT NOT NULL,
+            raw_text TEXT NOT NULL DEFAULT '',
+            tags TEXT NOT NULL DEFAULT '{}',
+            structured TEXT NOT NULL DEFAULT '',
+            analyzed_at TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            deleted INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE INDEX IF NOT EXISTS idx_praxis_journal_user ON praxis_journal(user_id, entry_date, deleted);
+
         -- Stakeholder columns (per-user schema config for stakeholders)
         CREATE TABLE IF NOT EXISTS stakeholder_columns (
             user_id   TEXT    NOT NULL REFERENCES users(id),
