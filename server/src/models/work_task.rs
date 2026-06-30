@@ -56,6 +56,14 @@ pub struct WorkTask {
     /// collaborators 是协作者数组,纯文本标识,不关联账号。
     #[serde(default)]
     pub collaborators: Vec<String>,
+    #[serde(rename = "sourceType", default = "default_source_type")]
+    pub source_type: String,
+    #[serde(
+        rename = "sourceTodoId",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub source_todo_id: Option<String>,
     /// Custom column values: { column_key: string_value }.
     /// For multi-select custom cols, the value is a JSON array of strings.
     #[serde(rename = "customFields", default)]
@@ -101,6 +109,10 @@ pub struct CreateWorkTaskRequest {
     /// T-119:协作者数组(Linear 风格;assignee 是主责任人,collaborators 是参与方)
     #[serde(default)]
     pub collaborators: Vec<String>,
+    #[serde(rename = "sourceType", default = "default_source_type")]
+    pub source_type: String,
+    #[serde(rename = "sourceTodoId", default)]
+    pub source_todo_id: Option<String>,
     #[serde(rename = "customFields", default)]
     pub custom_fields: Option<Map<String, JsonValue>>,
 }
@@ -136,6 +148,9 @@ fn default_status() -> String {
 fn default_priority() -> String {
     "mid".to_string()
 }
+fn default_source_type() -> String {
+    "manual".to_string()
+}
 
 #[cfg(test)]
 mod tests {
@@ -167,6 +182,8 @@ mod tests {
             progress: 0,
             tags: Vec::new(),
             collaborators: Vec::new(),
+            source_type: "manual".into(),
+            source_todo_id: None,
             custom_fields: Map::new(),
             sort_order: 0.0,
             created_at: String::new(),

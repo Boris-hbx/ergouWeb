@@ -45,6 +45,7 @@ var WorkTable = (function() {
     // 结构:{ colKey: Set<选中的存储值> };存在某 key = 该列筛选生效(只显示值 ∈ Set 的行)。
     // 纯前端内存态;切时间 Tab / 分组不清空(正交叠加);仅表格视图生效。
     var _colFilters = {};
+    var _sourceFilter = '';
 
     // 可筛列:select / status / multi 类型 + 责任人(取代旧工具栏下拉)。文本走搜索、日期走 Tab、数字本轮不做。
     function _isFilterable(col) {
@@ -130,6 +131,13 @@ var WorkTable = (function() {
 
     function clearAllFilters() {
         _colFilters = {};
+        _sourceFilter = '';
+        var sf = document.getElementById('wt-source-filter');
+        if (sf) sf.value = '';
+        Work.render();
+    }
+    function setSourceFilter(value) {
+        _sourceFilter = value || '';
         Work.render();
     }
     function setColumnFilter(key, values) {
@@ -159,6 +167,7 @@ var WorkTable = (function() {
     function _visibleRows() {
         // T-098 时间 Tab + T-130 全局搜索(applyTimeTabFilter 内含)+ T-132 表头列筛选
         var rows = Work.applyTimeTabFilter(Work.rows());
+        if (_sourceFilter) rows = rows.filter(function(t) { return (t.sourceType || 'manual') === _sourceFilter; });
         return _hasAnyColFilter() ? rows.filter(_passColFilters) : rows;
     }
 
@@ -175,8 +184,9 @@ var WorkTable = (function() {
         // 内置专属
         if (k === 'title') {
             var title = v ? _esc(v) : '<span class="wt-empty">(无标题)</span>';
+            var sourceBadge = (t.sourceType === 'todo') ? '<span class="wt-source-badge">Todo</span>' : '';
             return '<td class="wt-cell-title wt-editable" '
-                +    'onclick="WorkTable.editText(' + t.id + ',\'title\')">' + title + '</td>';
+                +    'onclick="WorkTable.editText(' + t.id + ',\'title\')">' + title + sourceBadge + '</td>';
         }
         if (k === 'assignee') {
             // T-121:UI 不再区分主+协,统一"平等多人";点击 → 单 input modal 逗号分隔
@@ -1197,6 +1207,7 @@ var WorkTable = (function() {
         openColFilter: openColFilter,
         clearAllFilters: clearAllFilters,
         setColumnFilter: setColumnFilter,
+        setSourceFilter: setSourceFilter,
         // 给 thead 行内 onmousedown 用
         _resizeStart: _resizeStart,
         // 给 work-board.js 复用(头像配色 / 状态/优先级元数据)

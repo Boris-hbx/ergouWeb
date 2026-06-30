@@ -128,6 +128,20 @@ pub struct Todo {
     pub deleted: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub deleted_at: Option<String>,
+    #[serde(rename = "upgradedToWork", default)]
+    pub upgraded_to_work: bool,
+    #[serde(
+        rename = "workTaskId",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub work_task_id: Option<String>,
+    #[serde(
+        rename = "upgradedAt",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub upgraded_at: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next_reminder: Option<TodoReminder>,
 }
