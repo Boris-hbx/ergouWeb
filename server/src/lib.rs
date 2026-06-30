@@ -378,6 +378,17 @@ pub fn build_app(state: state::AppState) -> Router {
             "/work/stakeholder-columns/{key}",
             delete(routes::stakeholder_columns::delete_column),
         )
+        // Praxis module (T-283 / SPEC praxis) - guarded by AdminUserId in handlers.
+        .route(
+            "/praxis/contacts",
+            get(routes::praxis_contacts::list_contacts)
+                .post(routes::praxis_contacts::create_contact),
+        )
+        .route(
+            "/praxis/contacts/{id}",
+            axum::routing::patch(routes::praxis_contacts::update_contact)
+                .delete(routes::praxis_contacts::delete_contact),
+        )
         // T-105 SPEC insight — 注意此处必须与 main.rs 同步(memory:duplicate-build-app)
         .route(
             "/insights",

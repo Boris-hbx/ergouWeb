@@ -1053,6 +1053,24 @@ fn create_tables(conn: &Connection) {
         );
         CREATE INDEX IF NOT EXISTS idx_stakeholders_user ON stakeholders(user_id, deleted);
 
+        -- Praxis contacts (T-283 / SPEC praxis)
+        CREATE TABLE IF NOT EXISTS praxis_contacts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            layer TEXT NOT NULL DEFAULT 'normal',
+            last_contact_at TEXT,
+            last_quality TEXT,
+            risk INTEGER NOT NULL DEFAULT 0,
+            note TEXT NOT NULL DEFAULT '',
+            cycle_off INTEGER NOT NULL DEFAULT 0,
+            sort_order REAL NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            deleted INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE INDEX IF NOT EXISTS idx_praxis_contacts_user ON praxis_contacts(user_id, deleted);
+
         -- Stakeholder columns (per-user schema config for stakeholders)
         CREATE TABLE IF NOT EXISTS stakeholder_columns (
             user_id   TEXT    NOT NULL REFERENCES users(id),

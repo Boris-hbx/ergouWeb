@@ -25,3 +25,4 @@ pub mod annotation;
 pub mod insight_task;
 // T-204 SPEC insight-factory P0
 pub mod factory;
+pub mod praxis_contact;
