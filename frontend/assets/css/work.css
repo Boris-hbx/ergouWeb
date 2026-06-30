@@ -478,6 +478,54 @@ body:has(.sidebar.collapsed) { --sidebar-width: 0px; }
 .pj-fade { animation: pjFade .35s ease; }
 @keyframes pjFade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
+/* ============ 记录回看 (T-286 / SPEC praxis §6) ============ */
+.praxis-review-entry {
+  display: flex; flex-direction: column; gap: 2px; align-items: flex-start;
+  width: 100%; margin: 0 0 18px; padding: 12px 18px; cursor: pointer; text-align: left;
+  border: 1px solid #ebedf2; border-radius: 12px; background: #fbfbfd;
+  transition: border-color .15s ease, background .15s ease;
+}
+.praxis-review-entry:hover { border-color: #d8dbe3; background: #f6f7fb; }
+.praxis-review-entry span { font-weight: 700; color: #334155; font-size: 0.95rem; }
+.praxis-review-entry em { font-style: normal; font-size: 0.8rem; color: #94a3b8; }
+
+.pr-count { margin-left: auto; font-size: 0.8rem; color: #64748b; }
+.pr-filters {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
+  margin-bottom: 16px; font-size: 0.84rem; color: #475569;
+}
+.pr-filters input[type="date"], .pr-filters select {
+  border: 1px solid #d8dbe3; border-radius: 8px; padding: 5px 8px; font: inherit; margin-left: 4px;
+}
+.pr-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 18px; align-items: start; }
+.pr-list { display: flex; flex-direction: column; gap: 10px; max-height: 600px; overflow-y: auto; }
+.pr-list-empty, .pr-detail-empty {
+  color: #94a3b8; font-size: 0.85rem; text-align: center; padding: 40px 12px;
+}
+.pr-row {
+  display: flex; flex-direction: column; gap: 6px; width: 100%; text-align: left; cursor: pointer;
+  border: 1px solid #ebedf2; border-radius: 12px; background: #fff; padding: 12px 14px;
+  transition: border-color .12s ease, box-shadow .12s ease;
+}
+.pr-row:hover { border-color: #c9bdf0; }
+.pr-row.selected { border-color: #b6a4ee; box-shadow: 0 0 0 3px rgba(124, 77, 255, .1); }
+.pr-row-head { display: flex; align-items: center; gap: 10px; }
+.pr-row-date { font-weight: 700; color: #1f2433; font-size: 0.85rem; }
+.pr-row-type { font-size: 0.72rem; padding: 2px 8px; border-radius: 10px; background: #ece4ff; color: #6d28d9; }
+.pr-row-title { font-size: 0.88rem; color: #334155; line-height: 1.5; }
+.pr-row-boards { display: flex; flex-wrap: wrap; gap: 5px; }
+.pr-row-board { font-size: 0.7rem; padding: 2px 8px; border-radius: 10px; background: #f1f5f9; color: #64748b; }
+
+.pr-detail { border: 1px solid #ebedf2; border-radius: 14px; background: #fff; padding: 18px; min-height: 360px; }
+.pr-detail-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.pr-detail-head h4 { margin: 0; color: #1f2433; }
+.pr-detail-sec { margin-bottom: 14px; }
+.pr-detail-sec h5 { margin: 0 0 6px; font-size: 0.8rem; color: #6b7280; }
+.pr-detail-sec p { margin: 0; font-size: 0.9rem; line-height: 1.6; color: #334155; }
+.pr-detail-sec ul { margin: 0; padding-left: 18px; }
+.pr-detail-sec li { font-size: 0.86rem; line-height: 1.55; color: #334155; }
+.pr-raw { white-space: pre-wrap; }
+
 /* ============ 工具栏 ============ */
 .wt-back-btn {
   background: none; border: none; color: var(--primary-color);

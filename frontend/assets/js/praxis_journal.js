@@ -36,9 +36,9 @@ var PraxisJournal = (function() {
         return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
     }
 
-    function open() {
+    function open(date) {
         toggleView(true);
-        _date = todayStr();
+        _date = date || todayStr();
         var di = document.getElementById('pj-date');
         if (di) di.value = _date;
         renderTags();
@@ -54,11 +54,13 @@ var PraxisJournal = (function() {
     }
 
     function toggleView(showJournal) {
-        var cockpit = document.getElementById('praxis-cockpit');
-        var entry = document.getElementById('praxis-today-entry');
+        ['praxis-cockpit', 'praxis-today-entry', 'praxis-review-entry'].forEach(function(id) {
+            var el = document.getElementById(id);
+            if (el) el.style.display = showJournal ? 'none' : '';
+        });
+        var rview = document.getElementById('praxis-review-view');
+        if (rview) rview.style.display = 'none';
         var jview = document.getElementById('praxis-journal-view');
-        if (cockpit) cockpit.style.display = showJournal ? 'none' : '';
-        if (entry) entry.style.display = showJournal ? 'none' : '';
         if (jview) jview.style.display = showJournal ? '' : 'none';
     }
 
