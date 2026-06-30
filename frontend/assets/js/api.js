@@ -658,6 +658,18 @@ var API = (function() {
         stakeholderDeleteColumn: async function(key) {
             return await request('DELETE', '/work/stakeholder-columns/' + encodeURIComponent(key));
         },
+        praxisContactList: async function() {
+            return await request('GET', '/praxis/contacts');
+        },
+        praxisContactCreate: async function(data) {
+            return await request('POST', '/praxis/contacts', data);
+        },
+        praxisContactUpdate: async function(id, patch) {
+            return await request('PATCH', '/praxis/contacts/' + encodeURIComponent(id), patch);
+        },
+        praxisContactDelete: async function(id) {
+            return await request('DELETE', '/praxis/contacts/' + encodeURIComponent(id));
+        },
 
         // ===== Insight Tasks v0.3 (T-122 后端 / T-123 前端) =====
         // 单层 insight_task。claim / create-report 由 Claude Code 调,前端不用。

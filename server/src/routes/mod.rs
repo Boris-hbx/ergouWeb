@@ -40,3 +40,4 @@ pub mod insight_share;
 pub mod insight_factory;
 // T-218 SPEC analytics — user behavior events ingest
 pub mod events;
+pub mod praxis_contacts;

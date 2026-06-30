@@ -373,6 +373,17 @@ pub fn build_app(state: AppState) -> Router {
             "/work/stakeholder-columns/{key}",
             delete(routes::stakeholder_columns::delete_column),
         )
+        // Praxis module (T-283 / SPEC praxis) - guarded by AdminUserId in handlers.
+        .route(
+            "/praxis/contacts",
+            get(routes::praxis_contacts::list_contacts)
+                .post(routes::praxis_contacts::create_contact),
+        )
+        .route(
+            "/praxis/contacts/{id}",
+            axum::routing::patch(routes::praxis_contacts::update_contact)
+                .delete(routes::praxis_contacts::delete_contact),
+        )
         // Insight module (T-105 / SPEC insight) — Hybrid 架构:Web 后端只做收件箱/抓取/存储,
         // 报告生成在 Claude Code(Boris 本机)写回,公开 /r/{token} 不在 /api 下,见 build_app 末尾。
         .route(

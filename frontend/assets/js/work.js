@@ -103,6 +103,9 @@ var Work = (function() {
             _feature = 'praxis';
             localStorage.setItem('work_feature', 'praxis');
             if (praxisView) praxisView.style.display = '';
+            if (window.Praxis && typeof Praxis.open === 'function') {
+                Praxis.open();
+            }
         }
     }
 

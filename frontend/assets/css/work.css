@@ -102,6 +102,291 @@ body:has(.sidebar.collapsed) { --sidebar-width: 0px; }
   font-size: 0.92rem;
 }
 
+/* ============ Praxis (T-283) ============ */
+.praxis-view {
+  width: 100%;
+  min-width: 0;
+}
+.praxis-shell {
+  display: grid;
+  gap: 16px;
+  min-width: 980px;
+}
+.praxis-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 92px;
+  padding: 18px 22px;
+  border: 1px solid var(--eg-border, var(--border-color));
+  border-radius: 8px;
+  background: linear-gradient(135deg, #f7f7fb 0%, #eef7f0 52%, #f7f1ff 100%);
+}
+.praxis-kicker {
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.praxis-banner h2 {
+  margin: 4px 0 0;
+  color: #172033;
+  font-size: 1.55rem;
+  letter-spacing: 0;
+}
+.praxis-score {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: #475569;
+  font-weight: 700;
+}
+.praxis-score input {
+  width: 72px;
+  height: 36px;
+  border: 1px solid var(--eg-border, var(--border-color));
+  border-radius: 8px;
+  padding: 0 10px;
+  background: #fff;
+  color: #172033;
+  font-weight: 800;
+}
+.praxis-board-grid {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(96px, 1fr));
+  gap: 8px;
+}
+.praxis-board-card {
+  display: grid;
+  grid-template-columns: 26px 1fr auto;
+  align-items: center;
+  gap: 6px;
+  min-height: 48px;
+  padding: 0 10px;
+  border: 1px solid var(--eg-border, var(--border-color));
+  border-radius: 8px;
+  background: var(--eg-surface, #fff);
+  color: #334155;
+  cursor: pointer;
+  text-align: left;
+}
+.praxis-board-card:hover,
+.praxis-board-card.active {
+  border-color: #7c4dff;
+  box-shadow: 0 4px 14px rgba(124, 77, 255, .12);
+}
+.praxis-board-icon {
+  font-size: 1.05rem;
+}
+.praxis-board-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.82rem;
+  font-weight: 750;
+}
+.praxis-board-score {
+  color: #7c4dff;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+.praxis-relation-layout {
+  display: grid;
+  grid-template-columns: minmax(680px, 1fr) 300px;
+  gap: 14px;
+}
+.praxis-map-panel,
+.praxis-editor {
+  border: 1px solid var(--eg-border, var(--border-color));
+  border-radius: 8px;
+  background: var(--eg-surface, #fff);
+}
+.praxis-map-panel {
+  min-height: 560px;
+  padding: 16px;
+}
+.praxis-map-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.praxis-map-head h3,
+.praxis-form-head h3 {
+  margin: 0;
+  color: #172033;
+  font-size: 1.05rem;
+  letter-spacing: 0;
+}
+.praxis-map-head p {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 0.84rem;
+}
+.praxis-arc-wrap {
+  position: relative;
+  min-height: 500px;
+  overflow: hidden;
+}
+.praxis-arc-svg {
+  display: block;
+  width: 100%;
+  height: 500px;
+}
+.praxis-arc {
+  fill: none;
+  stroke: url(#praxis-arc-grad);
+  stroke-width: 2.2;
+  opacity: .78;
+}
+.praxis-arc-important {
+  opacity: .62;
+}
+.praxis-arc-normal {
+  opacity: .48;
+}
+.praxis-self {
+  fill: #172033;
+  stroke: #fff;
+  stroke-width: 4;
+}
+.praxis-self-text {
+  fill: #fff;
+  font-size: 16px;
+  font-weight: 800;
+}
+.praxis-layer-label {
+  fill: #64748b;
+  font-size: 13px;
+  font-weight: 700;
+}
+.praxis-node {
+  cursor: pointer;
+}
+.praxis-node circle {
+  stroke: #fff;
+  stroke-width: 3;
+  transition: transform .14s ease, opacity .14s ease;
+}
+.praxis-node:hover circle,
+.praxis-node.selected circle {
+  transform: scale(1.08);
+}
+.praxis-node text {
+  fill: #334155;
+  font-size: 13px;
+  font-weight: 750;
+  paint-order: stroke;
+  stroke: #fff;
+  stroke-width: 4px;
+}
+.praxis-node.hi circle {
+  fill: #ffb020;
+}
+.praxis-node.dim circle {
+  fill: #cbd5e1;
+  opacity: .72;
+}
+.praxis-node.solid circle {
+  fill: #2563eb;
+}
+.praxis-node.light circle {
+  fill: #8b5cf6;
+  opacity: .78;
+}
+.praxis-node.selected circle {
+  stroke: #111827;
+}
+.praxis-node-risk {
+  fill: #ef4444 !important;
+  stroke: #fff !important;
+  stroke-width: 2 !important;
+}
+.praxis-empty-hint {
+  position: absolute;
+  left: 170px;
+  top: 244px;
+  color: #64748b;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+.praxis-editor {
+  min-height: 560px;
+  padding: 16px;
+}
+.praxis-editor-empty,
+.praxis-static-board {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  min-height: 320px;
+  color: #64748b;
+  text-align: center;
+}
+.praxis-static-icon {
+  font-size: 2.4rem;
+  margin-bottom: 8px;
+}
+.praxis-static-board h3 {
+  margin: 0;
+  color: #172033;
+}
+.praxis-static-board p {
+  margin: 8px 0 0;
+}
+.praxis-form {
+  display: grid;
+  gap: 12px;
+}
+.praxis-form-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.praxis-field {
+  display: grid;
+  gap: 6px;
+  color: #475569;
+  font-size: 0.82rem;
+  font-weight: 750;
+}
+.praxis-field input,
+.praxis-field select,
+.praxis-field textarea {
+  width: 100%;
+  min-height: 36px;
+  box-sizing: border-box;
+  border: 1px solid var(--eg-border, var(--border-color));
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #fff;
+  color: #172033;
+  font: inherit;
+}
+.praxis-field textarea {
+  resize: vertical;
+}
+.praxis-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #334155;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+.praxis-danger {
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #fff1f2;
+  color: #b91c1c;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-weight: 750;
+}
+
 /* ============ 工具栏 ============ */
 .wt-back-btn {
   background: none; border: none; color: var(--primary-color);
