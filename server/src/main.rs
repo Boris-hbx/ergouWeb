@@ -399,6 +399,12 @@ pub fn build_app(state: AppState) -> Router {
             "/praxis/journal/{id}/analyze",
             post(routes::praxis_journal::analyze_journal),
         )
+        // Praxis 关系人交流记录 (T-287 / SPEC praxis §7) - guarded by AdminUserId in handlers.
+        .route(
+            "/praxis/contacts/{id}/logs",
+            get(routes::praxis_contact_logs::list_logs)
+                .post(routes::praxis_contact_logs::create_log),
+        )
         // Insight module (T-105 / SPEC insight) — Hybrid 架构:Web 后端只做收件箱/抓取/存储,
         // 报告生成在 Claude Code(Boris 本机)写回,公开 /r/{token} 不在 /api 下,见 build_app 末尾。
         .route(

@@ -670,6 +670,13 @@ var API = (function() {
         praxisContactDelete: async function(id) {
             return await request('DELETE', '/praxis/contacts/' + encodeURIComponent(id));
         },
+        // ===== Praxis 关系人交流记录 v0.2 (T-287) =====
+        praxisContactLogList: async function(contactId) {
+            return await request('GET', '/praxis/contacts/' + encodeURIComponent(contactId) + '/logs');
+        },
+        praxisContactLogCreate: async function(contactId, data) {
+            return await request('POST', '/praxis/contacts/' + encodeURIComponent(contactId) + '/logs', data);
+        },
 
         // ===== Praxis 今日经营记录 v0.2 (T-285) =====
         praxisJournalList: async function(params) {
