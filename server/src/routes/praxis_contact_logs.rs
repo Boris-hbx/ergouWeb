@@ -62,10 +62,7 @@ fn row_to_log(row: &rusqlite::Row) -> rusqlite::Result<PraxisContactLog> {
     })
 }
 
-pub fn list_logs_impl(
-    db: &Connection,
-    contact_id: i64,
-) -> Result<Vec<PraxisContactLog>, String> {
+pub fn list_logs_impl(db: &Connection, contact_id: i64) -> Result<Vec<PraxisContactLog>, String> {
     let sql = format!(
         "SELECT {SELECT_COLS} FROM praxis_contact_logs WHERE contact_id = ?1 ORDER BY at DESC, id DESC"
     );
@@ -250,12 +247,7 @@ mod tests {
         let app = crate::build_app(state);
 
         // contact starts dim (no last_contact_at)
-        let cid = create_contact(
-            &app,
-            &admin_token,
-            r#"{"name":"Mentor","layer":"core"}"#,
-        )
-        .await;
+        let cid = create_contact(&app, &admin_token, r#"{"name":"Mentor","layer":"core"}"#).await;
 
         // add a log → should write back last_contact_at + last_quality
         let resp = app

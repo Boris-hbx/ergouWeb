@@ -28,6 +28,7 @@ use crate::models::work_column::{
 };
 use crate::state::AppState;
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize)]
 pub struct ColumnsResponse {
     pub success: bool,

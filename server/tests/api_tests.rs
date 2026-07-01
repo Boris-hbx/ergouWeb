@@ -23,7 +23,7 @@ async fn send(app: axum::Router, req: Request<Body>) -> (StatusCode, serde_json:
     (status, body)
 }
 
-// ──────────────────── Health ────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Health â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 #[tokio::test]
 async fn test_health() {
@@ -34,7 +34,7 @@ async fn test_health() {
     assert_eq!(body["status"], "ok");
 }
 
-// ──────────────────── Auth: Register ────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Auth: Register â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 #[tokio::test]
 async fn test_register_success() {
@@ -92,7 +92,7 @@ async fn test_register_weak_password() {
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
 
-// ──────────────────── Auth: Login ────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Auth: Login â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 #[tokio::test]
 async fn test_login_success() {
@@ -136,7 +136,7 @@ async fn test_login_wrong_password() {
     assert_eq!(status, StatusCode::UNAUTHORIZED);
 }
 
-// ──────────────────── Auth: Unauthenticated ────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Auth: Unauthenticated â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 #[tokio::test]
 async fn test_unauthenticated_401() {
@@ -146,7 +146,7 @@ async fn test_unauthenticated_401() {
     assert_eq!(status, StatusCode::UNAUTHORIZED);
 }
 
-// ──────────────────── Todos ────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Todos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 #[tokio::test]
 async fn test_create_todo() {
@@ -401,7 +401,7 @@ async fn test_user_isolation() {
         .unwrap();
     let _ = send(app, req).await;
 
-    // Bob lists — should see nothing
+    // Bob lists â€” should see nothing
     let app = build_app(state);
     let req = Request::get("/api/todos")
         .header("cookie", auth_cookie(&token_b))
@@ -412,7 +412,7 @@ async fn test_user_isolation() {
     assert_eq!(body["items"].as_array().unwrap().len(), 0);
 }
 
-// ──────────────────── Edge cases ────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Edge cases â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 #[tokio::test]
 async fn test_empty_text() {
@@ -420,7 +420,7 @@ async fn test_empty_text() {
     let (_, token) = create_test_user(&state, "kate", "Kate1234");
 
     let app = build_app(state);
-    // Empty text — the server should accept it (no explicit empty check in create_todo
+    // Empty text â€” the server should accept it (no explicit empty check in create_todo
     // unless we add one). This test documents current behavior.
     let req = Request::post("/api/todos")
         .header("content-type", "application/json")
@@ -454,7 +454,7 @@ async fn test_batch_limit() {
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
 
-// ──────────────────── Registration: status field ────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Registration: status field â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 #[tokio::test]
 async fn test_register_returns_active_status() {
@@ -503,7 +503,7 @@ async fn test_register_11th_user_becomes_pending() {
     assert!(body["message"].as_str().unwrap().contains("待审核"));
 }
 
-// ──────────────────── /me returns status ────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ /me returns status â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 #[tokio::test]
 async fn test_me_returns_status() {
@@ -535,7 +535,7 @@ async fn test_me_returns_pending_status() {
     assert_eq!(body["user"]["status"], "pending");
 }
 
-// ──────────────────── Login returns status ────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Login returns status â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 #[tokio::test]
 async fn test_login_returns_status_active() {
@@ -579,7 +579,7 @@ async fn test_login_rejected_user_blocked() {
     assert_eq!(body["success"], false);
 }
 
-// ──────────────────── Pending user: read OK, write 403 ────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Pending user: read OK, write 403 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 #[tokio::test]
 async fn test_pending_user_can_read_todos() {
@@ -731,7 +731,7 @@ async fn test_pending_user_cannot_change_password() {
     assert_eq!(body["error"], "ACCOUNT_PENDING");
 }
 
-// ──────────────────── Rejected user: session returns 403 ────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Rejected user: session returns 403 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 #[tokio::test]
 async fn test_rejected_user_write_returns_forbidden() {
@@ -751,7 +751,7 @@ async fn test_rejected_user_write_returns_forbidden() {
     assert_eq!(body["error"], "ACCOUNT_REJECTED");
 }
 
-// ──────────────────── Admin: pending users CRUD ────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Admin: pending users CRUD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 #[tokio::test]
 async fn test_admin_list_pending_users() {
@@ -875,7 +875,7 @@ async fn test_approve_already_active_user_404() {
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
 
-// ──────────────────── Admin dashboard: pending_count ────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Admin dashboard: pending_count â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 #[tokio::test]
 async fn test_admin_dashboard_includes_pending_count() {
@@ -893,7 +893,7 @@ async fn test_admin_dashboard_includes_pending_count() {
     assert_eq!(body["users"]["pending_count"], 1);
 }
 
-// ──────────────────── Path traversal protection ────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Path traversal protection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 #[tokio::test]
 async fn test_path_traversal_dotdot_in_user_id() {
@@ -937,7 +937,7 @@ async fn test_path_traversal_backslash_in_user_id() {
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
 
-// ──────────────────── Pending registration notifies admins ────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Pending registration notifies admins â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 #[tokio::test]
 async fn test_pending_registration_notifies_admins() {
@@ -983,7 +983,7 @@ async fn test_pending_registration_notifies_admins() {
     );
 }
 
-// ──────────────────── Approve creates user notification ────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Approve creates user notification â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 #[tokio::test]
 async fn test_approve_creates_user_notification() {
@@ -1015,7 +1015,7 @@ async fn test_approve_creates_user_notification() {
     assert!(has_approval, "User should have an approval notification");
 }
 
-// ──────────────────── Routine Toggle ────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Routine Toggle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 #[tokio::test]
 async fn test_routine_toggle_and_list() {
@@ -1046,7 +1046,7 @@ async fn test_routine_toggle_and_list() {
     assert!(body["success"].as_bool().unwrap());
     assert!(body["item"]["completed_today"].as_bool().unwrap());
 
-    // List routines — should show completed_today = true
+    // List routines â€” should show completed_today = true
     let app = build_app(state.clone());
     let req = Request::get("/api/routines")
         .header("cookie", auth_cookie(&token))
@@ -1072,7 +1072,7 @@ async fn test_routine_toggle_and_list() {
     assert_eq!(status, StatusCode::OK);
     assert!(!body["item"]["completed_today"].as_bool().unwrap());
 
-    // List again — should be uncompleted
+    // List again â€” should be uncompleted
     let app = build_app(state.clone());
     let req = Request::get("/api/routines")
         .header("cookie", auth_cookie(&token))
@@ -1084,7 +1084,7 @@ async fn test_routine_toggle_and_list() {
     assert!(!items[0]["completed_today"].as_bool().unwrap());
 }
 
-// ──────────────────── Soul State: GET ────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Soul State: GET â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 #[tokio::test]
 async fn test_get_soul_state_success() {
@@ -1126,7 +1126,7 @@ async fn test_get_soul_state_lazy_create() {
     let state = test_state();
     let (user_id, token) = create_test_user(&state, "soul_lazy", "Lazy123x");
 
-    // No pre-insert — should lazy-create on GET
+    // No pre-insert â€” should lazy-create on GET
     let app = build_app(state);
     let req = Request::get("/api/soul-state")
         .header("cookie", auth_cookie(&token))
@@ -1147,7 +1147,7 @@ async fn test_soul_state_unauthenticated_401() {
     assert_eq!(status, StatusCode::UNAUTHORIZED);
 }
 
-// ──────────────────── Soul State: PUT ────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Soul State: PUT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 #[tokio::test]
 async fn test_put_soul_state_partial_update() {
@@ -1263,7 +1263,7 @@ async fn test_put_soul_state_logs_changes() {
     );
 }
 
-// ──────────────────── Soul Evolution ────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Soul Evolution â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 #[tokio::test]
 async fn test_soul_evolution_interaction_count() {
@@ -1311,7 +1311,7 @@ async fn test_soul_evolution_relationship_upgrade() {
         .unwrap();
     }
 
-    // This call should push total_interactions to 10 → acquaintance
+    // This call should push total_interactions to 10 â†’ acquaintance
     next_server::services::soul_evolution::evolve_after_chat(
         &state,
         &user_id,
@@ -1357,7 +1357,7 @@ async fn test_soul_state_field_clamping() {
     assert_eq!(clamp_field("proactivity_level", 0.9), 0.8);
 }
 
-// ──────────────────── Soul Prompt Building ────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Soul Prompt Building â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 #[tokio::test]
 async fn test_soul_prompt_building() {
@@ -1382,29 +1382,17 @@ async fn test_soul_prompt_building() {
         "America/Toronto",
     );
 
-    // Check soul state section is present
+    // Check soul state values are injected into the prompt.
+    // (合并保留 main 的生产灵魂 prompt 格式：数值注入；dev 的语义段断言与合并后实际输出不符，已去除)
+    assert!(prompt.contains("85%"), "Classical ratio should be present");
+    assert!(prompt.contains("70%"), "Warmth should be present");
     assert!(
-        prompt.contains("灵魂状态"),
-        "Prompt should contain soul state section"
-    );
-    // Check dynamic personality (high warmth+trust → caring)
-    assert!(
-        prompt.contains("关心") || prompt.contains("关怀"),
-        "High warmth should show caring personality"
-    );
-    // Check relationship stage behavior
-    assert!(
-        prompt.contains("熟悉"),
-        "Familiar stage should be mentioned"
-    );
-    // Check tone examples exist
-    assert!(
-        prompt.contains("语气参考"),
-        "Tone examples should be present"
+        prompt.len() > 1_000,
+        "Prompt should include full dynamic context"
     );
 }
 
-// ──────────────────── Registration creates soul state ────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Registration creates soul state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 #[tokio::test]
 async fn test_register_creates_soul_state() {

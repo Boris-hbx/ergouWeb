@@ -14,9 +14,7 @@ use serde_json::{json, Value as JsonValue};
 use tracing::{error, warn};
 
 use crate::auth::AdminUserId;
-use crate::models::praxis_journal::{
-    CreateJournalRequest, PraxisJournal, UpdateJournalRequest,
-};
+use crate::models::praxis_journal::{CreateJournalRequest, PraxisJournal, UpdateJournalRequest};
 use crate::services::llm::LlmClient;
 use crate::state::AppState;
 
@@ -106,7 +104,8 @@ fn load_journal(db: &Connection, user_id: &str, id: i64) -> Option<PraxisJournal
     let sql = format!(
         "SELECT {SELECT_COLS} FROM praxis_journal WHERE id = ?1 AND user_id = ?2 AND deleted = 0"
     );
-    db.query_row(&sql, params![id, user_id], row_to_journal).ok()
+    db.query_row(&sql, params![id, user_id], row_to_journal)
+        .ok()
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -122,9 +121,8 @@ pub fn list_journal_impl(
     user_id: &str,
     q: &ListQuery,
 ) -> Result<Vec<PraxisJournal>, String> {
-    let mut sql = format!(
-        "SELECT {SELECT_COLS} FROM praxis_journal WHERE user_id = ?1 AND deleted = 0"
-    );
+    let mut sql =
+        format!("SELECT {SELECT_COLS} FROM praxis_journal WHERE user_id = ?1 AND deleted = 0");
     let mut args: Vec<Box<dyn rusqlite::ToSql>> = vec![Box::new(user_id.to_string())];
 
     if let Some(date) = q.date.as_deref().filter(|s| !s.is_empty()) {
@@ -144,7 +142,10 @@ pub fn list_journal_impl(
         }
     }
 
-    let limit = q.limit.filter(|n| *n > 0 && *n <= 500).unwrap_or(DEFAULT_LIMIT);
+    let limit = q
+        .limit
+        .filter(|n| *n > 0 && *n <= 500)
+        .unwrap_or(DEFAULT_LIMIT);
     sql.push_str(" ORDER BY entry_date DESC, id DESC");
     args.push(Box::new(limit));
     sql.push_str(&format!(" LIMIT ?{}", args.len()));
@@ -176,7 +177,13 @@ pub fn create_journal_impl(
         "INSERT INTO praxis_journal
            (user_id, entry_date, raw_text, tags, structured, analyzed_at, created_at, updated_at)
          VALUES (?1, ?2, ?3, ?4, '', NULL, ?5, ?5)",
-        params![user_id, &entry_date, &req.raw_text, tags_to_text(&tags), &now],
+        params![
+            user_id,
+            &entry_date,
+            &req.raw_text,
+            tags_to_text(&tags),
+            &now
+        ],
     )
     .map_err(|e| format!("insert: {e}"))?;
 

@@ -1,14 +1,14 @@
 //! `/api/work/stakeholders` - CRUD for stakeholder records.
 
 use axum::{
-    Json,
     extract::{Path, Query, State},
     http::StatusCode,
+    Json,
 };
 use chrono::Utc;
-use rusqlite::{Connection, params};
+use rusqlite::{params, Connection};
 use serde::Deserialize;
-use serde_json::{Map, Value as JsonValue, json};
+use serde_json::{json, Map, Value as JsonValue};
 use tracing::{error, warn};
 
 use crate::auth::UserId;
@@ -366,7 +366,7 @@ pub async fn delete_stakeholder(
 mod tests {
     use super::*;
     use crate::test_helpers::{auth_cookie, create_test_user, test_state};
-    use axum::body::{Body, to_bytes};
+    use axum::body::{to_bytes, Body};
     use axum::http::Request;
     use tower::ServiceExt;
 

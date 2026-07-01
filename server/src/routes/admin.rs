@@ -496,8 +496,14 @@ pub async fn list_users(
     let search = params.get("search").cloned().unwrap_or_default();
     let status_filter = params.get("status").cloned().unwrap_or_default();
     let role_filter = params.get("role").cloned().unwrap_or_default();
-    let sort = params.get("sort").cloned().unwrap_or_else(|| "created_at".into());
-    let order = params.get("order").cloned().unwrap_or_else(|| "desc".into());
+    let sort = params
+        .get("sort")
+        .cloned()
+        .unwrap_or_else(|| "created_at".into());
+    let order = params
+        .get("order")
+        .cloned()
+        .unwrap_or_else(|| "desc".into());
 
     // Build safe ORDER BY
     let sort_col = match sort.as_str() {
@@ -529,7 +535,10 @@ pub async fn list_users(
         Ok(s) => s,
         Err(e) => {
             tracing::warn!("[admin] list_users query error: {}", e);
-            return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"success": false, "error": "内部错误"})));
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"success": false, "error": "内部错误"})),
+            );
         }
     };
 
@@ -553,7 +562,10 @@ pub async fn list_users(
         .map(|rows| rows.filter_map(|r| r.ok()).collect())
         .unwrap_or_default();
 
-    (StatusCode::OK, Json(json!({"success": true, "users": rows})))
+    (
+        StatusCode::OK,
+        Json(json!({"success": true, "users": rows})),
+    )
 }
 
 /// PUT /api/admin/users/{id}/role — owner-only role change
@@ -565,35 +577,58 @@ pub async fn change_role(
 ) -> impl IntoResponse {
     let new_role = req.get("role").and_then(|v| v.as_str()).unwrap_or("");
     if new_role != "admin" && new_role != "user" {
-        return (StatusCode::BAD_REQUEST, Json(json!({"success": false, "message": "角色只能是 admin 或 user"})));
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"success": false, "message": "角色只能是 admin 或 user"})),
+        );
     }
 
     if target_id == owner.0 {
-        return (StatusCode::BAD_REQUEST, Json(json!({"success": false, "message": "不能修改自己的角色"})));
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"success": false, "message": "不能修改自己的角色"})),
+        );
     }
 
     let db = state.db.lock();
 
     // Prevent changing owner's role
     let target_role: String = db
-        .query_row("SELECT role FROM users WHERE id = ?1", [&target_id], |r| r.get(0))
+        .query_row("SELECT role FROM users WHERE id = ?1", [&target_id], |r| {
+            r.get(0)
+        })
         .unwrap_or_default();
     if target_role == "owner" {
-        return (StatusCode::FORBIDDEN, Json(json!({"success": false, "message": "无法修改系统所有者角色"})));
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({"success": false, "message": "无法修改系统所有者角色"})),
+        );
     }
 
     let now = chrono::Utc::now().to_rfc3339();
-    let affected = db.execute(
-        "UPDATE users SET role = ?1, updated_at = ?2 WHERE id = ?3",
-        rusqlite::params![new_role, now, target_id],
-    ).unwrap_or(0);
+    let affected = db
+        .execute(
+            "UPDATE users SET role = ?1, updated_at = ?2 WHERE id = ?3",
+            rusqlite::params![new_role, now, target_id],
+        )
+        .unwrap_or(0);
 
     if affected == 0 {
-        return (StatusCode::NOT_FOUND, Json(json!({"success": false, "message": "用户不存在"})));
+        return (
+            StatusCode::NOT_FOUND,
+            Json(json!({"success": false, "message": "用户不存在"})),
+        );
     }
 
     let details = format!("{}→{}", target_role, new_role);
-    insert_audit_log(&db, &owner.0, "role_change", Some(&target_id), None, Some(&details));
+    insert_audit_log(
+        &db,
+        &owner.0,
+        "role_change",
+        Some(&target_id),
+        None,
+        Some(&details),
+    );
 
     (StatusCode::OK, Json(json!({"success": true})))
 }
@@ -606,12 +641,23 @@ pub async fn force_logout(
 ) -> impl IntoResponse {
     let db = state.db.lock();
 
-    let deleted = db.execute("DELETE FROM sessions WHERE user_id = ?1", [&target_id])
+    let deleted = db
+        .execute("DELETE FROM sessions WHERE user_id = ?1", [&target_id])
         .unwrap_or(0);
 
-    insert_audit_log(&db, &admin.0, "force_logout", Some(&target_id), None, Some(&format!("{} sessions", deleted)));
+    insert_audit_log(
+        &db,
+        &admin.0,
+        "force_logout",
+        Some(&target_id),
+        None,
+        Some(&format!("{} sessions", deleted)),
+    );
 
-    (StatusCode::OK, Json(json!({"success": true, "deleted_sessions": deleted})))
+    (
+        StatusCode::OK,
+        Json(json!({"success": true, "deleted_sessions": deleted})),
+    )
 }
 
 /// POST /api/admin/users/{id}/suspend
@@ -624,10 +670,15 @@ pub async fn suspend_user(
 
     // Prevent suspending owner
     let target_role: String = db
-        .query_row("SELECT role FROM users WHERE id = ?1", [&target_id], |r| r.get(0))
+        .query_row("SELECT role FROM users WHERE id = ?1", [&target_id], |r| {
+            r.get(0)
+        })
         .unwrap_or_default();
     if target_role == "owner" {
-        return (StatusCode::FORBIDDEN, Json(json!({"success": false, "message": "无法封禁系统所有者"})));
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({"success": false, "message": "无法封禁系统所有者"})),
+        );
     }
 
     let now = chrono::Utc::now().to_rfc3339();
@@ -637,15 +688,22 @@ pub async fn suspend_user(
     ).unwrap_or(0);
 
     if affected == 0 {
-        return (StatusCode::NOT_FOUND, Json(json!({"success": false, "message": "用户不存在或非活跃状态"})));
+        return (
+            StatusCode::NOT_FOUND,
+            Json(json!({"success": false, "message": "用户不存在或非活跃状态"})),
+        );
     }
 
     // Invalidate sessions
-    db.execute("DELETE FROM sessions WHERE user_id = ?1", [&target_id]).ok();
+    db.execute("DELETE FROM sessions WHERE user_id = ?1", [&target_id])
+        .ok();
 
     insert_audit_log(&db, &admin.0, "suspend_user", Some(&target_id), None, None);
 
-    (StatusCode::OK, Json(json!({"success": true, "message": "已封禁用户"})))
+    (
+        StatusCode::OK,
+        Json(json!({"success": true, "message": "已封禁用户"})),
+    )
 }
 
 // ===== Conversation Monitor =====
@@ -659,8 +717,14 @@ pub async fn conversation_user_summary(
     let _ = admin;
     let db = state.db.lock();
 
-    let date_from = params.get("date_from").cloned().unwrap_or_else(|| "2000-01-01".into());
-    let date_to = params.get("date_to").cloned().unwrap_or_else(|| "2099-12-31".into());
+    let date_from = params
+        .get("date_from")
+        .cloned()
+        .unwrap_or_else(|| "2000-01-01".into());
+    let date_to = params
+        .get("date_to")
+        .cloned()
+        .unwrap_or_else(|| "2099-12-31".into());
 
     let mut stmt = match db.prepare(
         "SELECT c.user_id, COALESCE(u.display_name, u.username) as user_name,
@@ -695,7 +759,10 @@ pub async fn conversation_user_summary(
         .map(|rows| rows.filter_map(|r| r.ok()).collect())
         .unwrap_or_default();
 
-    (StatusCode::OK, Json(json!({"success": true, "users": users})))
+    (
+        StatusCode::OK,
+        Json(json!({"success": true, "users": users})),
+    )
 }
 
 /// GET /api/admin/conversations — paginated list
@@ -708,10 +775,22 @@ pub async fn list_conversations(
     let db = state.db.lock();
 
     let user_id_filter = params.get("user_id").cloned().unwrap_or_default();
-    let date_from = params.get("date_from").cloned().unwrap_or_else(|| "2000-01-01".into());
-    let date_to = params.get("date_to").cloned().unwrap_or_else(|| "2099-12-31".into());
-    let limit: i64 = params.get("limit").and_then(|v| v.parse().ok()).unwrap_or(20);
-    let offset: i64 = params.get("offset").and_then(|v| v.parse().ok()).unwrap_or(0);
+    let date_from = params
+        .get("date_from")
+        .cloned()
+        .unwrap_or_else(|| "2000-01-01".into());
+    let date_to = params
+        .get("date_to")
+        .cloned()
+        .unwrap_or_else(|| "2099-12-31".into());
+    let limit: i64 = params
+        .get("limit")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(20);
+    let offset: i64 = params
+        .get("offset")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0);
 
     let mut stmt = match db.prepare(
         "SELECT c.id, c.title, c.user_id, COALESCE(u.display_name, u.username) as user_name,
@@ -733,31 +812,39 @@ pub async fn list_conversations(
     };
 
     let rows: Vec<serde_json::Value> = stmt
-        .query_map(rusqlite::params![user_id_filter, date_from, date_to, limit, offset], |r| {
-            Ok(json!({
-                "id": r.get::<_, String>(0)?,
-                "title": r.get::<_, Option<String>>(1)?,
-                "user_id": r.get::<_, String>(2)?,
-                "user_name": r.get::<_, String>(3)?,
-                "message_count": r.get::<_, i64>(4)?,
-                "token_sum": r.get::<_, i64>(5)?,
-                "created_at": r.get::<_, String>(6)?,
-                "updated_at": r.get::<_, String>(7)?
-            }))
-        })
+        .query_map(
+            rusqlite::params![user_id_filter, date_from, date_to, limit, offset],
+            |r| {
+                Ok(json!({
+                    "id": r.get::<_, String>(0)?,
+                    "title": r.get::<_, Option<String>>(1)?,
+                    "user_id": r.get::<_, String>(2)?,
+                    "user_name": r.get::<_, String>(3)?,
+                    "message_count": r.get::<_, i64>(4)?,
+                    "token_sum": r.get::<_, i64>(5)?,
+                    "created_at": r.get::<_, String>(6)?,
+                    "updated_at": r.get::<_, String>(7)?
+                }))
+            },
+        )
         .map(|rows| rows.filter_map(|r| r.ok()).collect())
         .unwrap_or_default();
 
     // Total count for pagination
-    let total: i64 = db.query_row(
-        "SELECT COUNT(*) FROM conversations c
+    let total: i64 = db
+        .query_row(
+            "SELECT COUNT(*) FROM conversations c
          WHERE (c.user_id = ?1 OR ?1 = '')
            AND c.updated_at >= ?2 AND c.updated_at <= ?3 || 'T23:59:59'",
-        rusqlite::params![user_id_filter, date_from, date_to],
-        |r| r.get(0),
-    ).unwrap_or(0);
+            rusqlite::params![user_id_filter, date_from, date_to],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
 
-    (StatusCode::OK, Json(json!({"success": true, "conversations": rows, "total": total})))
+    (
+        StatusCode::OK,
+        Json(json!({"success": true, "conversations": rows, "total": total})),
+    )
 }
 
 /// GET /api/admin/conversations/{id}/messages
@@ -772,12 +859,15 @@ pub async fn get_conversation_messages(
     let mut stmt = match db.prepare(
         "SELECT id, role, content_text, token_count, created_at
          FROM chat_messages WHERE conversation_id = ?1
-         ORDER BY created_at ASC"
+         ORDER BY created_at ASC",
     ) {
         Ok(s) => s,
         Err(e) => {
             tracing::warn!("[admin] get_messages error: {}", e);
-            return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"success": false, "error": "内部错误"})));
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"success": false, "error": "内部错误"})),
+            );
         }
     };
 
@@ -803,27 +893,31 @@ pub async fn get_conversation_messages(
         })
         .unwrap_or_default();
 
-    (StatusCode::OK, Json(json!({
-        "success": true,
-        "messages": messages,
-        "has_security_events": !flagged_ids.is_empty(),
-        "security_event_ids": flagged_ids
-    })))
+    (
+        StatusCode::OK,
+        Json(json!({
+            "success": true,
+            "messages": messages,
+            "has_security_events": !flagged_ids.is_empty(),
+            "security_event_ids": flagged_ids
+        })),
+    )
 }
 
 // ===== AI Dashboard =====
 
 /// GET /api/admin/ai-usage — token consumption by model and period
-pub async fn ai_usage(
-    State(state): State<AppState>,
-    admin: AdminUserId,
-) -> impl IntoResponse {
+pub async fn ai_usage(State(state): State<AppState>, admin: AdminUserId) -> impl IntoResponse {
     let _ = admin;
     let db = state.db.lock();
 
     let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
-    let week_ago = (chrono::Utc::now() - chrono::Duration::days(7)).format("%Y-%m-%d").to_string();
-    let month_ago = (chrono::Utc::now() - chrono::Duration::days(30)).format("%Y-%m-%d").to_string();
+    let week_ago = (chrono::Utc::now() - chrono::Duration::days(7))
+        .format("%Y-%m-%d")
+        .to_string();
+    let month_ago = (chrono::Utc::now() - chrono::Duration::days(30))
+        .format("%Y-%m-%d")
+        .to_string();
 
     // By model and period
     let query_model_period = |model: &str, since: &str| -> serde_json::Value {
@@ -831,16 +925,23 @@ pub async fn ai_usage(
             "SELECT COUNT(*), COALESCE(SUM(input_tokens),0), COALESCE(SUM(output_tokens),0)
              FROM chat_usage_log WHERE model LIKE '%' || ?1 || '%' AND created_at >= ?2",
             rusqlite::params![model, since],
-            |r| Ok(json!({
-                "messages": r.get::<_, i64>(0)?,
-                "input_tokens": r.get::<_, i64>(1)?,
-                "output_tokens": r.get::<_, i64>(2)?
-            })),
-        ).unwrap_or_else(|_| json!({"messages":0,"input_tokens":0,"output_tokens":0}))
+            |r| {
+                Ok(json!({
+                    "messages": r.get::<_, i64>(0)?,
+                    "input_tokens": r.get::<_, i64>(1)?,
+                    "output_tokens": r.get::<_, i64>(2)?
+                }))
+            },
+        )
+        .unwrap_or_else(|_| json!({"messages":0,"input_tokens":0,"output_tokens":0}))
     };
 
     let models = ["claude"];
-    let periods = [("today", today.as_str()), ("week", week_ago.as_str()), ("month", month_ago.as_str())];
+    let periods = [
+        ("today", today.as_str()),
+        ("week", week_ago.as_str()),
+        ("month", month_ago.as_str()),
+    ];
 
     let mut by_model = json!({});
     for model in &models {
@@ -868,7 +969,7 @@ pub async fn ai_usage(
          FROM users u LEFT JOIN chat_usage_log c ON c.user_id = u.id
          GROUP BY u.id
          HAVING COUNT(c.id) > 0
-         ORDER BY (COALESCE(SUM(c.input_tokens),0)+COALESCE(SUM(c.output_tokens),0)) DESC"
+         ORDER BY (COALESCE(SUM(c.input_tokens),0)+COALESCE(SUM(c.output_tokens),0)) DESC",
     ) {
         if let Ok(rows) = stmt.query_map([], |r| {
             Ok(json!({
@@ -888,19 +989,19 @@ pub async fn ai_usage(
         }
     }
 
-    (StatusCode::OK, Json(json!({
-        "success": true,
-        "by_model": by_model,
-        "totals": totals,
-        "per_user": per_user
-    })))
+    (
+        StatusCode::OK,
+        Json(json!({
+            "success": true,
+            "by_model": by_model,
+            "totals": totals,
+            "per_user": per_user
+        })),
+    )
 }
 
 /// GET /api/admin/ai-usage/providers — provider config status
-pub async fn ai_providers(
-    State(state): State<AppState>,
-    admin: AdminUserId,
-) -> impl IntoResponse {
+pub async fn ai_providers(State(state): State<AppState>, admin: AdminUserId) -> impl IntoResponse {
     let _ = (state, admin);
 
     let providers = json!([
@@ -911,7 +1012,10 @@ pub async fn ai_providers(
         }
     ]);
 
-    (StatusCode::OK, Json(json!({"success": true, "providers": providers})))
+    (
+        StatusCode::OK,
+        Json(json!({"success": true, "providers": providers})),
+    )
 }
 
 // ===== Enhanced Security Events =====
@@ -928,8 +1032,14 @@ pub async fn security_events_v2(
     let severity = params.get("severity").cloned().unwrap_or_default();
     let event_type = params.get("event_type").cloned().unwrap_or_default();
     let user_id_filter = params.get("user_id").cloned().unwrap_or_default();
-    let limit: i64 = params.get("limit").and_then(|v| v.parse().ok()).unwrap_or(50);
-    let offset: i64 = params.get("offset").and_then(|v| v.parse().ok()).unwrap_or(0);
+    let limit: i64 = params
+        .get("limit")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(50);
+    let offset: i64 = params
+        .get("offset")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0);
 
     let mut stmt = match db.prepare(
         "SELECT se.id, se.user_id, COALESCE(u.display_name, u.username) as user_name,
@@ -950,19 +1060,22 @@ pub async fn security_events_v2(
     };
 
     let rows: Vec<serde_json::Value> = stmt
-        .query_map(rusqlite::params![severity, event_type, user_id_filter, limit, offset], |r| {
-            Ok(json!({
-                "id": r.get::<_, String>(0)?,
-                "user_id": r.get::<_, String>(1)?,
-                "user_name": r.get::<_, String>(2)?,
-                "event_type": r.get::<_, String>(3)?,
-                "severity": r.get::<_, String>(4)?,
-                "description": r.get::<_, String>(5)?,
-                "conversation_id": r.get::<_, Option<String>>(6)?,
-                "admin_notified": r.get::<_, i64>(7)?,
-                "created_at": r.get::<_, String>(8)?
-            }))
-        })
+        .query_map(
+            rusqlite::params![severity, event_type, user_id_filter, limit, offset],
+            |r| {
+                Ok(json!({
+                    "id": r.get::<_, String>(0)?,
+                    "user_id": r.get::<_, String>(1)?,
+                    "user_name": r.get::<_, String>(2)?,
+                    "event_type": r.get::<_, String>(3)?,
+                    "severity": r.get::<_, String>(4)?,
+                    "description": r.get::<_, String>(5)?,
+                    "conversation_id": r.get::<_, Option<String>>(6)?,
+                    "admin_notified": r.get::<_, i64>(7)?,
+                    "created_at": r.get::<_, String>(8)?
+                }))
+            },
+        )
         .map(|rows| rows.filter_map(|r| r.ok()).collect())
         .unwrap_or_default();
 
@@ -972,7 +1085,7 @@ pub async fn security_events_v2(
             "SELECT se.user_id, COALESCE(u.display_name, u.username), COUNT(*), MAX(se.created_at)
              FROM security_events se JOIN users u ON u.id = se.user_id
              GROUP BY se.user_id HAVING COUNT(*) >= 3
-             ORDER BY COUNT(*) DESC"
+             ORDER BY COUNT(*) DESC",
         )
         .and_then(|mut s| {
             s.query_map([], |r| {
@@ -1003,12 +1116,15 @@ pub async fn security_events_v2(
         })
         .unwrap_or_default();
 
-    (StatusCode::OK, Json(json!({
-        "success": true,
-        "events": rows,
-        "risk_users": risk_users,
-        "suspended_users": suspended
-    })))
+    (
+        StatusCode::OK,
+        Json(json!({
+            "success": true,
+            "events": rows,
+            "risk_users": risk_users,
+            "suspended_users": suspended
+        })),
+    )
 }
 
 /// POST /api/admin/security-events/{id}/review — mark as reviewed
@@ -1019,16 +1135,28 @@ pub async fn review_security_event(
 ) -> impl IntoResponse {
     let db = state.db.lock();
 
-    let affected = db.execute(
-        "UPDATE security_events SET admin_notified = 1 WHERE id = ?1",
-        [&event_id],
-    ).unwrap_or(0);
+    let affected = db
+        .execute(
+            "UPDATE security_events SET admin_notified = 1 WHERE id = ?1",
+            [&event_id],
+        )
+        .unwrap_or(0);
 
     if affected == 0 {
-        return (StatusCode::NOT_FOUND, Json(json!({"success": false, "message": "事件不存在"})));
+        return (
+            StatusCode::NOT_FOUND,
+            Json(json!({"success": false, "message": "事件不存在"})),
+        );
     }
 
-    insert_audit_log(&db, &admin.0, "review_security_event", None, Some(&event_id), None);
+    insert_audit_log(
+        &db,
+        &admin.0,
+        "review_security_event",
+        None,
+        Some(&event_id),
+        None,
+    );
 
     (StatusCode::OK, Json(json!({"success": true})))
 }
@@ -1036,22 +1164,26 @@ pub async fn review_security_event(
 // ===== System Status =====
 
 /// GET /api/admin/system-status
-pub async fn system_status(
-    State(state): State<AppState>,
-    admin: AdminUserId,
-) -> impl IntoResponse {
+pub async fn system_status(State(state): State<AppState>, admin: AdminUserId) -> impl IntoResponse {
     let _ = admin;
     let db = state.db.lock();
 
     // Table row counts
-    let tables = ["users", "todos", "conversations", "chat_messages", "expense_entries", "trips", "routines", "security_events"];
+    let tables = [
+        "users",
+        "todos",
+        "conversations",
+        "chat_messages",
+        "expense_entries",
+        "trips",
+        "routines",
+        "security_events",
+    ];
     let mut table_counts = json!({});
     for table in &tables {
-        let count: i64 = db.query_row(
-            &format!("SELECT COUNT(*) FROM {}", table),
-            [],
-            |r| r.get(0),
-        ).unwrap_or(0);
+        let count: i64 = db
+            .query_row(&format!("SELECT COUNT(*) FROM {}", table), [], |r| r.get(0))
+            .unwrap_or(0);
         table_counts[*table] = json!(count);
     }
 
@@ -1060,39 +1192,51 @@ pub async fn system_status(
     let db_size = std::fs::metadata(&db_path).map(|m| m.len()).unwrap_or(0);
 
     // Upload storage size
-    let upload_dir = format!("{}/uploads", std::env::var("DATA_DIR").unwrap_or_else(|_| "data".into()));
+    let upload_dir = format!(
+        "{}/uploads",
+        std::env::var("DATA_DIR").unwrap_or_else(|_| "data".into())
+    );
     let (upload_files, upload_size) = count_dir_size(&upload_dir);
 
     // Recent errors
-    let errors_24h: i64 = db.query_row(
-        "SELECT COUNT(*) FROM client_errors WHERE created_at >= datetime('now', '-1 day')",
-        [], |r| r.get(0),
-    ).unwrap_or(0);
-    let errors_7d: i64 = db.query_row(
-        "SELECT COUNT(*) FROM client_errors WHERE created_at >= datetime('now', '-7 days')",
-        [], |r| r.get(0),
-    ).unwrap_or(0);
+    let errors_24h: i64 = db
+        .query_row(
+            "SELECT COUNT(*) FROM client_errors WHERE created_at >= datetime('now', '-1 day')",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+    let errors_7d: i64 = db
+        .query_row(
+            "SELECT COUNT(*) FROM client_errors WHERE created_at >= datetime('now', '-7 days')",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
 
     // Uptime
     let uptime_secs = state.start_time.elapsed().as_secs();
 
-    (StatusCode::OK, Json(json!({
-        "success": true,
-        "version": env!("CARGO_PKG_VERSION"),
-        "uptime_secs": uptime_secs,
-        "database": {
-            "file_size": db_size,
-            "tables": table_counts
-        },
-        "storage": {
-            "upload_files": upload_files,
-            "upload_size": upload_size
-        },
-        "errors": {
-            "last_24h": errors_24h,
-            "last_7d": errors_7d
-        }
-    })))
+    (
+        StatusCode::OK,
+        Json(json!({
+            "success": true,
+            "version": env!("CARGO_PKG_VERSION"),
+            "uptime_secs": uptime_secs,
+            "database": {
+                "file_size": db_size,
+                "tables": table_counts
+            },
+            "storage": {
+                "upload_files": upload_files,
+                "upload_size": upload_size
+            },
+            "errors": {
+                "last_24h": errors_24h,
+                "last_7d": errors_7d
+            }
+        })),
+    )
 }
 
 fn count_dir_size(path: &str) -> (u64, u64) {
@@ -1100,7 +1244,9 @@ fn count_dir_size(path: &str) -> (u64, u64) {
     let mut size = 0u64;
     if let Ok(entries) = std::fs::read_dir(path) {
         for entry in entries.flatten() {
-            let ft = entry.file_type().unwrap_or_else(|_| entry.file_type().unwrap());
+            let ft = entry
+                .file_type()
+                .unwrap_or_else(|_| entry.file_type().unwrap());
             if ft.is_file() {
                 files += 1;
                 size += entry.metadata().map(|m| m.len()).unwrap_or(0);
@@ -1127,8 +1273,14 @@ pub async fn audit_log(
 
     let admin_filter = params.get("admin_user").cloned().unwrap_or_default();
     let action_filter = params.get("action_type").cloned().unwrap_or_default();
-    let limit: i64 = params.get("limit").and_then(|v| v.parse().ok()).unwrap_or(50);
-    let offset: i64 = params.get("offset").and_then(|v| v.parse().ok()).unwrap_or(0);
+    let limit: i64 = params
+        .get("limit")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(50);
+    let offset: i64 = params
+        .get("offset")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0);
 
     let mut stmt = match db.prepare(
         "SELECT a.id, a.admin_user_id, COALESCE(u.display_name, u.username) as admin_name,
@@ -1141,33 +1293,42 @@ pub async fn audit_log(
          WHERE (a.admin_user_id = ?1 OR ?1 = '')
            AND (a.action_type = ?2 OR ?2 = '')
          ORDER BY a.created_at DESC
-         LIMIT ?3 OFFSET ?4"
+         LIMIT ?3 OFFSET ?4",
     ) {
         Ok(s) => s,
         Err(e) => {
             tracing::warn!("[admin] audit_log error: {}", e);
-            return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"success": false, "error": "内部错误"})));
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"success": false, "error": "内部错误"})),
+            );
         }
     };
 
     let rows: Vec<serde_json::Value> = stmt
-        .query_map(rusqlite::params![admin_filter, action_filter, limit, offset], |r| {
-            Ok(json!({
-                "id": r.get::<_, String>(0)?,
-                "admin_user_id": r.get::<_, String>(1)?,
-                "admin_name": r.get::<_, String>(2)?,
-                "action_type": r.get::<_, String>(3)?,
-                "target_user_id": r.get::<_, Option<String>>(4)?,
-                "target_name": r.get::<_, Option<String>>(5)?,
-                "target_resource": r.get::<_, Option<String>>(6)?,
-                "details": r.get::<_, Option<String>>(7)?,
-                "created_at": r.get::<_, String>(8)?
-            }))
-        })
+        .query_map(
+            rusqlite::params![admin_filter, action_filter, limit, offset],
+            |r| {
+                Ok(json!({
+                    "id": r.get::<_, String>(0)?,
+                    "admin_user_id": r.get::<_, String>(1)?,
+                    "admin_name": r.get::<_, String>(2)?,
+                    "action_type": r.get::<_, String>(3)?,
+                    "target_user_id": r.get::<_, Option<String>>(4)?,
+                    "target_name": r.get::<_, Option<String>>(5)?,
+                    "target_resource": r.get::<_, Option<String>>(6)?,
+                    "details": r.get::<_, Option<String>>(7)?,
+                    "created_at": r.get::<_, String>(8)?
+                }))
+            },
+        )
         .map(|rows| rows.filter_map(|r| r.ok()).collect())
         .unwrap_or_default();
 
-    (StatusCode::OK, Json(json!({"success": true, "entries": rows})))
+    (
+        StatusCode::OK,
+        Json(json!({"success": true, "entries": rows})),
+    )
 }
 
 // ═══════════════════════════════════════════
@@ -1216,7 +1377,10 @@ pub async fn list_people(
         .map(|rows| rows.filter_map(|r| r.ok()).collect())
         .unwrap_or_default();
 
-    (StatusCode::OK, Json(json!({"success": true, "people": rows})))
+    (
+        StatusCode::OK,
+        Json(json!({"success": true, "people": rows})),
+    )
 }
 
 /// POST /api/admin/people
@@ -1229,23 +1393,45 @@ pub async fn create_person(
 
     let user_id = match body["user_id"].as_str() {
         Some(u) if !u.is_empty() => u,
-        _ => return (StatusCode::BAD_REQUEST, Json(json!({"success": false, "error": "user_id is required"}))),
+        _ => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"success": false, "error": "user_id is required"})),
+            )
+        }
     };
     let name = match body["name"].as_str() {
         Some(n) if !n.trim().is_empty() => n.trim(),
-        _ => return (StatusCode::BAD_REQUEST, Json(json!({"success": false, "error": "name is required"}))),
+        _ => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"success": false, "error": "name is required"})),
+            )
+        }
     };
     let relationship = match body["relationship"].as_str() {
         Some(r) if !r.trim().is_empty() => r.trim(),
-        _ => return (StatusCode::BAD_REQUEST, Json(json!({"success": false, "error": "relationship is required"}))),
+        _ => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"success": false, "error": "relationship is required"})),
+            )
+        }
     };
 
     // Check limit
     let count: i64 = db
-        .query_row("SELECT COUNT(*) FROM ergou_people WHERE user_id=?1", [user_id], |r| r.get(0))
+        .query_row(
+            "SELECT COUNT(*) FROM ergou_people WHERE user_id=?1",
+            [user_id],
+            |r| r.get(0),
+        )
         .unwrap_or(0);
     if count >= 20 {
-        return (StatusCode::BAD_REQUEST, Json(json!({"success": false, "error": "每个用户最多20个人物"})));
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"success": false, "error": "每个用户最多20个人物"})),
+        );
     }
 
     // Dedup
@@ -1257,7 +1443,10 @@ pub async fn create_person(
         )
         .unwrap_or(false);
     if exists {
-        return (StatusCode::BAD_REQUEST, Json(json!({"success": false, "error": format!("已存在名为 {} 的人物", name)})));
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"success": false, "error": format!("已存在名为 {} 的人物", name)})),
+        );
     }
 
     let id = uuid::Uuid::new_v4().to_string()[..8].to_string();
@@ -1298,12 +1487,18 @@ pub async fn update_person(
     // Name dedup check
     if let Some(ref new_name) = name {
         // Get user_id for this person
-        let user_id: String = match db.query_row(
-            "SELECT user_id FROM ergou_people WHERE id=?1", [&id], |r| r.get(0),
-        ) {
-            Ok(u) => u,
-            Err(_) => return (StatusCode::NOT_FOUND, Json(json!({"success": false, "error": "人物不存在"}))),
-        };
+        let user_id: String =
+            match db.query_row("SELECT user_id FROM ergou_people WHERE id=?1", [&id], |r| {
+                r.get(0)
+            }) {
+                Ok(u) => u,
+                Err(_) => {
+                    return (
+                        StatusCode::NOT_FOUND,
+                        Json(json!({"success": false, "error": "人物不存在"})),
+                    )
+                }
+            };
         let dup: bool = db
             .query_row(
                 "SELECT COUNT(*) > 0 FROM ergou_people WHERE user_id=?1 AND name=?2 AND id!=?3",
@@ -1312,7 +1507,10 @@ pub async fn update_person(
             )
             .unwrap_or(false);
         if dup {
-            return (StatusCode::BAD_REQUEST, Json(json!({"success": false, "error": format!("已存在名为 {} 的人物", new_name)})));
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"success": false, "error": format!("已存在名为 {} 的人物", new_name)})),
+            );
         }
     }
 
@@ -1338,11 +1536,17 @@ pub async fn delete_person(
     let db = state.db.lock();
 
     match db.execute("DELETE FROM ergou_people WHERE id=?1", [&id]) {
-        Ok(0) => (StatusCode::NOT_FOUND, Json(json!({"success": false, "error": "人物不存在"}))),
+        Ok(0) => (
+            StatusCode::NOT_FOUND,
+            Json(json!({"success": false, "error": "人物不存在"})),
+        ),
         Ok(_) => (StatusCode::OK, Json(json!({"success": true}))),
         Err(e) => {
             tracing::warn!("[admin] delete_person error: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"success": false, "error": "删除失败"})))
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"success": false, "error": "删除失败"})),
+            )
         }
     }
 }
@@ -1387,9 +1591,9 @@ pub async fn migrate_todo_content(
     }
     let mut rows_vec: Vec<WorkTaskRow> = Vec::new();
     {
-        let mut stmt = match db.prepare(
-            "SELECT id, title, desc FROM work_tasks WHERE user_id = ?1 AND deleted = 0",
-        ) {
+        let mut stmt = match db
+            .prepare("SELECT id, title, desc FROM work_tasks WHERE user_id = ?1 AND deleted = 0")
+        {
             Ok(s) => s,
             Err(e) => {
                 tracing::error!("[migrate-todo-content] prepare wt: {}", e);
@@ -1453,7 +1657,8 @@ pub async fn migrate_todo_content(
             skipped_no_todo += 1;
             tracing::info!(
                 "[migrate-todo-content] skip wt_id={} title={:?}: no matching todo",
-                row.id, row.title
+                row.id,
+                row.title
             );
             continue;
         }
@@ -1461,7 +1666,9 @@ pub async fn migrate_todo_content(
             skipped_multi_match += 1;
             tracing::warn!(
                 "[migrate-todo-content] skip wt_id={} title={:?}: {} todos match (ambiguous)",
-                row.id, row.title, todos_content.len()
+                row.id,
+                row.title,
+                todos_content.len()
             );
             continue;
         }
@@ -1470,7 +1677,8 @@ pub async fn migrate_todo_content(
             skipped_empty_content += 1;
             tracing::info!(
                 "[migrate-todo-content] skip wt_id={} title={:?}: todo.content empty",
-                row.id, row.title
+                row.id,
+                row.title
             );
             continue;
         }
@@ -1479,7 +1687,9 @@ pub async fn migrate_todo_content(
             backfilled += 1;
             tracing::info!(
                 "[migrate-todo-content] [DRY-RUN] would backfill wt_id={} title={:?} ({} chars)",
-                row.id, row.title, content.chars().count()
+                row.id,
+                row.title,
+                content.chars().count()
             );
             continue;
         }
@@ -1492,20 +1702,24 @@ pub async fn migrate_todo_content(
                 backfilled += 1;
                 tracing::info!(
                     "[migrate-todo-content] backfilled wt_id={} title={:?} ({} chars)",
-                    row.id, row.title, content.chars().count()
+                    row.id,
+                    row.title,
+                    content.chars().count()
                 );
             }
             Err(e) => {
                 tracing::warn!(
                     "[migrate-todo-content] update failed wt_id={}: {}",
-                    row.id, e
+                    row.id,
+                    e
                 );
             }
         }
     }
 
     // 写 audit log 留痕(dry_run 也记,便于追溯演练)
-    let summary = format!(
+    let summary =
+        format!(
         "{}scanned={} backfilled={} already_has_desc={} multi_match={} no_todo={} empty_content={}",
         if dry_run { "[DRY-RUN] " } else { "" },
         scanned, backfilled, skipped_already_has_desc,
@@ -1514,7 +1728,11 @@ pub async fn migrate_todo_content(
     insert_audit_log(
         &db,
         &user_id,
-        if dry_run { "migrate_todo_content_dry_run" } else { "migrate_todo_content" },
+        if dry_run {
+            "migrate_todo_content_dry_run"
+        } else {
+            "migrate_todo_content"
+        },
         None,
         Some("work_tasks"),
         Some(&summary),
@@ -1573,9 +1791,9 @@ pub async fn migrate_insight_v0_3(
     }
     let mut insights: Vec<OldInsight> = Vec::new();
     {
-        let mut stmt = match db.prepare(
-            "SELECT id, topic, template FROM insights WHERE user_id = ?1 AND deleted = 0",
-        ) {
+        let mut stmt = match db
+            .prepare("SELECT id, topic, template FROM insights WHERE user_id = ?1 AND deleted = 0")
+        {
             Ok(s) => s,
             Err(e) => {
                 tracing::error!("[migrate-insight-v0.3] prepare insights: {}", e);
@@ -1725,7 +1943,9 @@ pub async fn migrate_insight_v0_3(
         migrated += 1;
         tracing::info!(
             "[migrate-insight-v0.3] insight #{} → task #{} ({} reports)",
-            ins.id, new_task_id, reports.len()
+            ins.id,
+            new_task_id,
+            reports.len()
         );
     }
 
@@ -1775,8 +1995,11 @@ mod migrate_tests {
         // 显式确保 role=owner
         {
             let db = state.db.lock();
-            db.execute("UPDATE users SET role = 'owner' WHERE id = ?1", rusqlite::params![&uid])
-                .unwrap();
+            db.execute(
+                "UPDATE users SET role = 'owner' WHERE id = ?1",
+                rusqlite::params![&uid],
+            )
+            .unwrap();
         }
         let cookie = auth_cookie(&token);
         (state, uid, cookie)

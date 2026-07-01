@@ -1,18 +1,18 @@
 //! `/api/work/stakeholder-columns` - per-user column schema for stakeholders.
 
 use axum::{
-    Json,
     extract::{Path, State},
     http::StatusCode,
+    Json,
 };
-use rusqlite::{Connection, params};
-use serde_json::{Value as JsonValue, json};
+use rusqlite::{params, Connection};
+use serde_json::{json, Value as JsonValue};
 use tracing::{error, warn};
 
 use crate::auth::UserId;
 use crate::models::stakeholder_column::{
-    BatchSaveStakeholderColumnsRequest, CreateStakeholderColumnRequest, StakeholderColumn,
-    builtin_seed,
+    builtin_seed, BatchSaveStakeholderColumnsRequest, CreateStakeholderColumnRequest,
+    StakeholderColumn,
 };
 use crate::state::AppState;
 
@@ -305,7 +305,7 @@ pub async fn delete_column(
 mod tests {
     use super::*;
     use crate::test_helpers::{auth_cookie, create_test_user, test_state};
-    use axum::body::{Body, to_bytes};
+    use axum::body::{to_bytes, Body};
     use axum::http::Request;
     use tower::ServiceExt;
 
@@ -416,12 +416,10 @@ mod tests {
             .await
             .unwrap();
         let j = body_json(resp).await;
-        assert!(
-            j["items"][0]["customFields"]
-                .as_object()
-                .unwrap()
-                .is_empty()
-        );
+        assert!(j["items"][0]["customFields"]
+            .as_object()
+            .unwrap()
+            .is_empty());
     }
 
     #[tokio::test]
