@@ -1383,6 +1383,7 @@ async fn test_soul_prompt_building() {
     );
 
     // Check soul state values are injected into the prompt.
+    // (合并保留 main 的生产灵魂 prompt 格式：数值注入；dev 的语义段断言与合并后实际输出不符，已去除)
     assert!(prompt.contains("85%"), "Classical ratio should be present");
     assert!(prompt.contains("70%"), "Warmth should be present");
     assert!(

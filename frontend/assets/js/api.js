@@ -658,6 +658,49 @@ var API = (function() {
         stakeholderDeleteColumn: async function(key) {
             return await request('DELETE', '/work/stakeholder-columns/' + encodeURIComponent(key));
         },
+        praxisContactList: async function() {
+            return await request('GET', '/praxis/contacts');
+        },
+        praxisContactCreate: async function(data) {
+            return await request('POST', '/praxis/contacts', data);
+        },
+        praxisContactUpdate: async function(id, patch) {
+            return await request('PATCH', '/praxis/contacts/' + encodeURIComponent(id), patch);
+        },
+        praxisContactDelete: async function(id) {
+            return await request('DELETE', '/praxis/contacts/' + encodeURIComponent(id));
+        },
+        // ===== Praxis 关系人交流记录 v0.2 (T-287) =====
+        praxisContactLogList: async function(contactId) {
+            return await request('GET', '/praxis/contacts/' + encodeURIComponent(contactId) + '/logs');
+        },
+        praxisContactLogCreate: async function(contactId, data) {
+            return await request('POST', '/praxis/contacts/' + encodeURIComponent(contactId) + '/logs', data);
+        },
+
+        // ===== Praxis 今日经营记录 v0.2 (T-285) =====
+        praxisJournalList: async function(params) {
+            var q = '';
+            if (params) {
+                Object.keys(params).forEach(function(k) {
+                    if (params[k] === undefined || params[k] === null || params[k] === '') return;
+                    q += (q ? '&' : '?') + encodeURIComponent(k) + '=' + encodeURIComponent(params[k]);
+                });
+            }
+            return await request('GET', '/praxis/journal' + q);
+        },
+        praxisJournalCreate: async function(data) {
+            return await request('POST', '/praxis/journal', data);
+        },
+        praxisJournalUpdate: async function(id, patch) {
+            return await request('PATCH', '/praxis/journal/' + encodeURIComponent(id), patch);
+        },
+        praxisJournalDelete: async function(id) {
+            return await request('DELETE', '/praxis/journal/' + encodeURIComponent(id));
+        },
+        praxisJournalAnalyze: async function(id) {
+            return await request('POST', '/praxis/journal/' + encodeURIComponent(id) + '/analyze');
+        },
 
         // ===== Insight Tasks v0.3 (T-122 后端 / T-123 前端) =====
         // 单层 insight_task。claim / create-report 由 Claude Code 调,前端不用。

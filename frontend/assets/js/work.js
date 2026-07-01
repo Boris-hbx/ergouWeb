@@ -21,23 +21,41 @@ var Work = (function() {
     var _renderFrozen = false; // T-103 B.3:完成动画期间冻结 render,避免动画被打断
     var _searchQuery = '';     // T-130:全局搜索词(已 trim + lowercase),跨 5 视图;空 = 不过滤
     var _searchTimer = null;   // T-130:debounce 150ms 计时器
+    // Future Praxis APIs must use AdminUserId; this front-end gate is UX only.
+    var WIP_FEATURES = {
+        'work.praxis': {
+            name: 'praxis',
+            cardId: 'work-praxis-card',
+            viewId: 'work-praxis-view',
+            unlockedRoles: ['owner', 'admin'],
+            lockedHint: '请联系管理员 Boris'
+        }
+    };
 
     // ============ 生命周期 ============
     function init() {
+        refreshFeatureGates();
         // 从 localStorage 恢复最后打开的子功能
         var last = localStorage.getItem('work_feature');
         if (last === 'stakeholder' && typeof Stakeholder !== 'undefined') Stakeholder.openFeature();
+        else if (last === 'insight' && typeof Insight !== 'undefined') Insight.openHub();
+        else if (last === 'insight_factory' && typeof InsightFactory !== 'undefined') InsightFactory.openHub();
+        else if (last === 'done' && typeof WorkDone !== 'undefined') WorkDone.openFeature();
         else if (last === 'table') openFeature('table');
+        else if (last === 'praxis' || last === 'compound' || last === 'iteration') openWipFeature('work.praxis', { restore: true });
         else showHub();
     }
 
     function showHub() {
         _feature = null;
         localStorage.removeItem('work_feature');
+        refreshFeatureGates();
         var hub = document.getElementById('work-hub');
         var tableView = document.getElementById('work-table-view');
+        var praxisView = document.getElementById('work-praxis-view');
         if (hub) hub.style.display = '';
         if (tableView) tableView.style.display = 'none';
+        if (praxisView) praxisView.style.display = 'none';
         // 回 Hub 时一并收起其它子视图(洞察 / 已完成档案),避免导航往返后残留覆盖
         var insView = document.getElementById('work-insight-view');
         var factoryView = document.getElementById('work-insight-factory-view');
@@ -47,6 +65,9 @@ var Work = (function() {
         if (factoryView) factoryView.style.display = 'none';
         if (doneView) doneView.style.display = 'none';
         if (stakeholderView) stakeholderView.style.display = 'none';
+        if (window.location.pathname.indexOf('/insight-factory') === 0) {
+            window.history.pushState(null, '', '/');
+        }
         // T-100:回到 Hub 时关闭详情抽屉(任务表已隐藏,抽屉应一起退场)
         if (typeof WorkDetail !== 'undefined' && WorkDetail.isOpen()) {
             WorkDetail.closeDetail();
@@ -56,9 +77,11 @@ var Work = (function() {
     function openFeature(name) {
         var hub = document.getElementById('work-hub');
         var tableView = document.getElementById('work-table-view');
+        var praxisView = document.getElementById('work-praxis-view');
         var stakeholderView = document.getElementById('stakeholder-view');
         if (hub) hub.style.display = 'none';
         if (tableView) tableView.style.display = 'none';
+        if (praxisView) praxisView.style.display = 'none';
         if (stakeholderView) stakeholderView.style.display = 'none';
 
         if (name === 'table') {
@@ -76,6 +99,50 @@ var Work = (function() {
                 _updateTabIndicator();
             });
         }
+        if (name === 'praxis') {
+            _feature = 'praxis';
+            localStorage.setItem('work_feature', 'praxis');
+            if (praxisView) praxisView.style.display = '';
+            if (window.Praxis && typeof Praxis.open === 'function') {
+                Praxis.open();
+            }
+        }
+    }
+
+    function _currentRole() {
+        return (window._currentUser && window._currentUser.role) ? window._currentUser.role : '';
+    }
+
+    function _isWipUnlocked(cfg) {
+        var role = _currentRole();
+        return cfg.unlockedRoles.indexOf(role) >= 0;
+    }
+
+    function refreshFeatureGates() {
+        Object.keys(WIP_FEATURES).forEach(function(key) {
+            var cfg = WIP_FEATURES[key];
+            var card = document.getElementById(cfg.cardId);
+            if (!card) return;
+            var unlocked = _isWipUnlocked(cfg);
+            card.classList.toggle('life-hub-card-disabled', !unlocked);
+            card.classList.toggle('work-wip-card-locked', !unlocked);
+            card.setAttribute('aria-disabled', unlocked ? 'false' : 'true');
+        });
+    }
+
+    function openWipFeature(key, opts) {
+        var cfg = WIP_FEATURES[key];
+        if (!cfg) return;
+        refreshFeatureGates();
+        if (!_isWipUnlocked(cfg)) {
+            if (opts && opts.restore) {
+                showHub();
+            } else if (typeof showToast === 'function') {
+                showToast(cfg.lockedHint, 'warning');
+            }
+            return;
+        }
+        openFeature(cfg.name);
     }
 
     function openTaskById(taskId) {
@@ -615,6 +682,8 @@ var Work = (function() {
         showHub: showHub,
         cycleChip: cycleChip,
         openFeature: openFeature,
+        openWipFeature: openWipFeature,
+        refreshFeatureGates: refreshFeatureGates,
         openTaskById: openTaskById,
         setView: setView,
         // T-098

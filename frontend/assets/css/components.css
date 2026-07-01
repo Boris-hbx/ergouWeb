@@ -4,6 +4,450 @@
    panels, and interactive elements.
    ============================================ */
 
+/* ========== Clear Management Primitives (T-239) ========== */
+.eg-surface {
+    background: var(--eg-surface);
+    border: 1px solid var(--eg-border);
+    border-radius: var(--eg-radius-xl);
+    box-shadow: var(--eg-shadow-card);
+}
+
+.eg-surface--muted {
+    background: var(--eg-surface-muted);
+}
+
+.eg-surface--raised {
+    background: var(--eg-surface-raised);
+    box-shadow: var(--eg-shadow-raised);
+}
+
+.eg-surface--overlay {
+    background: var(--eg-surface-overlay);
+    border: 1px solid var(--eg-border);
+    box-shadow: var(--eg-shadow-overlay);
+}
+
+.eg-divider {
+    border-color: var(--eg-border-subtle);
+}
+
+.eg-text-strong { color: var(--eg-text-strong); }
+.eg-text-body { color: var(--eg-text-body); }
+.eg-text-muted { color: var(--eg-text-muted); }
+.eg-text-faint { color: var(--eg-text-faint); }
+
+/* ========== Modal / Drawer / Popover Primitives (T-240) ========== */
+.eg-modal-overlay {
+    background: var(--overlay-bg, rgba(28, 27, 31, 0.4));
+    backdrop-filter: blur(2px);
+}
+
+.eg-modal {
+    background: var(--eg-surface-overlay);
+    border: 1px solid var(--eg-border);
+    border-radius: var(--eg-radius-xl);
+    box-shadow: var(--eg-shadow-overlay);
+}
+
+.eg-modal__header {
+    border-bottom: 1px solid var(--eg-border-subtle);
+}
+
+.eg-modal__body {
+    background: var(--eg-surface-overlay);
+}
+
+.eg-modal__footer {
+    border-top: 1px solid var(--eg-border-subtle);
+    background: var(--eg-surface-subtle);
+}
+
+.eg-drawer {
+    background: var(--eg-surface-overlay);
+    border-color: var(--eg-border);
+    box-shadow: var(--eg-shadow-popover);
+}
+
+.eg-popover {
+    background: var(--eg-surface-overlay);
+    border: 1px solid var(--eg-border);
+    border-radius: var(--eg-radius-lg);
+    box-shadow: var(--eg-shadow-popover);
+}
+
+/* ========== Toolbar / Segment Primitives (T-241) ========== */
+.eg-toolbar {
+    display: flex;
+    align-items: center;
+    gap: var(--eg-space-3, 12px);
+    flex-wrap: wrap;
+    margin-bottom: var(--eg-space-4, 16px);
+}
+
+.eg-toolbar__title {
+    margin: 0;
+    color: var(--eg-text-strong, var(--text-primary, #172033));
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 0;
+}
+
+.eg-toolbar__meta {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    padding: 0 10px;
+    border: 1px solid var(--eg-border-subtle, #e8edf4);
+    border-radius: 999px;
+    background: var(--eg-surface-muted, #f7f9fc);
+    color: var(--eg-text-muted, #647084);
+    font-size: var(--eg-font-size-xs, 12px);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.eg-toolbar__search {
+    margin-right: auto;
+}
+
+.eg-toolbar__view {
+    flex: 0 1 auto;
+}
+
+.eg-toolbar__actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--eg-space-2, 8px);
+    flex-wrap: wrap;
+    margin-left: auto;
+}
+
+.eg-toolbar__spacer {
+    flex: 1 1 auto;
+}
+
+.eg-segment {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 3px;
+    border: 1px solid var(--eg-border, #dfe5ee);
+    border-radius: var(--eg-radius-lg, 10px);
+    background: var(--eg-surface-muted, #f7f9fc);
+    overflow: auto;
+    scrollbar-width: none;
+}
+
+.eg-segment::-webkit-scrollbar {
+    display: none;
+}
+
+.eg-segment > button {
+    min-height: 30px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: var(--eg-radius-md, 8px);
+    background: transparent;
+    color: var(--eg-text-body, #475569);
+    font: inherit;
+    font-size: var(--eg-font-size-sm, 13px);
+    font-weight: 650;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background .15s ease, color .15s ease, box-shadow .15s ease;
+}
+
+.eg-segment > button:hover {
+    background: var(--eg-surface, #fff);
+    color: var(--eg-text-strong, #172033);
+}
+
+.eg-segment > button.active,
+.eg-segment > button.selected,
+.eg-segment > button[aria-selected="true"] {
+    background: var(--eg-surface-overlay, #fff);
+    color: var(--primary-color, #315bea);
+    box-shadow: var(--eg-shadow-card, 0 1px 2px rgba(23, 32, 51, .08));
+}
+
+.eg-control-select {
+    min-height: 36px;
+    padding: 0 12px;
+    border: 1px solid var(--eg-border, #dfe5ee);
+    border-radius: var(--eg-radius-md, 8px);
+    background: var(--eg-surface, #fff);
+    color: var(--eg-text-body, #475569);
+    font: inherit;
+    font-size: var(--eg-font-size-sm, 13px);
+    cursor: pointer;
+    box-sizing: border-box;
+}
+
+.eg-control-select:focus {
+    outline: 0;
+    border-color: var(--primary-color, #315bea);
+    box-shadow: var(--eg-focus-ring, 0 0 0 3px rgba(49, 91, 234, .18));
+}
+
+@media (max-width: 760px) {
+    .eg-toolbar {
+        align-items: stretch;
+    }
+
+    .eg-toolbar__search {
+        order: 2;
+        flex: 1 1 100%;
+        margin-right: 0;
+    }
+
+    .eg-toolbar__view {
+        order: 3;
+        max-width: 100%;
+    }
+
+    .eg-toolbar__actions {
+        order: 4;
+        width: 100%;
+        margin-left: 0;
+        justify-content: flex-start;
+    }
+}
+
+/* ========== Table / List / Card Density Primitives (T-242) ========== */
+.eg-table-surface {
+    border: 1px solid var(--eg-border, #dfe5ee);
+    border-radius: var(--eg-radius-lg, 8px);
+    background: var(--eg-surface, #fff);
+    box-shadow: none;
+    overflow: hidden;
+}
+
+.eg-density-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: var(--eg-font-size-sm, 13px);
+}
+
+.eg-density-table th {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--eg-border, #dfe5ee);
+    background: var(--eg-surface-muted, #f7f9fc);
+    color: var(--eg-text-muted, #647084);
+    font-weight: 650;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.eg-density-table td {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--eg-border-subtle, #e8edf4);
+    color: var(--eg-text-body, #475569);
+    vertical-align: middle;
+}
+
+.eg-density-table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+.eg-density-table tbody tr:hover td {
+    background: var(--eg-surface-muted, #f7f9fc);
+}
+
+.eg-repeated-card {
+    border: 1px solid var(--eg-border, #dfe5ee);
+    border-radius: var(--eg-radius-lg, 8px);
+    background: var(--eg-surface, #fff);
+    box-shadow: none;
+}
+
+.eg-repeated-card:hover {
+    border-color: var(--eg-border-strong, #c7d0dd);
+    background: var(--eg-surface-muted, #f7f9fc);
+}
+
+.eg-list-divider {
+    border-color: var(--eg-border-subtle, #e8edf4);
+}
+
+/* ========== Unified Button Language (T-238) ========== */
+.eg-btn {
+    --eg-btn-primary: var(--primary-color, #315bea);
+    --eg-btn-primary-strong: var(--primary-hover, #2346c9);
+    --eg-btn-line: var(--eg-border, var(--border-color, #dfe5ee));
+    --eg-btn-line-strong: var(--eg-border-strong, #c7d0dd);
+    --eg-btn-text: var(--eg-text-strong, var(--text-primary, #172033));
+    --eg-btn-muted: var(--eg-text-body, var(--text-secondary, #647084));
+    --eg-btn-danger: var(--danger-color, #d92d48);
+    --eg-btn-danger-strong: var(--eg-danger-strong, #b4233a);
+    --eg-btn-danger-soft: var(--eg-danger-surface, #fff1f3);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-height: 36px;
+    padding: 0 14px;
+    border: 1px solid var(--eg-btn-line);
+    border-radius: var(--eg-radius-md, 8px);
+    background: var(--eg-surface, #fff);
+    color: var(--eg-btn-text);
+    font: inherit;
+    font-size: var(--eg-font-size-sm, 13px);
+    font-weight: 650;
+    line-height: 1;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    box-sizing: border-box;
+    transition: background .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease, transform .05s ease;
+}
+
+.eg-btn:hover {
+    border-color: var(--eg-btn-line-strong);
+    background: var(--eg-surface-muted, #f8fafc);
+}
+
+.eg-btn:active {
+    transform: translateY(1px);
+}
+
+.eg-btn:focus-visible {
+    outline: 0;
+    box-shadow: var(--eg-focus-ring, 0 0 0 3px rgba(var(--primary-color-rgb, 49, 91, 234), .18));
+}
+
+.eg-btn:disabled,
+.eg-btn[disabled],
+.eg-btn[aria-disabled="true"] {
+    opacity: .52;
+    cursor: not-allowed;
+    pointer-events: none;
+    transform: none;
+}
+
+.eg-btn--primary {
+    border-color: var(--eg-btn-primary);
+    background: var(--eg-btn-primary);
+    color: #fff;
+    box-shadow: var(--eg-shadow-card, 0 1px 2px rgba(23, 32, 51, .08));
+}
+
+.eg-btn--primary:hover {
+    border-color: var(--eg-btn-primary-strong);
+    background: var(--eg-btn-primary-strong);
+}
+
+.eg-btn--secondary {
+    background: var(--eg-surface, #fff);
+    color: var(--eg-btn-text);
+}
+
+.eg-btn--ghost {
+    border-color: transparent;
+    background: transparent;
+    color: var(--eg-btn-muted);
+}
+
+.eg-btn--ghost:hover {
+    border-color: transparent;
+    background: rgba(100, 112, 132, .1);
+    color: var(--eg-btn-text);
+}
+
+.eg-btn--danger {
+    border-color: rgba(217, 45, 72, .38);
+    background: var(--eg-surface, #fff);
+    color: var(--eg-btn-danger);
+}
+
+.eg-btn--danger:hover {
+    border-color: rgba(217, 45, 72, .56);
+    background: var(--eg-btn-danger-soft);
+}
+
+.eg-btn--danger-fill {
+    border-color: var(--eg-btn-danger);
+    background: var(--eg-btn-danger);
+    color: #fff;
+}
+
+.eg-btn--danger-fill:hover {
+    border-color: var(--eg-btn-danger-strong);
+    background: var(--eg-btn-danger-strong);
+}
+
+.eg-btn--sm {
+    min-height: 30px;
+    padding: 0 10px;
+    font-size: var(--eg-font-size-xs, 12px);
+    border-radius: var(--eg-radius-sm, 7px);
+}
+
+.eg-btn--md {
+    min-height: 36px;
+}
+
+.eg-btn--lg {
+    min-height: 42px;
+    padding: 0 18px;
+    font-size: 14px;
+}
+
+.eg-btn--icon {
+    width: 36px;
+    min-width: 36px;
+    padding: 0;
+}
+
+.eg-btn--icon.eg-btn--sm {
+    width: 30px;
+    min-width: 30px;
+}
+
+.eg-btn.is-loading,
+.eg-btn[aria-busy="true"] {
+    cursor: wait;
+}
+
+.eg-btn__spinner {
+    width: 13px;
+    height: 13px;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: eg-btn-spin .75s linear infinite;
+}
+
+@keyframes eg-btn-spin {
+    to { transform: rotate(360deg); }
+}
+
+.eg-actionbar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.eg-actionbar--modal {
+    padding-top: 14px;
+    border-top: 1px solid var(--eg-border-subtle, var(--border-color, #dfe5ee));
+}
+
+@media (max-width: 640px) {
+    .eg-actionbar--modal {
+        flex-direction: column-reverse;
+        align-items: stretch;
+    }
+
+    .eg-actionbar--modal .eg-btn {
+        width: 100%;
+    }
+}
+
 /* ========== Sidebar Anti-Flicker ========== */
 html.sidebar-will-collapse .sidebar {
     transform: translateX(-100%);
@@ -237,8 +681,8 @@ html.sidebar-will-collapse .sidebar-hint {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(4px);
+    background: var(--overlay-bg, rgba(28, 27, 31, 0.4));
+    backdrop-filter: blur(2px);
     z-index: 10000;
     display: flex;
     align-items: center;
@@ -246,18 +690,18 @@ html.sidebar-will-collapse .sidebar-hint {
     animation: fadeIn 0.2s ease;
 }
 .progress-dialog {
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(20px);
-    border-radius: 16px;
+    background: var(--eg-surface-overlay);
+    border: 1px solid var(--eg-border);
+    border-radius: var(--eg-radius-xl);
     padding: 24px;
     min-width: 320px;
     max-width: 90vw;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    box-shadow: var(--eg-shadow-overlay);
     animation: slideUp 0.3s ease;
 }
 [data-theme="dark"] .progress-dialog {
-    background: rgba(30, 30, 40, 0.95);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--eg-surface-overlay);
+    border-color: var(--eg-border);
 }
 /* @keyframes slideUp — moved to base.css */
 .progress-dialog-title {
@@ -273,8 +717,8 @@ html.sidebar-will-collapse .sidebar-hint {
     margin-bottom: 20px;
     text-align: center;
     padding: 8px 12px;
-    background: var(--bg-secondary, #f3f4f6);
-    border-radius: 8px;
+    background: var(--eg-surface-muted, var(--bg-secondary, #f3f4f6));
+    border-radius: var(--eg-radius-md, 8px);
     max-height: 60px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -796,8 +1240,8 @@ html.sidebar-will-collapse .sidebar-hint {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.4);
-    backdrop-filter: blur(4px);
+    background: var(--overlay-bg, rgba(28, 27, 31, 0.4));
+    backdrop-filter: blur(2px);
     z-index: 10000;
     display: flex;
     align-items: flex-start;
@@ -806,28 +1250,28 @@ html.sidebar-will-collapse .sidebar-hint {
     animation: fadeIn 0.2s ease;
 }
 .task-modal {
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(20px);
-    border-radius: 12px;
+    background: var(--eg-surface-overlay);
+    border: 1px solid var(--eg-border);
+    border-radius: var(--eg-radius-xl);
     width: 720px;
     max-width: 95vw;
     max-height: 85vh;
     display: flex;
     flex-direction: column;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    box-shadow: var(--eg-shadow-overlay);
     animation: slideDown 0.3s ease;
 }
 /* @keyframes slideDown — moved to base.css */
 [data-theme="dark"] .task-modal {
-    background: rgba(30, 30, 40, 0.95);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--eg-surface-overlay);
+    border-color: var(--eg-border);
 }
 .task-modal-header {
     display: flex;
     align-items: flex-start;
     padding: 16px 20px 12px;
     gap: 12px;
-    border-bottom: 1px solid rgba(0,0,0,0.06);
+    border-bottom: 1px solid var(--eg-border-subtle);
     flex-shrink: 0;
 }
 .task-modal-header .title-input {
@@ -1387,9 +1831,9 @@ html.sidebar-will-collapse .sidebar-hint {
     justify-content: flex-end;
     gap: 12px;
     padding: 16px 24px;
-    border-top: 1px solid var(--border-color, #e5e7eb);
+    border-top: 1px solid var(--eg-border-subtle, var(--border-color, #e5e7eb));
     flex-shrink: 0;
-    background: inherit;
+    background: var(--eg-surface-subtle);
 }
 @media (max-height: 700px) {
     .task-modal-footer {
@@ -1410,6 +1854,9 @@ html.sidebar-will-collapse .sidebar-hint {
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s;
+}
+.task-modal-btn.eg-btn {
+    padding: 0 14px;
 }
 .task-modal-btn.secondary {
     background: var(--bg-secondary, #e5e7eb);
@@ -2280,10 +2727,10 @@ html.sidebar-will-collapse .sidebar-hint {
     position: fixed;
     min-width: 260px;
     max-width: 300px;
-    background: var(--bg-card);
-    border: 1px solid var(--border-color);
-    border-radius: 12px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    background: var(--eg-surface-overlay, var(--bg-card));
+    border: 1px solid var(--eg-border, var(--border-color));
+    border-radius: var(--eg-radius-lg, 12px);
+    box-shadow: var(--eg-shadow-popover, 0 8px 24px rgba(0, 0, 0, 0.15));
     padding: 12px;
     z-index: 10002;
     animation: slideDown 0.15s ease;
@@ -2722,8 +3169,8 @@ html.sidebar-will-collapse .sidebar-hint {
 .review-modal-overlay {
     position: fixed;
     top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0, 0, 0, 0.4);
-    backdrop-filter: blur(4px);
+    background: var(--overlay-bg, rgba(28, 27, 31, 0.4));
+    backdrop-filter: blur(2px);
     z-index: 10000;
     display: flex;
     align-items: flex-start;
@@ -2732,24 +3179,24 @@ html.sidebar-will-collapse .sidebar-hint {
     animation: fadeIn 0.2s ease;
 }
 .review-modal {
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(20px);
-    border-radius: 12px;
+    background: var(--eg-surface-overlay);
+    border: 1px solid var(--eg-border);
+    border-radius: var(--eg-radius-xl);
     width: 480px;
     max-width: 90vw;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    box-shadow: var(--eg-shadow-overlay);
     animation: slideDown 0.3s ease;
 }
 [data-theme="dark"] .review-modal {
-    background: rgba(30, 30, 40, 0.95);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--eg-surface-overlay);
+    border-color: var(--eg-border);
 }
 .review-modal-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 16px 20px;
-    border-bottom: 1px solid rgba(0,0,0,0.06);
+    border-bottom: 1px solid var(--eg-border-subtle);
 }
 .review-modal-header h3 {
     margin: 0;
@@ -2764,7 +3211,8 @@ html.sidebar-will-collapse .sidebar-hint {
     justify-content: flex-end;
     gap: 12px;
     padding: 16px 20px;
-    border-top: 1px solid rgba(0,0,0,0.06);
+    border-top: 1px solid var(--eg-border-subtle);
+    background: var(--eg-surface-subtle);
 }
 .review-field {
     margin-bottom: 16px;

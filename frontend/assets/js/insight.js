@@ -75,6 +75,7 @@ var Insight = (function() {
         if (hub) hub.style.display = 'none';
         if (tableView) tableView.style.display = 'none';
         if (insView) insView.style.display = '';
+        localStorage.setItem('work_feature', 'insight');
         _showDetail(false);
         _renderList();
         refreshList();
@@ -95,6 +96,7 @@ var Insight = (function() {
         var hub = document.getElementById('work-hub');
         if (insView) insView.style.display = 'none';
         if (hub) hub.style.display = '';
+        localStorage.removeItem('work_feature');
     }
 
     function _showDetail(on) {
@@ -148,7 +150,7 @@ var Insight = (function() {
           +   '</label>'
           +   '<span class="ins-cap-type-hint" id="ins-cap-type-hint"></span>'
           +   '<div class="ins-cap-spacer"></div>'
-          +   '<button class="ins-btn ins-btn-primary" onclick="Insight.submitNew()">创建</button>'
+          +   '<button class="eg-btn eg-btn--primary" onclick="Insight.submitNew()">创建</button>'
           + '</div>'
           + '</div>';
     }
@@ -417,7 +419,7 @@ var Insight = (function() {
               + '<textarea id="ins-fb-text" class="ins-fb-textarea" rows="3" '
               +   'placeholder="想让报告怎么改?写一句…提交后状态回「待处理」,下次跑 /insight 时按反馈修订">' + _esc(t.feedbackNote || '') + '</textarea>'
               + '<div class="ins-fb-foot">'
-              +   '<button class="ins-btn ins-btn-primary" onclick="Insight.submitFeedback()">提交反馈</button>'
+              +   '<button class="eg-btn eg-btn--primary" onclick="Insight.submitFeedback()">提交反馈</button>'
               + '</div>'
               + '</section>';
         }

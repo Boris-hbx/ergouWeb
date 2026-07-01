@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN" data-theme="">
 <head>
     <meta charset="UTF-8">
@@ -8,17 +8,17 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Next">
     <title>Next - Focus on the Right Thing</title>
-    <link rel="stylesheet" href="assets/css/base.css?v=20260630a">
-    <link rel="stylesheet" href="assets/css/style.css?v=20260630a">
-    <link rel="stylesheet" href="assets/css/components.css?v=20260630a">
-    <link rel="stylesheet" href="assets/css/mobile.css?v=20260630a">
-    <link rel="stylesheet" href="assets/css/abao.css?v=20260630a">
-    <link rel="stylesheet" href="assets/css/english.css?v=20260630a">
-    <link rel="stylesheet" href="assets/css/health.css?v=20260630a">
-    <link rel="stylesheet" href="assets/css/patrol.css?v=20260630a">
-    <link rel="stylesheet" href="assets/css/admin-panel.css?v=20260630a">
-    <link rel="stylesheet" href="assets/css/work.css?v=20260630a">
-    <link rel="stylesheet" href="assets/css/insight.css?v=20260630a">
+    <link rel="stylesheet" href="assets/css/base.css?v=20260630d">
+    <link rel="stylesheet" href="assets/css/style.css?v=20260630d">
+    <link rel="stylesheet" href="assets/css/components.css?v=20260630d">
+    <link rel="stylesheet" href="assets/css/mobile.css?v=20260630d">
+    <link rel="stylesheet" href="assets/css/abao.css?v=20260630d">
+    <link rel="stylesheet" href="assets/css/english.css?v=20260630d">
+    <link rel="stylesheet" href="assets/css/health.css?v=20260630d">
+    <link rel="stylesheet" href="assets/css/patrol.css?v=20260630d">
+    <link rel="stylesheet" href="assets/css/admin-panel.css?v=20260630d">
+    <link rel="stylesheet" href="assets/css/work.css?v=20260630d">
+    <link rel="stylesheet" href="assets/css/insight.css?v=20260630d">
     <link rel="manifest" href="assets/manifest.json">
     <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
     <script>
@@ -121,34 +121,6 @@
                 <a class="nav-link" data-page="life" onclick="switchPage('life')">生活</a>
                 <a class="nav-link" data-page="work" onclick="switchPage('work')">工作</a>
                 <a class="nav-link" data-page="admin" onclick="switchPage('admin')" id="admin-nav-link" style="display:none;">管理</a>
-            </div>
-
-            <!-- 底部区域 -->
-            <div class="sidebar-bottom-section">
-                <!-- 时区显示 -->
-                <div class="timezone-panel" id="timezone-panel">
-                    <div class="timezone-item">
-                        <span class="tz-city">北京</span>
-                        <div class="tz-info">
-                            <span class="tz-datetime" id="tz-beijing-date"></span>
-                            <span class="tz-time" id="tz-beijing-time"></span>
-                        </div>
-                    </div>
-                    <div class="timezone-item">
-                        <span class="tz-city">滑铁卢</span>
-                        <div class="tz-info">
-                            <span class="tz-datetime" id="tz-waterloo-date"></span>
-                            <span class="tz-time" id="tz-waterloo-time"></span>
-                        </div>
-                    </div>
-                    <div class="timezone-item">
-                        <span class="tz-city">温哥华</span>
-                        <div class="tz-info">
-                            <span class="tz-datetime" id="tz-vancouver-date"></span>
-                            <span class="tz-time" id="tz-vancouver-time"></span>
-                        </div>
-                    </div>
-                </div>
             </div>
         </nav>
 
@@ -1201,6 +1173,18 @@
                     <div class="life-hub-card-title">任务表</div>
                     <div class="life-hub-card-desc">表格 · 看板 · 日历 多视图</div>
                 </div>
+                <div class="life-hub-card life-hub-card-disabled work-wip-card work-wip-card-locked"
+                     id="work-praxis-card"
+                     data-track="work.praxis"
+                     aria-disabled="true"
+                    onclick="Work.openWipFeature('work.praxis')">
+                    <div class="life-hub-card-icon">
+                        🧭
+                        <span class="work-wip-lock" aria-hidden="true">🔒</span>
+                    </div>
+                    <div class="life-hub-card-title">Praxis</div>
+                    <div class="life-hub-card-desc">开发中</div>
+                </div>
                 <div class="life-hub-card" data-track="work.stakeholders" onclick="Stakeholder.openFeature()">
                     <div class="life-hub-card-icon">👥</div>
                     <div class="life-hub-card-title">干系人</div>
@@ -1254,13 +1238,13 @@
                 </button>
                 <div class="wt-tab-indicator" id="wt-tab-indicator"></div>
             </div>
-            <div class="wt-toolbar">
-                <h2>任务表</h2>
+            <div class="wt-toolbar eg-toolbar">
+                <h2 class="eg-toolbar__title">任务表</h2>
                 <!-- T-118:心电图折叠切换按钮(展开/收起 30 天负载心电图) -->
                 <button class="wt-heart-toggle" id="wt-heart-toggle" onclick="Work.toggleHeartStrip()" title="30 天负载心电图(展开/收起)">📊 心电图</button>
-                <span class="wt-total" id="wt-total">共 0 项</span>
+                <span class="wt-total eg-toolbar__meta" id="wt-total">共 0 项</span>
                 <!-- T-130:全局搜索(实时 filter,跨 5 视图;不含已完成档案) -->
-                <span class="wt-search-box">
+                <span class="wt-search-box eg-toolbar__search">
                     <input type="text" id="wt-search" class="wt-search" placeholder="🔍 搜索任务…"
                            oninput="Work.onSearchInput(this.value)" onkeydown="Work.onSearchKey(event)">
                     <span class="wt-search-clear" id="wt-search-clear" style="display:none"
@@ -1271,7 +1255,7 @@
                     <span>📅 <span id="wt-dfc-date"></span></span>
                     <span class="wt-dfc-x" onclick="Work.clearDateFilter()" title="清除日期过滤">✕</span>
                 </span>
-                <div class="wt-seg">
+                <div class="wt-seg eg-segment eg-toolbar__view">
                     <button id="wt-seg-center" class="active" onclick="Work.setView('center')">中枢</button>
                     <button id="wt-seg-table" onclick="Work.setView('table')">▦ 表格</button>
                     <button id="wt-seg-board" onclick="Work.setView('board')">▤ 看板</button>
@@ -1283,23 +1267,25 @@
                     <button id="wt-seg-attention" onclick="Work.setView('attention')">注意力</button>
                 </div>
                 <!-- T-132:责任人下拉已移除,改由责任人列表头漏斗筛选(多选,等价且更强) -->
-                <a class="wt-clear-filters" id="wt-clear-filters" style="display:none"
-                   onclick="WorkTable.clearAllFilters()" title="清空所有表头列筛选">✕ 清除全部筛选</a>
-                <select class="wt-select" id="wt-source-filter" onchange="WorkTable.setSourceFilter(this.value)" title="任务来源">
-                    <option value="">全部来源</option>
-                    <option value="manual">手动</option>
-                    <option value="todo">Todo</option>
-                </select>
-                <select class="wt-select" id="wt-group" onchange="Work.render()">
-                    <option value="">不分组</option>
-                    <option value="level">按层级分组</option>
-                    <option value="assignee">按责任人分组</option>
-                    <option value="status">按状态分组</option>
-                    <option value="area">按领域分组</option>
-                    <option value="engage">按参与模式分组</option>
-                </select>
-                <button class="wt-select" onclick="WorkColumnCfg.open()" title="编辑表头、列类型、增删列">⚙ 列设置</button>
-                <button class="wt-newbtn" data-track="work.task.create" onclick="WorkTable.addRow()">+ 新建任务</button>
+                <div class="eg-toolbar__actions">
+                    <a class="wt-clear-filters" id="wt-clear-filters" style="display:none"
+                       onclick="WorkTable.clearAllFilters()" title="清空所有表头列筛选">✕ 清除全部筛选</a>
+                    <select class="wt-select eg-control-select" id="wt-source-filter" onchange="WorkTable.setSourceFilter(this.value)" title="任务来源">
+                        <option value="">全部来源</option>
+                        <option value="manual">手动</option>
+                        <option value="todo">Todo</option>
+                    </select>
+                    <select class="wt-select eg-control-select" id="wt-group" onchange="Work.render()">
+                        <option value="">不分组</option>
+                        <option value="level">按层级分组</option>
+                        <option value="assignee">按责任人分组</option>
+                        <option value="status">按状态分组</option>
+                        <option value="area">按领域分组</option>
+                        <option value="engage">按参与模式分组</option>
+                    </select>
+                    <button class="eg-btn eg-btn--secondary" onclick="WorkColumnCfg.open()" title="编辑表头、列类型、增删列">⚙ 列设置</button>
+                    <button class="eg-btn eg-btn--primary" data-track="work.task.create" onclick="WorkTable.addRow()">+ 新建任务</button>
+                </div>
             </div>
 
             <div id="wt-center-view" class="wt-hidden"></div>
@@ -1313,27 +1299,124 @@
             <div id="wt-attention-view" class="wt-hidden"></div>
         </div>
 
+        <div id="work-praxis-view" class="praxis-view" style="display:none;">
+            <button class="wt-back-btn" onclick="Work.showHub()">&larr; 工作</button>
+            <div class="praxis-shell">
+                <section class="praxis-banner">
+                    <div>
+                        <div class="praxis-kicker">Praxis</div>
+                        <h2>🧭 Praxis</h2>
+                    </div>
+                    <div class="praxis-score">
+                        <span>健康度</span>
+                        <input id="praxis-health-score" type="number" min="0" max="100" value="58" onchange="Praxis.setHealthScore(this.value)">
+                    </div>
+                </section>
+                <!-- T-285:今日经营 主入口(顶部主行动,不占八板块格) -->
+                <button class="praxis-today-entry" id="praxis-today-entry" onclick="PraxisJournal.open()">
+                    <span class="praxis-today-icon">📓</span>
+                    <span class="praxis-today-text">
+                        <strong>今日经营</strong>
+                        <em id="praxis-today-sub">用 5 分钟记录今天，AI 帮你归类经营板块</em>
+                    </span>
+                    <span class="praxis-today-status" id="praxis-today-status">未记录</span>
+                </button>
+                <!-- T-286:记录回看 入口 -->
+                <button class="praxis-review-entry" id="praxis-review-entry" onclick="PraxisReview.open()">
+                    <span>📚 记录回看</span>
+                    <em>翻历史经营记录，看看自己是不是在重复同一个模式</em>
+                </button>
+                <div id="praxis-cockpit">
+                    <div class="praxis-board-grid" id="praxis-board-grid"></div>
+                    <section class="praxis-relation-layout">
+                        <div class="praxis-map-panel">
+                            <div class="praxis-map-head">
+                                <div>
+                                    <h3>关键关系</h3>
+                                    <p id="praxis-contact-count">0 人</p>
+                                </div>
+                                <button class="eg-btn eg-btn--primary" onclick="Praxis.startCreate()">+ 新建关系人</button>
+                            </div>
+                            <div class="praxis-arc-wrap" id="praxis-arc-wrap"></div>
+                        </div>
+                        <aside class="praxis-editor" id="praxis-editor">
+                            <div class="praxis-editor-empty">选择节点或新建关系人</div>
+                        </aside>
+                    </section>
+                </div>
+                <!-- T-285:今日经营页(桌面三栏简版,spec §5.4) -->
+                <div id="praxis-journal-view" style="display:none;">
+                    <div class="pj-head">
+                        <button class="pj-back" onclick="PraxisJournal.close()">&larr; 驾驶舱</button>
+                        <h3>今日经营</h3>
+                        <div class="pj-datebar">
+                            <label>日期 <input type="date" id="pj-date" onchange="PraxisJournal.changeDate(this.value)"></label>
+                            <span id="pj-status-pill" class="pj-status-pill">未记录</span>
+                        </div>
+                    </div>
+                    <div class="pj-grid">
+                        <aside class="pj-col pj-left" id="pj-left"></aside>
+                        <section class="pj-col pj-center">
+                            <textarea id="pj-raw" class="pj-textarea" placeholder="今天发生了什么？哪些事有长期价值？有没有一个判断、一次交流、一个风险信号值得留下？"></textarea>
+                            <div class="pj-prompts" id="pj-prompts"></div>
+                            <div class="pj-tags" id="pj-tags"></div>
+                            <div class="pj-actions">
+                                <button class="eg-btn eg-btn--primary" id="pj-analyze-btn" onclick="PraxisJournal.saveAndAnalyze()">保存并分析</button>
+                                <button class="eg-btn" id="pj-save-btn" onclick="PraxisJournal.saveOnly()">仅保存</button>
+                            </div>
+                        </section>
+                        <aside class="pj-col pj-right" id="pj-right">
+                            <div class="pj-ai-empty">写完点「保存并分析」，这里会出现今日观察。</div>
+                        </aside>
+                    </div>
+                </div>
+                <!-- T-286:记录回看页(列表+筛选+只读详情,复用 GET /api/praxis/journal) -->
+                <div id="praxis-review-view" style="display:none;">
+                    <div class="pj-head">
+                        <button class="pj-back" onclick="PraxisReview.close()">&larr; 驾驶舱</button>
+                        <h3>记录回看</h3>
+                        <span class="pr-count" id="pr-count">共 0 条</span>
+                    </div>
+                    <div class="pr-filters">
+                        <label>从 <input type="date" id="pr-from" onchange="PraxisReview.applyFilter()"></label>
+                        <label>到 <input type="date" id="pr-to" onchange="PraxisReview.applyFilter()"></label>
+                        <label>板块 <select id="pr-board" onchange="PraxisReview.applyFilter()"></select></label>
+                        <label>类型 <select id="pr-type" onchange="PraxisReview.applyFilter()"></select></label>
+                        <button class="eg-btn" onclick="PraxisReview.resetFilter()">重置</button>
+                    </div>
+                    <div class="pr-layout">
+                        <div class="pr-list" id="pr-list"></div>
+                        <aside class="pr-detail" id="pr-detail">
+                            <div class="pr-detail-empty">点左侧某条记录看详情</div>
+                        </aside>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- T-223:干系人独立页(表格 / 看板 / 分布) -->
         <div id="stakeholder-view" style="display:none;">
             <button class="wt-back-btn" onclick="Stakeholder.backToHub()">&larr; 工作</button>
-            <div class="sh-toolbar">
-                <h2>干系人</h2>
-                <span class="wt-total" id="sh-total">共 0 人</span>
-                <span class="wt-search-box">
+            <div class="sh-toolbar eg-toolbar">
+                <h2 class="eg-toolbar__title">干系人</h2>
+                <span class="wt-total eg-toolbar__meta" id="sh-total">共 0 人</span>
+                <span class="wt-search-box eg-toolbar__search">
                     <input type="text" id="sh-search" class="wt-search" placeholder="🔍 搜索姓名/部门/事项..."
                            oninput="Stakeholder.onSearchInput(this.value)" onkeydown="Stakeholder.onSearchKey(event)">
                     <span class="wt-search-clear" id="sh-search-clear" style="display:none"
                           onclick="Stakeholder.clearSearch()" title="清空(Esc)">✕</span>
                 </span>
-                <div class="wt-seg">
+                <div class="wt-seg eg-segment eg-toolbar__view">
                     <button id="sh-seg-table" class="active" onclick="Stakeholder.setView('table')">▦ 表格</button>
                     <button id="sh-seg-board" onclick="Stakeholder.setView('board')">▤ 看板</button>
                     <button id="sh-seg-distribution" onclick="Stakeholder.setView('distribution')">✦ 分布</button>
                     <button id="sh-seg-graph" onclick="Stakeholder.setView('graph')">◎ 关系图</button>
                 </div>
-                <select class="wt-select" id="sh-board-dim" onchange="Stakeholder.setBoardDim(this.value)" title="看板分列维度"></select>
-                <button class="wt-select" onclick="Stakeholder.openColumns()" title="编辑干系人表头、列类型、增删列">⚙ 列设置</button>
-                <button class="wt-newbtn" data-track="stakeholder.create" onclick="Stakeholder.openCreate()">+ 新建干系人</button>
+                <div class="eg-toolbar__actions">
+                    <select class="wt-select eg-control-select" id="sh-board-dim" onchange="Stakeholder.setBoardDim(this.value)" title="看板分列维度"></select>
+                    <button class="eg-btn eg-btn--secondary" onclick="Stakeholder.openColumns()" title="编辑干系人表头、列类型、增删列">⚙ 列设置</button>
+                    <button class="eg-btn eg-btn--primary" data-track="stakeholder.create" onclick="Stakeholder.openCreate()">+ 新建干系人</button>
+                </div>
             </div>
             <div id="sh-table-view" class="wt-table-wrap"></div>
             <div id="sh-board-view" class="wt-board wt-hidden"></div>
@@ -1365,9 +1448,9 @@
             <div class="wt-modal-title" id="wt-text-title">任务标题</div>
             <div class="wt-modal-sub" id="wt-text-sub">长文本 · 可输入大段说明、背景、要点</div>
             <textarea id="wt-text-area" placeholder="在这里写详细内容……"></textarea>
-            <div class="wt-modal-actions">
-                <button class="wt-mbtn" onclick="WorkTable.closeText()">取消</button>
-                <button class="wt-mbtn primary" onclick="WorkTable.saveText()">保存</button>
+            <div class="wt-modal-actions eg-actionbar eg-actionbar--modal">
+                <button class="eg-btn eg-btn--secondary" onclick="WorkTable.closeText()">取消</button>
+                <button class="eg-btn eg-btn--primary" onclick="WorkTable.saveText()">保存</button>
             </div>
         </div>
     </div>
@@ -1378,8 +1461,8 @@
             <div class="wt-modal-title">列设置</div>
             <div class="wt-modal-sub">拖动 ≡ 调整列顺序 · 改列名 / 设类型 / 增删选项 · 底部可新增列</div>
             <div id="wt-col-list"></div>
-            <div class="wt-modal-actions">
-                <button class="wt-mbtn primary" onclick="WorkColumnCfg.close()">完成</button>
+            <div class="wt-modal-actions eg-actionbar eg-actionbar--modal">
+                <button class="eg-btn eg-btn--primary" onclick="WorkColumnCfg.close()">完成</button>
             </div>
         </div>
     </div>
@@ -1409,6 +1492,7 @@
           <span class="wt-pill" id="wt-d-status-pill">●待办</span>
           <span class="wt-pill" id="wt-d-prio-pill">中</span>
           <span class="wt-pill" id="wt-d-due-pill" style="display:none"></span>
+          <button class="wt-source-hint" id="wt-d-source-hint" style="display:none" onclick="WorkDetail.openSourceTodo()" title="打开来源 Todo">来自 Todo</button>
         </div>
       </div>
 
@@ -1580,9 +1664,9 @@
                     <textarea id="review-notes" rows="3" placeholder="补充说明"></textarea>
                 </div>
             </div>
-            <div class="review-modal-footer">
-                <button class="task-modal-btn secondary" onclick="closeReviewModal()">取消</button>
-                <button class="task-modal-btn primary" onclick="saveReview()">保存</button>
+            <div class="review-modal-footer eg-actionbar eg-actionbar--modal">
+                <button class="eg-btn eg-btn--secondary" onclick="closeReviewModal()">取消</button>
+                <button class="eg-btn eg-btn--primary" onclick="saveReview()">保存</button>
             </div>
         </div>
     </div>
@@ -1711,9 +1795,9 @@
                 </div>
             </div>
             <!-- 底部按钮（编辑/新建模式显示） -->
-            <div class="task-modal-footer" id="modal-footer-edit" style="display:none;">
-                <button class="task-modal-btn secondary" onclick="closeTaskModal()">取消</button>
-                <button class="task-modal-btn primary" id="modal-save-btn" onclick="saveTask()">保存</button>
+            <div class="task-modal-footer eg-actionbar eg-actionbar--modal" id="modal-footer-edit" style="display:none;">
+                <button class="eg-btn eg-btn--secondary" onclick="closeTaskModal()">取消</button>
+                <button class="eg-btn eg-btn--primary" id="modal-save-btn" onclick="saveTask()">保存</button>
             </div>
         </div>
     </div>
@@ -1860,75 +1944,78 @@
     </div>
 
     <!-- Markdown rendering (T-133: 本地自托管,CDN 仅作兜底——jsdelivr 国内常失败,失败则退化裸 markdown) -->
-    <script src="assets/vendor/marked.min.js?v=20260630a"></script>
+    <script src="assets/vendor/marked.min.js?v=20260630d"></script>
     <script>window.marked||document.write('<script src="https://cdn.jsdelivr.net/npm/marked@15/marked.min.js"><\/script>');</script>
-    <script src="assets/vendor/purify.min.js?v=20260630a"></script>
+    <script src="assets/vendor/purify.min.js?v=20260630d"></script>
     <script>window.DOMPurify||document.write('<script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"><\/script>');</script>
 
     <!-- JS Modules -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
-    <script src="assets/js/observability.js?v=20260630a"></script>
-    <script src="assets/js/api.js?v=20260630a"></script>
-    <script src="assets/js/utils.js?v=20260630a"></script>
+    <script src="assets/js/observability.js?v=20260630d"></script>
+    <script src="assets/js/api.js?v=20260630d"></script>
+    <script src="assets/js/utils.js?v=20260630d"></script>
     <!-- T-095: 通用弹窗组件 (openProgressDialog / openTextInputDialog),tasks.js 和 work-table.js 都依赖 -->
-    <script src="assets/js/dialogs.js?v=20260630a"></script>
-    <script src="assets/js/jelly-indicator.js?v=20260630a"></script>
-    <script src="assets/js/app.js?v=20260630a"></script>
-    <script src="assets/js/tasks.js?v=20260630a"></script>
-    <script src="assets/js/modal.js?v=20260630a"></script>
-    <script src="assets/js/datepicker.js?v=20260630a"></script>
-    <script src="assets/js/drag.js?v=20260630a"></script>
-    <script src="assets/js/actionsheet.js?v=20260630a"></script>
-    <script src="assets/js/share-modal.js?v=20260630a"></script>
-    <script src="assets/js/review.js?v=20260630a"></script>
-    <script src="assets/js/routines.js?v=20260630a"></script>
-    <script src="assets/js/features.js?v=20260630a"></script>
-    <script src="assets/js/particles.js?v=20260630a"></script>
-    <script src="assets/js/living-line.js?v=20260630a"></script>
-    <script src="assets/js/abao.js?v=20260630a"></script>
-    <script src="assets/js/english.js?v=20260630a"></script>
-    <script src="assets/js/life.js?v=20260630a"></script>
-    <script src="assets/js/expense.js?v=20260630a"></script>
-    <script src="assets/js/expense-analytics.js?v=20260630a"></script>
-    <script src="assets/js/trip.js?v=20260630a"></script>
-    <script src="assets/js/health-data.js?v=20260630a"></script>
-    <script src="assets/js/health-renderer.js?v=20260630a"></script>
-    <script src="assets/js/health.js?v=20260630a"></script>
-    <script src="assets/js/friends.js?v=20260630a"></script>
-    <script src="assets/js/notifications.js?v=20260630a"></script>
-    <script src="assets/js/settings.js?v=20260630a"></script>
-    <script src="assets/js/admin-panel.js?v=20260630a"></script>
+    <script src="assets/js/dialogs.js?v=20260630d"></script>
+    <script src="assets/js/jelly-indicator.js?v=20260630d"></script>
+    <script src="assets/js/app.js?v=20260630d"></script>
+    <script src="assets/js/tasks.js?v=20260630d"></script>
+    <script src="assets/js/modal.js?v=20260630d"></script>
+    <script src="assets/js/datepicker.js?v=20260630d"></script>
+    <script src="assets/js/drag.js?v=20260630d"></script>
+    <script src="assets/js/actionsheet.js?v=20260630d"></script>
+    <script src="assets/js/share-modal.js?v=20260630d"></script>
+    <script src="assets/js/review.js?v=20260630d"></script>
+    <script src="assets/js/routines.js?v=20260630d"></script>
+    <script src="assets/js/features.js?v=20260630d"></script>
+    <script src="assets/js/particles.js?v=20260630d"></script>
+    <script src="assets/js/living-line.js?v=20260630d"></script>
+    <script src="assets/js/abao.js?v=20260630d"></script>
+    <script src="assets/js/english.js?v=20260630d"></script>
+    <script src="assets/js/life.js?v=20260630d"></script>
+    <script src="assets/js/expense.js?v=20260630d"></script>
+    <script src="assets/js/expense-analytics.js?v=20260630d"></script>
+    <script src="assets/js/trip.js?v=20260630d"></script>
+    <script src="assets/js/health-data.js?v=20260630d"></script>
+    <script src="assets/js/health-renderer.js?v=20260630d"></script>
+    <script src="assets/js/health.js?v=20260630d"></script>
+    <script src="assets/js/friends.js?v=20260630d"></script>
+    <script src="assets/js/notifications.js?v=20260630d"></script>
+    <script src="assets/js/settings.js?v=20260630d"></script>
+    <script src="assets/js/admin-panel.js?v=20260630d"></script>
     <!-- T-219 行为分析采集：必须在 app.js / admin-panel.js 之后加载（要 hook 它们） -->
-    <script src="assets/js/tracker.js?v=20260630a"></script>
+    <script src="assets/js/tracker.js?v=20260630d"></script>
     <!-- Work module (T-094 / SPEC work-task-table) -->
-    <script src="assets/js/work-pick.js?v=20260630a"></script>
-    <script src="assets/js/work-grid-engine.js?v=20260630a"></script>
-    <script src="assets/js/work-table.js?v=20260630a"></script>
-    <script src="assets/js/work-column-cfg.js?v=20260630a"></script>
-    <script src="assets/js/work-board.js?v=20260630a"></script>
-    <script src="assets/js/work-calendar.js?v=20260630a"></script>
+    <script src="assets/js/work-pick.js?v=20260630d"></script>
+    <script src="assets/js/work-grid-engine.js?v=20260630d"></script>
+    <script src="assets/js/work-table.js?v=20260630d"></script>
+    <script src="assets/js/work-column-cfg.js?v=20260630d"></script>
+    <script src="assets/js/work-board.js?v=20260630d"></script>
+    <script src="assets/js/work-calendar.js?v=20260630d"></script>
     <!-- T-099 -->
-    <script src="assets/js/work-person.js?v=20260630a"></script>
+    <script src="assets/js/work-person.js?v=20260630d"></script>
     <!-- T-108 -->
-    <script src="assets/js/work-distribution.js?v=20260630a"></script>
-    <script src="assets/js/work-center.js?v=20260630a"></script>
-    <script src="assets/js/work-attention.js?v=20260630a"></script>
-    <script src="assets/js/work-detail.js?v=20260630a"></script>
-    <script src="assets/js/stakeholder.js?v=20260630a"></script>
-    <script src="assets/js/work.js?v=20260630a"></script>
+    <script src="assets/js/work-distribution.js?v=20260630d"></script>
+    <script src="assets/js/work-center.js?v=20260630d"></script>
+    <script src="assets/js/work-attention.js?v=20260630d"></script>
+    <script src="assets/js/work-detail.js?v=20260630d"></script>
+    <script src="assets/js/stakeholder.js?v=20260630d"></script>
+    <script src="assets/js/praxis.js?v=20260630d"></script>
+    <script src="assets/js/praxis_journal.js?v=20260630d"></script>
+    <script src="assets/js/praxis_review.js?v=20260630d"></script>
+    <script src="assets/js/work.js?v=20260630d"></script>
     <!-- T-111:已完成档案(按月分组归档区) -->
-    <script src="assets/js/work-done.js?v=20260630a"></script>
+    <script src="assets/js/work-done.js?v=20260630d"></script>
     <!-- T-123 Insight v0.3:单层 insight_task + textarea 反馈。
          v0.2 的 capture/revise/annotations/citation/detail 已废弃(insight-citation.js 仅 share.js 公开页动态加载) -->
-    <script src="assets/js/insight-markdown.js?v=20260630a"></script>
-    <script src="assets/js/insight.js?v=20260630a"></script>
-    <script src="assets/js/insight-factory.js?v=20260630a"></script>
+    <script src="assets/js/insight-markdown.js?v=20260630d"></script>
+    <script src="assets/js/insight.js?v=20260630d"></script>
+    <script src="assets/js/insight-factory.js?v=20260630d"></script>
     <!-- T-116:个人访问令牌 (PAT) 管理 -->
-    <script src="assets/js/pat.js?v=20260630a"></script>
-    <script src="assets/js/patrol-utils.js?v=20260630a"></script>
-    <script src="assets/js/patrol-terrain.js?v=20260630a"></script>
-    <script src="assets/js/patrol-debug.js?v=20260630a"></script>
-    <script src="assets/js/patrol.js?v=20260630a"></script>
+    <script src="assets/js/pat.js?v=20260630d"></script>
+    <script src="assets/js/patrol-utils.js?v=20260630d"></script>
+    <script src="assets/js/patrol-terrain.js?v=20260630d"></script>
+    <script src="assets/js/patrol-debug.js?v=20260630d"></script>
+    <script src="assets/js/patrol.js?v=20260630d"></script>
 
     <script>
     // Initialize

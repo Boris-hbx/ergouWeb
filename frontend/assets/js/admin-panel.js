@@ -259,20 +259,20 @@ var AdminPanel = (function() {
                 html += '<td><div class="admin-btn-group">';
                 // Context-specific actions
                 if (u.status === 'pending') {
-                    html += '<button class="admin-btn admin-btn-success" data-action="approve" data-id="' + esc(u.id) + '">通过</button>';
-                    html += '<button class="admin-btn admin-btn-danger" data-action="reject" data-id="' + esc(u.id) + '">拒绝</button>';
+                    html += '<button class="eg-btn eg-btn--primary eg-btn--sm" data-action="approve" data-id="' + esc(u.id) + '">通过</button>';
+                    html += '<button class="eg-btn eg-btn--danger eg-btn--sm" data-action="reject" data-id="' + esc(u.id) + '">拒绝</button>';
                 } else if (u.status === 'active' && u.role !== 'owner') {
-                    html += '<button class="admin-btn admin-btn-secondary" data-action="force-logout" data-id="' + esc(u.id) + '">强制登出</button>';
-                    html += '<button class="admin-btn admin-btn-danger" data-action="suspend" data-id="' + esc(u.id) + '">封禁</button>';
+                    html += '<button class="eg-btn eg-btn--secondary eg-btn--sm" data-action="force-logout" data-id="' + esc(u.id) + '">强制登出</button>';
+                    html += '<button class="eg-btn eg-btn--danger eg-btn--sm" data-action="suspend" data-id="' + esc(u.id) + '">封禁</button>';
                     if (_role === 'owner') {
                         if (u.role === 'user') {
-                            html += '<button class="admin-btn admin-btn-primary" data-action="set-admin" data-id="' + esc(u.id) + '">设管理员</button>';
+                            html += '<button class="eg-btn eg-btn--primary eg-btn--sm" data-action="set-admin" data-id="' + esc(u.id) + '">设管理员</button>';
                         } else if (u.role === 'admin') {
-                            html += '<button class="admin-btn admin-btn-secondary" data-action="revoke-admin" data-id="' + esc(u.id) + '">撤销管理员</button>';
+                            html += '<button class="eg-btn eg-btn--secondary eg-btn--sm" data-action="revoke-admin" data-id="' + esc(u.id) + '">撤销管理员</button>';
                         }
                     }
                 } else if (u.status === 'suspended') {
-                    html += '<button class="admin-btn admin-btn-success" data-action="restore" data-id="' + esc(u.id) + '">恢复</button>';
+                    html += '<button class="eg-btn eg-btn--primary eg-btn--sm" data-action="restore" data-id="' + esc(u.id) + '">恢复</button>';
                 }
                 html += '</div></td>';
                 html += '</tr>';
@@ -722,7 +722,7 @@ var AdminPanel = (function() {
                 html += '<div class="admin-risk-user-card">';
                 html += '<div class="risk-name">' + esc(u.user_name || u.user_id) + '</div>';
                 html += '<div class="risk-stats">' + u.event_count + ' 次事件 · 最近: ' + shortDate(u.last_event) + '</div>';
-                html += '<button class="admin-btn admin-btn-danger" style="margin-top:6px;" data-risk-suspend="' + esc(u.user_id) + '">封禁</button>';
+                html += '<button class="eg-btn eg-btn--danger eg-btn--sm" style="margin-top:6px;" data-risk-suspend="' + esc(u.user_id) + '">封禁</button>';
                 html += '</div>';
             }
             html += '</div>';
@@ -755,10 +755,10 @@ var AdminPanel = (function() {
                 html += '<td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(e.description) + '</td>';
                 html += '<td><div class="admin-btn-group">';
                 if (e.conversation_id) {
-                    html += '<button class="admin-btn admin-btn-secondary" data-view-conv="' + esc(e.conversation_id) + '">查看对话</button>';
+                    html += '<button class="eg-btn eg-btn--secondary eg-btn--sm" data-view-conv="' + esc(e.conversation_id) + '">查看对话</button>';
                 }
                 if (!e.reviewed) {
-                    html += '<button class="admin-btn admin-btn-primary" data-review-event="' + esc(e.id) + '">已审阅</button>';
+                    html += '<button class="eg-btn eg-btn--primary eg-btn--sm" data-review-event="' + esc(e.id) + '">已审阅</button>';
                 }
                 html += '</div></td></tr>';
             }
@@ -1029,7 +1029,7 @@ var AdminPanel = (function() {
             var html = '<table class="admin-panel-table"><thead><tr><th>用户</th><th>角色</th><th>事件</th><th>会话</th><th>最近活跃</th><th>操作</th></tr></thead><tbody>';
             users.forEach(function(u) {
                 html += '<tr><td>' + esc(u.display_name || u.user_id) + '</td><td>' + roleBadge(u.role || 'user') + '</td><td>' + fmt(u.events) + '</td><td>' + fmt(u.sessions) + '</td><td>' + shortDateTime(u.last_active) + '</td>' +
-                    '<td><button class="admin-btn admin-btn-secondary" data-analytics-user="' + esc(u.user_id) + '">钻取</button></td></tr>';
+                    '<td><button class="eg-btn eg-btn--secondary eg-btn--sm" data-analytics-user="' + esc(u.user_id) + '">钻取</button></td></tr>';
             });
             el.innerHTML = html + '</tbody></table>';
             var self = this;
@@ -1252,7 +1252,7 @@ var AdminPanel = (function() {
                 html += '<option value="' + esc(u.id) + '">' + esc(u.display_name || u.username) + '</option>';
             });
             html += '</select>';
-            html += '<button class="admin-btn admin-btn-primary" id="people-add-btn">+ 新增人物</button>';
+            html += '<button class="eg-btn eg-btn--primary" id="people-add-btn">+ 新增人物</button>';
             html += '</div>';
 
             if (this._data.length === 0) {
@@ -1271,8 +1271,8 @@ var AdminPanel = (function() {
                     html += '<td><span class="admin-badge">' + esc(p.created_by) + '</span></td>';
                     html += '<td>' + esc(p.username || p.user_id) + '</td>';
                     html += '<td style="white-space:nowrap;">';
-                    html += '<button class="admin-btn admin-btn-sm" data-action="edit-person" data-id="' + esc(p.id) + '">编辑</button> ';
-                    html += '<button class="admin-btn admin-btn-sm admin-btn-danger" data-action="delete-person" data-id="' + esc(p.id) + '" data-name="' + esc(p.name) + '">删除</button>';
+                    html += '<button class="eg-btn eg-btn--secondary eg-btn--sm" data-action="edit-person" data-id="' + esc(p.id) + '">编辑</button> ';
+                    html += '<button class="eg-btn eg-btn--danger eg-btn--sm" data-action="delete-person" data-id="' + esc(p.id) + '" data-name="' + esc(p.name) + '">删除</button>';
                     html += '</td></tr>';
                 });
                 html += '</tbody></table></div>';
@@ -1316,7 +1316,7 @@ var AdminPanel = (function() {
             var isEdit = !!person;
             var overlay = document.createElement('div');
             overlay.className = 'admin-modal-overlay';
-            overlay.innerHTML = '<div class="admin-modal" style="max-width:480px;">' +
+            overlay.innerHTML = '<div class="admin-modal admin-modal--person">' +
                 '<div class="admin-modal-title">' + (isEdit ? '编辑人物' : '新增人物') + '</div>' +
                 '<div class="admin-form">' +
                 (isEdit ? '' : '<div class="admin-form-group"><label>所属用户</label>' +
@@ -1329,9 +1329,9 @@ var AdminPanel = (function() {
                 '<div class="admin-form-group"><label>态度</label><input type="text" id="person-attitude" class="admin-input" placeholder="如:经常夸她，特别尊重" value="' + esc(person ? person.attitude : '') + '"></div>' +
                 '<div class="admin-form-group"><label>备注</label><textarea id="person-notes" class="admin-input" rows="2" placeholder="生日、喜好等">' + esc(person ? person.notes : '') + '</textarea></div>' +
                 '</div>' +
-                '<div class="admin-modal-actions">' +
-                '<button class="admin-btn" id="person-cancel">取消</button>' +
-                '<button class="admin-btn admin-btn-primary" id="person-save">' + (isEdit ? '保存' : '添加') + '</button>' +
+                '<div class="admin-modal-actions eg-actionbar eg-actionbar--modal">' +
+                '<button class="eg-btn eg-btn--secondary" id="person-cancel">取消</button>' +
+                '<button class="eg-btn eg-btn--primary" id="person-save">' + (isEdit ? '保存' : '添加') + '</button>' +
                 '</div></div>';
             document.body.appendChild(overlay);
 
@@ -1445,11 +1445,11 @@ var AdminPanel = (function() {
             html += '<div class="admin-patrol-group">';
             html += '<div class="admin-patrol-group-title">操控</div>';
             html += '<div class="admin-patrol-btns">';
-            html += '<button class="admin-btn admin-btn-primary ap-ctrl" data-action="force">出场</button>';
-            html += '<button class="admin-btn admin-btn-secondary ap-ctrl" data-action="home">回家</button>';
-            html += '<button class="admin-btn admin-btn-secondary ap-ctrl" data-action="pause">暂停</button>';
-            html += '<button class="admin-btn admin-btn-secondary ap-ctrl" data-action="cooldown">重置冷却</button>';
-            html += '<button class="admin-btn admin-btn-secondary ap-ctrl" data-action="terrain">地形</button>';
+            html += '<button class="eg-btn eg-btn--primary eg-btn--sm ap-ctrl" data-action="force">出场</button>';
+            html += '<button class="eg-btn eg-btn--secondary eg-btn--sm ap-ctrl" data-action="home">回家</button>';
+            html += '<button class="eg-btn eg-btn--secondary eg-btn--sm ap-ctrl" data-action="pause">暂停</button>';
+            html += '<button class="eg-btn eg-btn--secondary eg-btn--sm ap-ctrl" data-action="cooldown">重置冷却</button>';
+            html += '<button class="eg-btn eg-btn--secondary eg-btn--sm ap-ctrl" data-action="terrain">地形</button>';
             html += '</div>';
             if (!connected) {
                 html += '<div class="ap-hint">值班系统未初始化（仅移动端）</div>';

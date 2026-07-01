@@ -29,6 +29,9 @@
 
             // Store current user info for cross-module use
             window._currentUser = data.user;
+            if (window.Work && typeof Work.refreshFeatureGates === 'function') {
+                Work.refreshFeatureGates();
+            }
 
             // Show admin nav link for admin/owner roles
             var adminNavLink = document.getElementById('admin-nav-link');
@@ -236,8 +239,47 @@ function loadQuadrantState() {
 }
 
 // 页面切换 (Todo ↔ 例行审视 ↔ 收件箱 ↔ 设置)
+function returnCurrentModuleHome(page) {
+    if (typeof Observability !== 'undefined') Observability.addBreadcrumb('nav.home', page);
+
+    switch (page) {
+        case 'todo':
+            if (typeof loadItems === 'function') loadItems();
+            if (typeof loadRoutines === 'function') loadRoutines();
+            break;
+        case 'review':
+            if (typeof loadReviews === 'function') loadReviews();
+            break;
+        case 'english':
+            if (typeof English !== 'undefined') {
+                if (English.showList) English.showList();
+                else if (English.init) English.init();
+            }
+            break;
+        case 'life':
+            if (typeof Life !== 'undefined' && Life.showHub) Life.showHub();
+            break;
+        case 'work':
+            if (typeof Work !== 'undefined' && Work.showHub) Work.showHub();
+            break;
+        case 'settings':
+            if (typeof loadSettingsData === 'function') loadSettingsData();
+            if (typeof Friends !== 'undefined' && Friends.loadFriendsData) Friends.loadFriendsData();
+            break;
+        case 'admin':
+            if (typeof AdminPanel !== 'undefined') {
+                if (AdminPanel.showSection) AdminPanel.showSection('overview');
+                else if (AdminPanel.init) AdminPanel.init();
+            }
+            break;
+    }
+}
+
 function switchPage(page) {
-    if (currentPage === page) return;
+    if (currentPage === page) {
+        returnCurrentModuleHome(page);
+        return;
+    }
     currentPage = page;
     // Breadcrumb: navigation
     if (typeof Observability !== 'undefined') Observability.addBreadcrumb('nav', page);
@@ -268,6 +310,9 @@ function switchPage(page) {
     // T-100:离开工作模块时自动关闭任务详情抽屉(否则 fixed 抽屉会盖到其它模块)
     if (page !== 'work' && typeof WorkDetail !== 'undefined' && WorkDetail.isOpen && WorkDetail.isOpen()) {
         WorkDetail.closeDetail();
+    }
+    if (page !== 'work' && window.location.pathname.indexOf('/insight-factory') === 0) {
+        window.history.pushState(null, '', '/');
     }
     document.getElementById('settings-view').style.display = page === 'settings' ? '' : 'none';
     var adminView = document.getElementById('admin-view');

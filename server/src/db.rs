@@ -1053,6 +1053,53 @@ fn create_tables(conn: &Connection) {
         );
         CREATE INDEX IF NOT EXISTS idx_stakeholders_user ON stakeholders(user_id, deleted);
 
+        -- Praxis contacts (T-283 / SPEC praxis)
+        CREATE TABLE IF NOT EXISTS praxis_contacts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            layer TEXT NOT NULL DEFAULT 'normal',
+            last_contact_at TEXT,
+            last_quality TEXT,
+            risk INTEGER NOT NULL DEFAULT 0,
+            note TEXT NOT NULL DEFAULT '',
+            cycle_off INTEGER NOT NULL DEFAULT 0,
+            sort_order REAL NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            deleted INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE INDEX IF NOT EXISTS idx_praxis_contacts_user ON praxis_contacts(user_id, deleted);
+
+        -- Praxis daily-operation journal (T-285 / SPEC praxis §5)
+        CREATE TABLE IF NOT EXISTS praxis_journal (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            entry_date TEXT NOT NULL,
+            raw_text TEXT NOT NULL DEFAULT '',
+            tags TEXT NOT NULL DEFAULT '{}',
+            structured TEXT NOT NULL DEFAULT '',
+            analyzed_at TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            deleted INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE INDEX IF NOT EXISTS idx_praxis_journal_user ON praxis_journal(user_id, entry_date, deleted);
+
+        -- Praxis contact interaction logs (T-287 / SPEC praxis §7)
+        CREATE TABLE IF NOT EXISTS praxis_contact_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            contact_id INTEGER NOT NULL,
+            user_id TEXT NOT NULL,
+            at TEXT NOT NULL,
+            method TEXT,
+            quality TEXT,
+            content TEXT NOT NULL DEFAULT '',
+            note TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_praxis_logs_contact ON praxis_contact_logs(contact_id, at DESC);
+
         -- Stakeholder columns (per-user schema config for stakeholders)
         CREATE TABLE IF NOT EXISTS stakeholder_columns (
             user_id   TEXT    NOT NULL REFERENCES users(id),
