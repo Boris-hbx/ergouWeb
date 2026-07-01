@@ -2679,12 +2679,25 @@ fn tool_get_trip_summary(db: &Connection, user_id: &str, input: &Value) -> Value
 fn is_sensitive_content(content: &str) -> bool {
     let lower = content.to_lowercase();
     let patterns = [
-        "密码", "password", "passwd",
-        "银行卡", "信用卡", "借记卡", "card number",
-        "身份证", "护照", "passport",
-        "社保号", "ssn", "social security",
-        "pin码", "pin code", "验证码",
-        "私钥", "private key", "secret key",
+        "密码",
+        "password",
+        "passwd",
+        "银行卡",
+        "信用卡",
+        "借记卡",
+        "card number",
+        "身份证",
+        "护照",
+        "passport",
+        "社保号",
+        "ssn",
+        "social security",
+        "pin码",
+        "pin code",
+        "验证码",
+        "私钥",
+        "private key",
+        "secret key",
     ];
     patterns.iter().any(|p| lower.contains(p))
 }
@@ -2693,7 +2706,9 @@ fn is_sensitive_content(content: &str) -> bool {
 
 fn require_admin(db: &Connection, user_id: &str) -> Option<Value> {
     let role: String = db
-        .query_row("SELECT role FROM users WHERE id=?1", [user_id], |r| r.get(0))
+        .query_row("SELECT role FROM users WHERE id=?1", [user_id], |r| {
+            r.get(0)
+        })
         .unwrap_or_default();
     if role != "admin" && role != "owner" {
         Some(json!({"error": "只有主人能教我认人，你没这个权限。"}))
@@ -2703,7 +2718,9 @@ fn require_admin(db: &Connection, user_id: &str) -> Option<Value> {
 }
 
 fn tool_save_person(db: &Connection, user_id: &str, input: &Value) -> Value {
-    if let Some(err) = require_admin(db, user_id) { return err; }
+    if let Some(err) = require_admin(db, user_id) {
+        return err;
+    }
     let name = match input["name"].as_str() {
         Some(n) if !n.trim().is_empty() => n.trim(),
         _ => return json!({"error": "name 不能为空"}),
@@ -2758,7 +2775,9 @@ fn tool_save_person(db: &Connection, user_id: &str, input: &Value) -> Value {
 }
 
 fn tool_update_person(db: &Connection, user_id: &str, input: &Value) -> Value {
-    if let Some(err) = require_admin(db, user_id) { return err; }
+    if let Some(err) = require_admin(db, user_id) {
+        return err;
+    }
     let id = match input["id"].as_str() {
         Some(i) if !i.is_empty() => i,
         _ => return json!({"error": "id is required"}),
@@ -2783,7 +2802,12 @@ fn tool_update_person(db: &Connection, user_id: &str, input: &Value) -> Value {
     let attitude = input["attitude"].as_str().map(|s| s.trim().to_string());
     let notes = input["notes"].as_str().map(|s| s.trim().to_string());
 
-    if name.is_none() && relationship.is_none() && nickname.is_none() && attitude.is_none() && notes.is_none() {
+    if name.is_none()
+        && relationship.is_none()
+        && nickname.is_none()
+        && attitude.is_none()
+        && notes.is_none()
+    {
         return json!({"error": "没有需要更新的字段"});
     }
 
@@ -2812,7 +2836,9 @@ fn tool_update_person(db: &Connection, user_id: &str, input: &Value) -> Value {
 }
 
 fn tool_delete_person(db: &Connection, user_id: &str, input: &Value) -> Value {
-    if let Some(err) = require_admin(db, user_id) { return err; }
+    if let Some(err) = require_admin(db, user_id) {
+        return err;
+    }
     let id = match input["id"].as_str() {
         Some(i) if !i.is_empty() => i,
         _ => return json!({"error": "id is required"}),
@@ -2978,7 +3004,10 @@ fn tool_update_memory(db: &Connection, user_id: &str, input: &Value) -> Value {
         return json!({"error": "记忆不存在或不属于当前用户"});
     }
 
-    let new_content = input["content"].as_str().map(|s| s.trim()).filter(|s| !s.is_empty());
+    let new_content = input["content"]
+        .as_str()
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty());
     let new_category = input["category"].as_str();
     let new_importance = input["importance"].as_i64();
 
@@ -3051,8 +3080,7 @@ fn tool_update_memory(db: &Connection, user_id: &str, input: &Value) -> Value {
     params.push(Box::new(id.to_string()));
     params.push(Box::new(user_id.to_string()));
 
-    let params_refs: Vec<&dyn rusqlite::types::ToSql> =
-        params.iter().map(|p| p.as_ref()).collect();
+    let params_refs: Vec<&dyn rusqlite::types::ToSql> = params.iter().map(|p| p.as_ref()).collect();
 
     match db.execute(&sql, params_refs.as_slice()) {
         Ok(0) => json!({"error": "更新失败"}),
@@ -3071,7 +3099,9 @@ fn tool_list_memories(db: &Connection, user_id: &str, input: &Value) -> Value {
         _ => "last_accessed_at DESC",
     };
 
-    let (sql, params_vec): (String, Vec<Box<dyn rusqlite::types::ToSql>>) = if let Some(cat) = category {
+    let (sql, params_vec): (String, Vec<Box<dyn rusqlite::types::ToSql>>) = if let Some(cat) =
+        category
+    {
         (
             format!(
                 "SELECT id, category, content, importance, access_count FROM ergou_memories WHERE user_id=?1 AND category=?2 ORDER BY {} LIMIT ?3",
@@ -3156,7 +3186,12 @@ fn tool_report_security_event(db: &Connection, user_id: &str, input: &Value) -> 
         _ => return json!({"error": "description is required"}),
     };
 
-    let valid_types = ["probe_other_user", "prompt_injection", "identity_spoof", "batch_abuse"];
+    let valid_types = [
+        "probe_other_user",
+        "prompt_injection",
+        "identity_spoof",
+        "batch_abuse",
+    ];
     if !valid_types.contains(&event_type) {
         return json!({"error": "无效的事件类型"});
     }
@@ -3278,11 +3313,15 @@ fn tool_create_work_task(db: &Connection, user_id: &str, input: &Value) -> Value
         priority: opt_string(input, "priority").unwrap_or_else(|| "mid".to_string()),
         due_date: opt_string(input, "due_date").filter(|s| !s.is_empty()),
         progress: input["progress"].as_i64().unwrap_or(0) as i32,
-        tags: Vec::new(),  // T-110:LLM 工具暂不传 tags(P2 加,届时 schema 字段已就绪)
+        tags: Vec::new(), // T-110:LLM 工具暂不传 tags(P2 加,届时 schema 字段已就绪)
         // T-119:支持 collaborators 数组(主+协 Linear 风格)
         collaborators: input["collaborators"]
             .as_array()
-            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
             .unwrap_or_default(),
         source_type: "manual".to_string(),
         source_todo_id: None,
@@ -3317,12 +3356,16 @@ fn tool_update_work_task(db: &Connection, user_id: &str, input: &Value) -> Value
         priority: opt_string(input, "priority"),
         due_date: opt_string(input, "due_date"), // 空字符串 = 清空(impl 已处理)
         progress: input["progress"].as_i64().map(|n| n as i32),
-        tags: None,  // T-110:LLM 工具暂不改 tags(P2 加)
+        tags: None, // T-110:LLM 工具暂不改 tags(P2 加)
         // T-119:支持 collaborators 整体替换(传 [] 清空,不传保持不变)
         collaborators: input
             .get("collaborators")
             .and_then(|v| v.as_array())
-            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect()),
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            }),
         custom_fields: None,
         sort_order: None,
     };
@@ -3359,18 +3402,17 @@ fn tool_query_work_tasks(db: &Connection, user_id: &str, input: &Value) -> Value
         limit: Some(input["limit"].as_i64().unwrap_or(10).clamp(1, 50)),
     };
     match query_tasks_impl(db, user_id, &filters) {
-        Ok((items, summary)) => match (
-            serde_json::to_value(&items),
-            serde_json::to_value(&summary),
-        ) {
-            (Ok(items_v), Ok(sum_v)) => json!({
-                "success": true,
-                "count": items.len(),
-                "tasks": items_v,
-                "summary": sum_v,
-            }),
-            _ => json!({"error": "serialize failed"}),
-        },
+        Ok((items, summary)) => {
+            match (serde_json::to_value(&items), serde_json::to_value(&summary)) {
+                (Ok(items_v), Ok(sum_v)) => json!({
+                    "success": true,
+                    "count": items.len(),
+                    "tasks": items_v,
+                    "summary": sum_v,
+                }),
+                _ => json!({"error": "serialize failed"}),
+            }
+        }
         Err(e) => json!({"error": format!("查询任务失败: {}", e)}),
     }
 }
@@ -3432,11 +3474,7 @@ mod work_task_tool_tests {
         let db = setup();
         tool_create_work_task(&db, UID, &json!({"title": "a", "status": "todo"}));
         let c = tool_create_work_task(&db, UID, &json!({"title": "b"}));
-        tool_update_work_task(
-            &db,
-            UID,
-            &json!({"id": c["id"], "status": "done"}),
-        );
+        tool_update_work_task(&db, UID, &json!({"id": c["id"], "status": "done"}));
         let r = tool_query_work_tasks(&db, UID, &json!({"status_not": "done"}));
         assert_eq!(r["success"], true);
         assert_eq!(r["count"], 1);
@@ -3446,16 +3484,8 @@ mod work_task_tool_tests {
     #[test]
     fn query_q_searches_title_and_desc() {
         let db = setup();
-        tool_create_work_task(
-            &db,
-            UID,
-            &json!({"title": "季度经费报表"}),
-        );
-        tool_create_work_task(
-            &db,
-            UID,
-            &json!({"title": "院评审", "desc": "含经费明细"}),
-        );
+        tool_create_work_task(&db, UID, &json!({"title": "季度经费报表"}));
+        tool_create_work_task(&db, UID, &json!({"title": "院评审", "desc": "含经费明细"}));
         tool_create_work_task(&db, UID, &json!({"title": "复印资料"}));
         let r = tool_query_work_tasks(&db, UID, &json!({"q": "经费"}));
         assert_eq!(r["count"], 2);

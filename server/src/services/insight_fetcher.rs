@@ -39,10 +39,7 @@ pub async fn fetch_blog(url: &str) -> Result<FetchResult, String> {
     }
 
     // 30s 超时 + 限制 5MB 上限(防巨型页面 OOM)
-    let bytes = resp
-        .bytes()
-        .await
-        .map_err(|e| format!("read body: {e}"))?;
+    let bytes = resp.bytes().await.map_err(|e| format!("read body: {e}"))?;
     if bytes.len() > 5 * 1024 * 1024 {
         return Err(format!("payload too large: {} bytes", bytes.len()));
     }
@@ -79,7 +76,11 @@ pub fn extract_text(html: &str) -> String {
 /// 在 `html` 中找到首个 `<tag>...</tag>` 的内层字符串(用于 title)
 fn extract_tag_text(html: &str, tag: &str) -> Option<String> {
     let s = extract_tag_slice(html, tag)?;
-    Some(decode_entities(&collapse_ws(&strip_tags_naive(s))).trim().to_string())
+    Some(
+        decode_entities(&collapse_ws(&strip_tags_naive(s)))
+            .trim()
+            .to_string(),
+    )
 }
 
 /// 找到首个 `<tag ...>` 后到 `</tag>` 之间的子串(返回原 HTML 片段)
@@ -157,12 +158,9 @@ fn char_len_at(s: &[u8]) -> usize {
         return 0;
     }
     let b = s[0];
-    if b < 0x80 {
+    if b < 0xC0 {
         1
-    } else if b < 0xC0 {
-        1
-    } // invalid lead, skip 1
-    else if b < 0xE0 {
+    } else if b < 0xE0 {
         2
     } else if b < 0xF0 {
         3

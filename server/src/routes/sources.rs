@@ -23,9 +23,7 @@ use std::sync::Arc;
 use tracing::{error, info, warn};
 
 use crate::auth::UserId;
-use crate::models::source::{
-    infer_kind, CreateSourceRequest, Source, UpdateSourceRequest,
-};
+use crate::models::source::{infer_kind, CreateSourceRequest, Source, UpdateSourceRequest};
 use crate::services::insight_fetcher;
 use crate::state::AppState;
 
@@ -151,8 +149,16 @@ pub async fn create_source(
     user_id: UserId,
     Json(req): Json<CreateSourceRequest>,
 ) -> (StatusCode, Json<JsonValue>) {
-    let url_trimmed = req.url.as_deref().map(|s| s.trim()).filter(|s| !s.is_empty());
-    let has_content = req.content.as_deref().map(|s| !s.trim().is_empty()).unwrap_or(false);
+    let url_trimmed = req
+        .url
+        .as_deref()
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty());
+    let has_content = req
+        .content
+        .as_deref()
+        .map(|s| !s.trim().is_empty())
+        .unwrap_or(false);
     if url_trimmed.is_none() && !has_content {
         return (
             StatusCode::BAD_REQUEST,
@@ -443,14 +449,10 @@ pub async fn refetch_source(
 // ============ helper ============
 
 fn fetch_source(db: &Connection, user_id: &str, id: i64) -> (StatusCode, Json<JsonValue>) {
-    let sql = format!(
-        "SELECT {SELECT_COLS} FROM sources WHERE id = ?1 AND user_id = ?2 AND deleted = 0"
-    );
+    let sql =
+        format!("SELECT {SELECT_COLS} FROM sources WHERE id = ?1 AND user_id = ?2 AND deleted = 0");
     match db.query_row(&sql, params![id, user_id], row_to_source) {
-        Ok(t) => (
-            StatusCode::OK,
-            Json(json!({ "success": true, "item": t })),
-        ),
+        Ok(t) => (StatusCode::OK, Json(json!({ "success": true, "item": t }))),
         Err(rusqlite::Error::QueryReturnedNoRows) => (
             StatusCode::NOT_FOUND,
             Json(json!({ "success": false, "error": "未找到素材" })),
@@ -490,7 +492,9 @@ mod tests {
                     .uri("/api/sources")
                     .header("Cookie", &cookie)
                     .header("Content-Type", "application/json")
-                    .body(Body::from(r#"{"content":"paste text body","title":"我的笔记"}"#))
+                    .body(Body::from(
+                        r#"{"content":"paste text body","title":"我的笔记"}"#,
+                    ))
                     .unwrap(),
             )
             .await
@@ -516,7 +520,9 @@ mod tests {
                     .uri("/api/sources")
                     .header("Cookie", &cookie)
                     .header("Content-Type", "application/json")
-                    .body(Body::from(r#"{"url":"https://www.youtube.com/watch?v=abc"}"#))
+                    .body(Body::from(
+                        r#"{"url":"https://www.youtube.com/watch?v=abc"}"#,
+                    ))
                     .unwrap(),
             )
             .await
@@ -571,7 +577,9 @@ mod tests {
                     .uri("/api/sources")
                     .header("Cookie", &cookie)
                     .header("Content-Type", "application/json")
-                    .body(Body::from(format!(r#"{{"content":"y","insightId":{iid}}}"#)))
+                    .body(Body::from(format!(
+                        r#"{{"content":"y","insightId":{iid}}}"#
+                    )))
                     .unwrap(),
             )
             .await

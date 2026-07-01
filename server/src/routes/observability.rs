@@ -56,7 +56,11 @@ pub async fn report_client_error(
         } else {
             entry.0 += 1;
             if entry.0 > 10 {
-                return (StatusCode::TOO_MANY_REQUESTS, Json(json!({"error": "rate_limited"}))).into_response();
+                return (
+                    StatusCode::TOO_MANY_REQUESTS,
+                    Json(json!({"error": "rate_limited"})),
+                )
+                    .into_response();
             }
         }
     }

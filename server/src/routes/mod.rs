@@ -17,10 +17,10 @@ pub mod reviews;
 pub mod routine_collab;
 pub mod routines;
 pub mod soul_state;
-pub mod todos;
-pub mod trips;
 pub mod stakeholder_columns;
 pub mod stakeholders;
+pub mod todos;
+pub mod trips;
 pub mod work_columns;
 pub mod work_tasks;
 // T-105 SPEC insight
@@ -40,6 +40,6 @@ pub mod insight_share;
 pub mod insight_factory;
 // T-218 SPEC analytics — user behavior events ingest
 pub mod events;
-pub mod praxis_contacts;
 pub mod praxis_contact_logs;
+pub mod praxis_contacts;
 pub mod praxis_journal;

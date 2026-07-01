@@ -838,22 +838,14 @@ pub async fn message_feedback_handler(
     )
     .ok();
 
-    (
-        StatusCode::OK,
-        Json(json!({"success": true})),
-    )
+    (StatusCode::OK, Json(json!({"success": true})))
 }
 
 /// Helper: build a single-event SSE error response
 fn make_sse_error(msg: &str) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
     let payload = json!({"type": "error", "message": msg});
     Sse::new(futures::stream::once(async move {
-        Ok::<_, Infallible>(
-            Event::default()
-                .event("error")
-                .json_data(payload)
-                .unwrap(),
-        )
+        Ok::<_, Infallible>(Event::default().event("error").json_data(payload).unwrap())
     }))
     .keep_alive(KeepAlive::default())
 }

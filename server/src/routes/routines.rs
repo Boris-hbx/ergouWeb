@@ -86,7 +86,10 @@ pub async fn list_routines(
     let db = state.db.lock();
     ensure_collab_tables(&db);
     let tz = chrono::FixedOffset::east_opt(8 * 3600).unwrap(); // UTC+8
-    let today = chrono::Utc::now().with_timezone(&tz).format("%Y-%m-%d").to_string();
+    let today = chrono::Utc::now()
+        .with_timezone(&tz)
+        .format("%Y-%m-%d")
+        .to_string();
 
     let mut items: Vec<Routine> = Vec::new();
 
@@ -239,7 +242,10 @@ pub async fn toggle_routine(
     let db = state.db.lock();
     ensure_collab_tables(&db);
     let tz = chrono::FixedOffset::east_opt(8 * 3600).unwrap(); // UTC+8
-    let today = chrono::Utc::now().with_timezone(&tz).format("%Y-%m-%d").to_string();
+    let today = chrono::Utc::now()
+        .with_timezone(&tz)
+        .format("%Y-%m-%d")
+        .to_string();
     let now = chrono::Utc::now().to_rfc3339();
 
     let is_owner: bool = db
