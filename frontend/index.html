@@ -8,17 +8,17 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Next">
     <title>Next - Focus on the Right Thing</title>
-    <link rel="stylesheet" href="assets/css/base.css?v=20260630d">
-    <link rel="stylesheet" href="assets/css/style.css?v=20260630d">
-    <link rel="stylesheet" href="assets/css/components.css?v=20260630d">
-    <link rel="stylesheet" href="assets/css/mobile.css?v=20260630d">
-    <link rel="stylesheet" href="assets/css/abao.css?v=20260630d">
-    <link rel="stylesheet" href="assets/css/english.css?v=20260630d">
-    <link rel="stylesheet" href="assets/css/health.css?v=20260630d">
-    <link rel="stylesheet" href="assets/css/patrol.css?v=20260630d">
-    <link rel="stylesheet" href="assets/css/admin-panel.css?v=20260630d">
-    <link rel="stylesheet" href="assets/css/work.css?v=20260630d">
-    <link rel="stylesheet" href="assets/css/insight.css?v=20260630d">
+    <link rel="stylesheet" href="assets/css/base.css?v=20260701a">
+    <link rel="stylesheet" href="assets/css/style.css?v=20260701a">
+    <link rel="stylesheet" href="assets/css/components.css?v=20260701a">
+    <link rel="stylesheet" href="assets/css/mobile.css?v=20260701a">
+    <link rel="stylesheet" href="assets/css/abao.css?v=20260701a">
+    <link rel="stylesheet" href="assets/css/english.css?v=20260701a">
+    <link rel="stylesheet" href="assets/css/health.css?v=20260701a">
+    <link rel="stylesheet" href="assets/css/patrol.css?v=20260701a">
+    <link rel="stylesheet" href="assets/css/admin-panel.css?v=20260701a">
+    <link rel="stylesheet" href="assets/css/work.css?v=20260701a">
+    <link rel="stylesheet" href="assets/css/insight.css?v=20260701a">
     <link rel="manifest" href="assets/manifest.json">
     <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
     <script>
@@ -1302,42 +1302,50 @@
         <div id="work-praxis-view" class="praxis-view" style="display:none;">
             <button class="wt-back-btn" onclick="Work.showHub()">&larr; 工作</button>
             <div class="praxis-shell">
-                <section class="praxis-banner">
-                    <div>
-                        <div class="praxis-kicker">Praxis</div>
-                        <h2>🧭 Praxis</h2>
+                <!-- T-290:顶部工具条(标题+今日经营+记录回看+健康度),取代原 3 行大卡 -->
+                <div class="praxis-topbar" id="praxis-topbar">
+                    <div class="praxis-tb-brand">
+                        <span class="praxis-tb-logo">🧭</span>
+                        <span class="praxis-tb-en">Praxis</span>
+                        <span class="praxis-tb-tag">经营自己</span>
                     </div>
-                    <div class="praxis-score">
-                        <span>健康度</span>
-                        <input id="praxis-health-score" type="number" min="0" max="100" value="58" onchange="Praxis.setHealthScore(this.value)">
+                    <button class="praxis-tb-act" id="praxis-today-entry" onclick="PraxisJournal.open()">
+                        <span class="praxis-tb-ic">📝</span>
+                        <span class="praxis-tb-actxt"><span class="t">今日经营</span><span class="s">5 分钟记录 → AI 归类</span></span>
+                        <span class="praxis-today-status pj-status-empty" id="praxis-today-status">未记录</span>
+                    </button>
+                    <button class="praxis-tb-act" id="praxis-review-entry" onclick="PraxisReview.open()">
+                        <span class="praxis-tb-ic">🕘</span>
+                        <span class="praxis-tb-actxt"><span class="t">记录回看</span><span class="s">翻历史 · 找重复模式</span></span>
+                    </button>
+                    <div class="praxis-tb-spacer"></div>
+                    <div class="praxis-tb-health">
+                        <span class="lab">健康度</span>
+                        <button class="praxis-health-ring s-mid" id="praxis-health-ring" onclick="Praxis.editHealth()" title="点击手动设置">58</button>
                     </div>
-                </section>
-                <!-- T-285:今日经营 主入口(顶部主行动,不占八板块格) -->
-                <button class="praxis-today-entry" id="praxis-today-entry" onclick="PraxisJournal.open()">
-                    <span class="praxis-today-icon">📓</span>
-                    <span class="praxis-today-text">
-                        <strong>今日经营</strong>
-                        <em id="praxis-today-sub">用 5 分钟记录今天，AI 帮你归类经营板块</em>
-                    </span>
-                    <span class="praxis-today-status" id="praxis-today-status">未记录</span>
-                </button>
-                <!-- T-286:记录回看 入口 -->
-                <button class="praxis-review-entry" id="praxis-review-entry" onclick="PraxisReview.open()">
-                    <span>📚 记录回看</span>
-                    <em>翻历史经营记录，看看自己是不是在重复同一个模式</em>
-                </button>
+                </div>
                 <div id="praxis-cockpit">
-                    <div class="praxis-board-grid" id="praxis-board-grid"></div>
+                    <!-- 八板块 tab 行(名称+评分环,hover 弹理念) -->
+                    <div class="praxis-board-tabs" id="praxis-board-grid"></div>
+                    <!-- 板块内容区(占满剩余高度) -->
                     <section class="praxis-relation-layout">
                         <div class="praxis-map-panel">
                             <div class="praxis-map-head">
                                 <div>
-                                    <h3>关键关系</h3>
+                                    <h3 id="praxis-board-title">关键关系</h3>
                                     <p id="praxis-contact-count">0 人</p>
                                 </div>
-                                <button class="eg-btn eg-btn--primary" onclick="Praxis.startCreate()">+ 新建关系人</button>
+                                <button class="eg-btn eg-btn--primary" id="praxis-add-contact" onclick="Praxis.startCreate()">+ 新建关系人</button>
                             </div>
+                            <div class="praxis-board-idea" id="praxis-board-idea"></div>
                             <div class="praxis-arc-wrap" id="praxis-arc-wrap"></div>
+                            <div class="praxis-legend" id="praxis-legend">
+                                <span class="pl-it"><span class="pl-sw sw-solid"></span>最近深聊</span>
+                                <span class="pl-it"><span class="pl-sw sw-light"></span>仅浅联系</span>
+                                <span class="pl-it"><span class="pl-sw sw-dim"></span>超维护周期</span>
+                                <span class="pl-it"><span class="pl-sw sw-hi"></span>建议本周联系</span>
+                                <span class="pl-it"><span class="pl-sw sw-risk"></span>有风险</span>
+                            </div>
                         </div>
                         <aside class="praxis-editor" id="praxis-editor">
                             <div class="praxis-editor-empty">选择节点或新建关系人</div>
@@ -1944,78 +1952,78 @@
     </div>
 
     <!-- Markdown rendering (T-133: 本地自托管,CDN 仅作兜底——jsdelivr 国内常失败,失败则退化裸 markdown) -->
-    <script src="assets/vendor/marked.min.js?v=20260630d"></script>
+    <script src="assets/vendor/marked.min.js?v=20260701a"></script>
     <script>window.marked||document.write('<script src="https://cdn.jsdelivr.net/npm/marked@15/marked.min.js"><\/script>');</script>
-    <script src="assets/vendor/purify.min.js?v=20260630d"></script>
+    <script src="assets/vendor/purify.min.js?v=20260701a"></script>
     <script>window.DOMPurify||document.write('<script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"><\/script>');</script>
 
     <!-- JS Modules -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
-    <script src="assets/js/observability.js?v=20260630d"></script>
-    <script src="assets/js/api.js?v=20260630d"></script>
-    <script src="assets/js/utils.js?v=20260630d"></script>
+    <script src="assets/js/observability.js?v=20260701a"></script>
+    <script src="assets/js/api.js?v=20260701a"></script>
+    <script src="assets/js/utils.js?v=20260701a"></script>
     <!-- T-095: 通用弹窗组件 (openProgressDialog / openTextInputDialog),tasks.js 和 work-table.js 都依赖 -->
-    <script src="assets/js/dialogs.js?v=20260630d"></script>
-    <script src="assets/js/jelly-indicator.js?v=20260630d"></script>
-    <script src="assets/js/app.js?v=20260630d"></script>
-    <script src="assets/js/tasks.js?v=20260630d"></script>
-    <script src="assets/js/modal.js?v=20260630d"></script>
-    <script src="assets/js/datepicker.js?v=20260630d"></script>
-    <script src="assets/js/drag.js?v=20260630d"></script>
-    <script src="assets/js/actionsheet.js?v=20260630d"></script>
-    <script src="assets/js/share-modal.js?v=20260630d"></script>
-    <script src="assets/js/review.js?v=20260630d"></script>
-    <script src="assets/js/routines.js?v=20260630d"></script>
-    <script src="assets/js/features.js?v=20260630d"></script>
-    <script src="assets/js/particles.js?v=20260630d"></script>
-    <script src="assets/js/living-line.js?v=20260630d"></script>
-    <script src="assets/js/abao.js?v=20260630d"></script>
-    <script src="assets/js/english.js?v=20260630d"></script>
-    <script src="assets/js/life.js?v=20260630d"></script>
-    <script src="assets/js/expense.js?v=20260630d"></script>
-    <script src="assets/js/expense-analytics.js?v=20260630d"></script>
-    <script src="assets/js/trip.js?v=20260630d"></script>
-    <script src="assets/js/health-data.js?v=20260630d"></script>
-    <script src="assets/js/health-renderer.js?v=20260630d"></script>
-    <script src="assets/js/health.js?v=20260630d"></script>
-    <script src="assets/js/friends.js?v=20260630d"></script>
-    <script src="assets/js/notifications.js?v=20260630d"></script>
-    <script src="assets/js/settings.js?v=20260630d"></script>
-    <script src="assets/js/admin-panel.js?v=20260630d"></script>
+    <script src="assets/js/dialogs.js?v=20260701a"></script>
+    <script src="assets/js/jelly-indicator.js?v=20260701a"></script>
+    <script src="assets/js/app.js?v=20260701a"></script>
+    <script src="assets/js/tasks.js?v=20260701a"></script>
+    <script src="assets/js/modal.js?v=20260701a"></script>
+    <script src="assets/js/datepicker.js?v=20260701a"></script>
+    <script src="assets/js/drag.js?v=20260701a"></script>
+    <script src="assets/js/actionsheet.js?v=20260701a"></script>
+    <script src="assets/js/share-modal.js?v=20260701a"></script>
+    <script src="assets/js/review.js?v=20260701a"></script>
+    <script src="assets/js/routines.js?v=20260701a"></script>
+    <script src="assets/js/features.js?v=20260701a"></script>
+    <script src="assets/js/particles.js?v=20260701a"></script>
+    <script src="assets/js/living-line.js?v=20260701a"></script>
+    <script src="assets/js/abao.js?v=20260701a"></script>
+    <script src="assets/js/english.js?v=20260701a"></script>
+    <script src="assets/js/life.js?v=20260701a"></script>
+    <script src="assets/js/expense.js?v=20260701a"></script>
+    <script src="assets/js/expense-analytics.js?v=20260701a"></script>
+    <script src="assets/js/trip.js?v=20260701a"></script>
+    <script src="assets/js/health-data.js?v=20260701a"></script>
+    <script src="assets/js/health-renderer.js?v=20260701a"></script>
+    <script src="assets/js/health.js?v=20260701a"></script>
+    <script src="assets/js/friends.js?v=20260701a"></script>
+    <script src="assets/js/notifications.js?v=20260701a"></script>
+    <script src="assets/js/settings.js?v=20260701a"></script>
+    <script src="assets/js/admin-panel.js?v=20260701a"></script>
     <!-- T-219 行为分析采集：必须在 app.js / admin-panel.js 之后加载（要 hook 它们） -->
-    <script src="assets/js/tracker.js?v=20260630d"></script>
+    <script src="assets/js/tracker.js?v=20260701a"></script>
     <!-- Work module (T-094 / SPEC work-task-table) -->
-    <script src="assets/js/work-pick.js?v=20260630d"></script>
-    <script src="assets/js/work-grid-engine.js?v=20260630d"></script>
-    <script src="assets/js/work-table.js?v=20260630d"></script>
-    <script src="assets/js/work-column-cfg.js?v=20260630d"></script>
-    <script src="assets/js/work-board.js?v=20260630d"></script>
-    <script src="assets/js/work-calendar.js?v=20260630d"></script>
+    <script src="assets/js/work-pick.js?v=20260701a"></script>
+    <script src="assets/js/work-grid-engine.js?v=20260701a"></script>
+    <script src="assets/js/work-table.js?v=20260701a"></script>
+    <script src="assets/js/work-column-cfg.js?v=20260701a"></script>
+    <script src="assets/js/work-board.js?v=20260701a"></script>
+    <script src="assets/js/work-calendar.js?v=20260701a"></script>
     <!-- T-099 -->
-    <script src="assets/js/work-person.js?v=20260630d"></script>
+    <script src="assets/js/work-person.js?v=20260701a"></script>
     <!-- T-108 -->
-    <script src="assets/js/work-distribution.js?v=20260630d"></script>
-    <script src="assets/js/work-center.js?v=20260630d"></script>
-    <script src="assets/js/work-attention.js?v=20260630d"></script>
-    <script src="assets/js/work-detail.js?v=20260630d"></script>
-    <script src="assets/js/stakeholder.js?v=20260630d"></script>
-    <script src="assets/js/praxis.js?v=20260630d"></script>
-    <script src="assets/js/praxis_journal.js?v=20260630d"></script>
-    <script src="assets/js/praxis_review.js?v=20260630d"></script>
-    <script src="assets/js/work.js?v=20260630d"></script>
+    <script src="assets/js/work-distribution.js?v=20260701a"></script>
+    <script src="assets/js/work-center.js?v=20260701a"></script>
+    <script src="assets/js/work-attention.js?v=20260701a"></script>
+    <script src="assets/js/work-detail.js?v=20260701a"></script>
+    <script src="assets/js/stakeholder.js?v=20260701a"></script>
+    <script src="assets/js/praxis.js?v=20260701a"></script>
+    <script src="assets/js/praxis_journal.js?v=20260701a"></script>
+    <script src="assets/js/praxis_review.js?v=20260701a"></script>
+    <script src="assets/js/work.js?v=20260701a"></script>
     <!-- T-111:已完成档案(按月分组归档区) -->
-    <script src="assets/js/work-done.js?v=20260630d"></script>
+    <script src="assets/js/work-done.js?v=20260701a"></script>
     <!-- T-123 Insight v0.3:单层 insight_task + textarea 反馈。
          v0.2 的 capture/revise/annotations/citation/detail 已废弃(insight-citation.js 仅 share.js 公开页动态加载) -->
-    <script src="assets/js/insight-markdown.js?v=20260630d"></script>
-    <script src="assets/js/insight.js?v=20260630d"></script>
-    <script src="assets/js/insight-factory.js?v=20260630d"></script>
+    <script src="assets/js/insight-markdown.js?v=20260701a"></script>
+    <script src="assets/js/insight.js?v=20260701a"></script>
+    <script src="assets/js/insight-factory.js?v=20260701a"></script>
     <!-- T-116:个人访问令牌 (PAT) 管理 -->
-    <script src="assets/js/pat.js?v=20260630d"></script>
-    <script src="assets/js/patrol-utils.js?v=20260630d"></script>
-    <script src="assets/js/patrol-terrain.js?v=20260630d"></script>
-    <script src="assets/js/patrol-debug.js?v=20260630d"></script>
-    <script src="assets/js/patrol.js?v=20260630d"></script>
+    <script src="assets/js/pat.js?v=20260701a"></script>
+    <script src="assets/js/patrol-utils.js?v=20260701a"></script>
+    <script src="assets/js/patrol-terrain.js?v=20260701a"></script>
+    <script src="assets/js/patrol-debug.js?v=20260701a"></script>
+    <script src="assets/js/patrol.js?v=20260701a"></script>
 
     <script>
     // Initialize

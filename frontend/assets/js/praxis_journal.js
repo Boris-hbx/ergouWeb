@@ -54,7 +54,7 @@ var PraxisJournal = (function() {
     }
 
     function toggleView(showJournal) {
-        ['praxis-cockpit', 'praxis-today-entry', 'praxis-review-entry'].forEach(function(id) {
+        ['praxis-topbar', 'praxis-cockpit'].forEach(function(id) {
             var el = document.getElementById(id);
             if (el) el.style.display = showJournal ? 'none' : '';
         });
