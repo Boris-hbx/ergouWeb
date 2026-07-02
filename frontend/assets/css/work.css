@@ -235,12 +235,27 @@ body:has(.sidebar.collapsed) { --sidebar-width: 0px; }
   width: 100%;
   height: auto;
 }
-/* 同心弧（T-291 §11.6，严格对照 praxis-relations-preview.html）：
-   三层各一条不同色弧线（颜色由 praxis.js 逐层内联 stroke 给），虚线描边。 */
+/* 同心弧（T-295 §11.8，严格对照 docs/praxis-arc-prototype.html）：
+   正圆扇形，三层各一条不同色外边界弧（颜色由 praxis.js 逐层内联 stroke 给），实线。 */
 .praxis-arc {
   fill: none;
-  stroke-width: 1.8;
-  stroke-dasharray: 3 5;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+/* 容量软上限温和提示（§11.8 ④），浮在弧上方，不挤压弧本体。 */
+.praxis-cap-hint {
+  position: absolute;
+  left: 12px;
+  top: 8px;
+  z-index: 2;
+  max-width: 60%;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: #FFF7E6;
+  border: 1px solid #FFE1A8;
+  color: #92600A;
+  font-size: 0.78rem;
+  line-height: 1.4;
 }
 .praxis-self {
   fill: #7C4DFF;
