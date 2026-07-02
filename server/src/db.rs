@@ -409,6 +409,32 @@ fn run_migrations(conn: &Connection) {
            WHERE status = 'drafting';",
     )
     .ok();
+
+    // T-292: praxis 视角隔离 —— praxis_contacts 加 perspective_id,存量关系人迁入默认视角。
+    let has_contact_perspective: bool = conn
+        .prepare("SELECT perspective_id FROM praxis_contacts LIMIT 1")
+        .is_ok();
+    if !has_contact_perspective {
+        conn.execute_batch("ALTER TABLE praxis_contacts ADD COLUMN perspective_id INTEGER;")
+            .ok();
+    }
+    // 回填(幂等):有未归属关系人且还没有视角的用户,先种一个「默认」视角;
+    // 再把该用户所有 perspective_id IS NULL 的关系人挂到其第一个视角。
+    conn.execute_batch(
+        "INSERT INTO praxis_perspectives (user_id, name, sort_order, created_at, updated_at, deleted)
+         SELECT DISTINCT c.user_id, '默认', 1,
+                strftime('%Y-%m-%dT%H:%M:%fZ','now'), strftime('%Y-%m-%dT%H:%M:%fZ','now'), 0
+           FROM praxis_contacts c
+          WHERE c.perspective_id IS NULL
+            AND c.user_id NOT IN (SELECT p.user_id FROM praxis_perspectives p WHERE p.deleted = 0);
+         UPDATE praxis_contacts
+            SET perspective_id = (
+                SELECT p.id FROM praxis_perspectives p
+                 WHERE p.user_id = praxis_contacts.user_id AND p.deleted = 0
+                 ORDER BY p.sort_order ASC, p.id ASC LIMIT 1)
+          WHERE perspective_id IS NULL;",
+    )
+    .ok();
 }
 
 fn create_tables(conn: &Connection) {
@@ -1057,6 +1083,7 @@ fn create_tables(conn: &Connection) {
         CREATE TABLE IF NOT EXISTS praxis_contacts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id TEXT NOT NULL,
+            perspective_id INTEGER,
             name TEXT NOT NULL,
             layer TEXT NOT NULL DEFAULT 'normal',
             last_contact_at TEXT,
@@ -1085,6 +1112,19 @@ fn create_tables(conn: &Connection) {
             deleted INTEGER NOT NULL DEFAULT 0
         );
         CREATE INDEX IF NOT EXISTS idx_praxis_journal_user ON praxis_journal(user_id, entry_date, deleted);
+
+        -- Praxis perspectives (T-292 / SPEC praxis §11.1)
+        -- 每个视角是一套完全隔离的关系人数据集（工作/人生建议/日常…）。
+        CREATE TABLE IF NOT EXISTS praxis_perspectives (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            sort_order REAL NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            deleted INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE INDEX IF NOT EXISTS idx_praxis_perspectives_user ON praxis_perspectives(user_id, deleted);
 
         -- Praxis contact interaction logs (T-287 / SPEC praxis §7)
         CREATE TABLE IF NOT EXISTS praxis_contact_logs (

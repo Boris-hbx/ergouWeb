@@ -1,12 +1,13 @@
 //! `/api/praxis/contacts` - Praxis relation contacts.
 
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     Json,
 };
 use chrono::Utc;
 use rusqlite::{params, Connection};
+use serde::Deserialize;
 use serde_json::{json, Map, Value as JsonValue};
 use tracing::error;
 
@@ -14,9 +15,16 @@ use crate::auth::AdminUserId;
 use crate::models::praxis_contact::{
     CreatePraxisContactRequest, PraxisContact, UpdatePraxisContactRequest,
 };
+use crate::routes::praxis_perspectives::{ensure_default_perspective, perspective_owned};
 use crate::state::AppState;
 
-const SELECT_COLS: &str = "id, name, layer, last_contact_at, last_quality, risk, note, cycle_off, sort_order, created_at, updated_at";
+const SELECT_COLS: &str = "id, perspective_id, name, layer, last_contact_at, last_quality, risk, note, cycle_off, sort_order, created_at, updated_at";
+
+#[derive(Debug, Deserialize, Default)]
+pub struct ListContactsQuery {
+    #[serde(rename = "perspectiveId")]
+    pub perspective_id: Option<i64>,
+}
 
 fn now_rfc3339() -> String {
     Utc::now().to_rfc3339()
@@ -48,32 +56,11 @@ fn validate_layer(layer: &str) -> Result<String, String> {
     }
 }
 
-fn validate_quality(quality: Option<String>) -> Result<Option<String>, String> {
-    match quality.as_deref() {
-        None | Some("") => Ok(None),
-        Some("shallow" | "effective" | "deep") => Ok(quality),
-        _ => Err("lastQuality must be shallow, effective, deep, or null".into()),
-    }
-}
-
 fn field_string(fields: &Map<String, JsonValue>, key: &str) -> Option<String> {
     fields
         .get(key)
         .and_then(|v| v.as_str())
         .map(|s| s.to_string())
-}
-
-fn field_nullable_string(
-    fields: &Map<String, JsonValue>,
-    key: &str,
-) -> Result<Option<Option<String>>, String> {
-    match fields.get(key) {
-        None => Ok(None),
-        Some(JsonValue::Null) => Ok(Some(None)),
-        Some(JsonValue::String(s)) if s.is_empty() => Ok(Some(None)),
-        Some(JsonValue::String(s)) => Ok(Some(Some(s.clone()))),
-        Some(_) => Err(format!("{key} must be a string or null")),
-    }
 }
 
 fn field_bool(fields: &Map<String, JsonValue>, key: &str) -> Option<bool> {
@@ -85,20 +72,21 @@ fn field_f64(fields: &Map<String, JsonValue>, key: &str) -> Option<f64> {
 }
 
 fn row_to_contact(row: &rusqlite::Row) -> rusqlite::Result<PraxisContact> {
-    let risk: i64 = row.get(5)?;
-    let cycle_off: i64 = row.get(7)?;
+    let risk: i64 = row.get(6)?;
+    let cycle_off: i64 = row.get(8)?;
     Ok(PraxisContact {
         id: row.get(0)?,
-        name: row.get(1)?,
-        layer: row.get(2)?,
-        last_contact_at: row.get(3)?,
-        last_quality: row.get(4)?,
+        perspective_id: row.get(1)?,
+        name: row.get(2)?,
+        layer: row.get(3)?,
+        last_contact_at: row.get(4)?,
+        last_quality: row.get(5)?,
         risk: risk != 0,
-        note: row.get(6)?,
+        note: row.get(7)?,
         cycle_off: cycle_off != 0,
-        sort_order: row.get(8)?,
-        created_at: row.get(9)?,
-        updated_at: row.get(10)?,
+        sort_order: row.get(9)?,
+        created_at: row.get(10)?,
+        updated_at: row.get(11)?,
     })
 }
 
@@ -110,15 +98,38 @@ fn load_contact(db: &Connection, user_id: &str, id: i64) -> Option<PraxisContact
         .ok()
 }
 
-pub fn list_contacts_impl(db: &Connection, user_id: &str) -> Result<Vec<PraxisContact>, String> {
+/// 解析请求里的 perspectiveId：显式传入须属于该用户（否则 Err），
+/// 缺省回落到默认视角（老前端不带参数时行为不变——存量数据都迁在默认视角）。
+fn resolve_perspective(
+    db: &Connection,
+    user_id: &str,
+    requested: Option<i64>,
+) -> Result<i64, String> {
+    match requested {
+        Some(pid) => {
+            if perspective_owned(db, user_id, pid) {
+                Ok(pid)
+            } else {
+                Err("perspective not found".into())
+            }
+        }
+        None => ensure_default_perspective(db, user_id),
+    }
+}
+
+pub fn list_contacts_impl(
+    db: &Connection,
+    user_id: &str,
+    perspective_id: i64,
+) -> Result<Vec<PraxisContact>, String> {
     let sql = format!(
         "SELECT {SELECT_COLS} FROM praxis_contacts
-         WHERE user_id = ?1 AND deleted = 0
+         WHERE user_id = ?1 AND perspective_id = ?2 AND deleted = 0
          ORDER BY sort_order ASC, updated_at DESC, id ASC"
     );
     let mut stmt = db.prepare(&sql).map_err(|e| format!("prepare: {e}"))?;
     let rows = stmt
-        .query_map(params![user_id], row_to_contact)
+        .query_map(params![user_id, perspective_id], row_to_contact)
         .map_err(|e| format!("query: {e}"))?;
     Ok(rows.filter_map(|r| r.ok()).collect())
 }
@@ -130,7 +141,7 @@ pub fn create_contact_impl(
 ) -> Result<PraxisContact, String> {
     let name = validate_name(&req.name)?;
     let layer = validate_layer(&req.layer)?;
-    let last_quality = validate_quality(req.last_quality.clone())?;
+    let perspective_id = resolve_perspective(db, user_id, req.perspective_id)?;
     let now = now_rfc3339();
     let sort_order = req.sort_order.unwrap_or_else(|| {
         db.query_row(
@@ -141,16 +152,16 @@ pub fn create_contact_impl(
         .unwrap_or(1.0)
     });
 
+    // T-292 §11.3:last_contact_at/last_quality 是派生缓存,新建一律 NULL("从未联系")。
     db.execute(
         "INSERT INTO praxis_contacts
-           (user_id, name, layer, last_contact_at, last_quality, risk, note, cycle_off, sort_order, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?10)",
+           (user_id, perspective_id, name, layer, risk, note, cycle_off, sort_order, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?9)",
         params![
             user_id,
+            perspective_id,
             &name,
             &layer,
-            &req.last_contact_at,
-            &last_quality,
             if req.risk { 1 } else { 0 },
             &req.note,
             if req.cycle_off { 1 } else { 0 },
@@ -180,12 +191,8 @@ pub fn update_contact_impl(
     if let Some(layer) = field_string(&patch.fields, "layer") {
         current.layer = validate_layer(&layer)?;
     }
-    if let Some(last_contact_at) = field_nullable_string(&patch.fields, "lastContactAt")? {
-        current.last_contact_at = last_contact_at;
-    }
-    if let Some(last_quality) = field_nullable_string(&patch.fields, "lastQuality")? {
-        current.last_quality = validate_quality(last_quality)?;
-    }
+    // T-292 §11.3:lastContactAt/lastQuality 是派生缓存,PATCH 传入一律忽略
+    // (老客户端兼容);§11.5:视角间不迁移,perspectiveId 同样忽略。
     if let Some(risk) = field_bool(&patch.fields, "risk") {
         current.risk = risk;
     }
@@ -200,16 +207,15 @@ pub fn update_contact_impl(
     }
 
     let now = now_rfc3339();
+    // 派生缓存 last_contact_at/last_quality 不在 SET 里——只随交流记录增改删重算。
     db.execute(
         "UPDATE praxis_contacts
-         SET name = ?1, layer = ?2, last_contact_at = ?3, last_quality = ?4,
-             risk = ?5, note = ?6, cycle_off = ?7, sort_order = ?8, updated_at = ?9
-         WHERE id = ?10 AND user_id = ?11 AND deleted = 0",
+         SET name = ?1, layer = ?2,
+             risk = ?3, note = ?4, cycle_off = ?5, sort_order = ?6, updated_at = ?7
+         WHERE id = ?8 AND user_id = ?9 AND deleted = 0",
         params![
             &current.name,
             &current.layer,
-            &current.last_contact_at,
-            &current.last_quality,
             if current.risk { 1 } else { 0 },
             &current.note,
             if current.cycle_off { 1 } else { 0 },
@@ -227,12 +233,34 @@ pub fn update_contact_impl(
 pub async fn list_contacts(
     State(state): State<AppState>,
     admin: AdminUserId,
+    Query(q): Query<ListContactsQuery>,
 ) -> (StatusCode, Json<JsonValue>) {
     let db = state.db.lock();
-    match list_contacts_impl(&db, &admin.0) {
+    let perspective_id = match resolve_perspective(&db, &admin.0, q.perspective_id) {
+        Ok(pid) => pid,
+        Err(e) if e.contains("not found") => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({ "success": false, "error": "未找到视角" })),
+            )
+        }
+        Err(e) => {
+            error!(target: "praxis_contacts", "list resolve perspective: {}", e);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "success": false, "error": "内部错误" })),
+            );
+        }
+    };
+    match list_contacts_impl(&db, &admin.0, perspective_id) {
         Ok(items) => (
             StatusCode::OK,
-            Json(json!({ "success": true, "items": items, "count": items.len() })),
+            Json(json!({
+                "success": true,
+                "items": items,
+                "count": items.len(),
+                "perspectiveId": perspective_id
+            })),
         ),
         Err(e) => {
             error!(target: "praxis_contacts", "list: {}", e);
@@ -258,6 +286,10 @@ pub async fn create_contact(
         Err(e) if e.contains("must") => (
             StatusCode::BAD_REQUEST,
             Json(json!({ "success": false, "error": e })),
+        ),
+        Err(e) if e.contains("not found") => (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "success": false, "error": "未找到视角" })),
         ),
         Err(e) => {
             error!(target: "praxis_contacts", "create: {}", e);
@@ -381,7 +413,11 @@ mod tests {
         assert_eq!(j["success"], true);
         assert_eq!(j["item"]["name"], "Boris");
         assert_eq!(j["item"]["layer"], "core");
-        assert_eq!(j["item"]["lastQuality"], "deep");
+        // T-292 §11.3:最近联系是派生缓存,创建入参里的 lastContactAt/lastQuality 被忽略
+        assert_eq!(j["item"]["lastContactAt"], JsonValue::Null);
+        assert_eq!(j["item"]["lastQuality"], JsonValue::Null);
+        // 缺省落在默认视角
+        assert!(j["item"]["perspectiveId"].as_i64().is_some());
         assert_eq!(j["item"]["risk"], true);
         let id = j["item"]["id"].as_i64().unwrap();
 
@@ -447,6 +483,123 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn contacts_are_isolated_by_perspective() {
+        let state = test_state();
+        let (_aid, admin_token) = create_admin_user(&state, "px-persp", "Pa55word1");
+        let app = crate::build_app(state);
+
+        // 默认视角里一个关系人(不带 perspectiveId)
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/praxis/contacts")
+                    .header("Cookie", auth_cookie(&admin_token))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(r#"{"name":"默认人","layer":"normal"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let default_pid = body_json(resp).await["item"]["perspectiveId"]
+            .as_i64()
+            .unwrap();
+
+        // 建「工作」视角,往里放一个关系人
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/praxis/perspectives")
+                    .header("Cookie", auth_cookie(&admin_token))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(r#"{"name":"工作"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let work_pid = body_json(resp).await["item"]["id"].as_i64().unwrap();
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/praxis/contacts")
+                    .header("Cookie", auth_cookie(&admin_token))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(format!(
+                        r#"{{"name":"工作人","layer":"core","perspectiveId":{work_pid}}}"#
+                    )))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(body_json(resp).await["item"]["perspectiveId"], work_pid);
+
+        // 不带参数 = 默认视角,只看到默认人;带 perspectiveId 只看到该视角的人 → 完全隔离
+        for (uri, expect_name, expect_pid) in [
+            ("/api/praxis/contacts".to_string(), "默认人", default_pid),
+            (
+                format!("/api/praxis/contacts?perspectiveId={default_pid}"),
+                "默认人",
+                default_pid,
+            ),
+            (
+                format!("/api/praxis/contacts?perspectiveId={work_pid}"),
+                "工作人",
+                work_pid,
+            ),
+        ] {
+            let resp = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .uri(uri)
+                        .header("Cookie", auth_cookie(&admin_token))
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            let j = body_json(resp).await;
+            assert_eq!(j["count"], 1);
+            assert_eq!(j["items"][0]["name"], expect_name);
+            assert_eq!(j["perspectiveId"], expect_pid);
+        }
+
+        // 不存在/不属于自己的视角:GET 与 POST 都 404
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/api/praxis/contacts?perspectiveId=99999")
+                    .header("Cookie", auth_cookie(&admin_token))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/praxis/contacts")
+                    .header("Cookie", auth_cookie(&admin_token))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(
+                        r#"{"name":"越权","layer":"normal","perspectiveId":99999}"#,
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
     async fn praxis_contacts_validate_fields() {
         let state = test_state();
         let (_admin_id, admin_token) = create_admin_user(&state, "px-admin-2", "Pa55word1");
@@ -455,7 +608,6 @@ mod tests {
         for body in [
             r#"{"name":"","layer":"normal"}"#,
             r#"{"name":"Boris","layer":"outer"}"#,
-            r#"{"name":"Boris","layer":"normal","lastQuality":"bad"}"#,
         ] {
             let resp = app
                 .clone()
