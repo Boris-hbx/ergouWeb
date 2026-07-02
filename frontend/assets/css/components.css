@@ -2573,6 +2573,33 @@ html.sidebar-will-collapse .sidebar-hint {
     background: rgba(20, 184, 166, .16);
 }
 
+/* T-293: 未升级四象限卡的可见升级入口 — 桌面 hover 浮现，动效轻过渡 */
+.todo-upgrade-quick {
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(20, 184, 166, .32);
+    border-radius: 6px;
+    background: rgba(20, 184, 166, .1);
+    color: #0f766e;
+    font-size: 13px;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity .15s ease, background .15s ease;
+}
+.task-item:hover .todo-upgrade-quick,
+.todo-upgrade-quick:focus-visible {
+    opacity: 1;
+}
+.todo-upgrade-quick:hover {
+    background: rgba(20, 184, 166, .2);
+}
+
 .assignee-divider {
     width: 1px;
     height: 20px;
