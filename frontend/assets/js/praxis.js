@@ -20,14 +20,22 @@ var Praxis = (function() {
         { key: 'risk', icon: '🛡️', name: '风险预案', score: 48, idea: '给最坏情况留后手，别让单点故障掀翻全局。' }
     ];
 
-    // 同心弧几何 + 配色（严格对照 docs/praxis-relations-preview.html）。
-    // T-291 §11.6：层级显示改名 核心/重点/重要；后端 layer 键仍 core/important/normal 不变，只在此处做显示映射。
-    // 维护周期：核心 7 天 / 重点 30 天 / 重要 不强制。
-    var CX = 95, CY = 190;
+    // 同心弧几何 + 配色（T-295 §11.8，严格对照 docs/praxis-arc-prototype.html）。
+    // 正圆扇形：三层同一圆心（在「我」CX,CY），只在右前方张开 SPAN° 扇形，半径依次变大。
+    // 人散落在各层「分区」内（沿角度 + 沿半径 2D 铺开），彩色弧只是每层外边界线。
+    // 中性代号：显示名 圈一/圈二/圈三（后端 layer 键仍 core/important/normal 不变，仅前端映射）。
+    // 周期语义（圈一约7天/圈二约30天/圈三不强制）移到 pill tooltip，不进弧标签。
+    var CX = 58, CY = 248, SPAN = 70;
+    var A0 = -SPAN / 2, A1 = SPAN / 2;   // 扇形起止角（0°=正右，负=上，正=下）
+    // rBound=该层外边界半径；cap=容量软上限；rows=分区内「同心排」(r=半径, k=该排满员人数)。
+    // rows 满员数 = cap，原型 v4 已验证满员时圆点+名字不重叠。
     var LAYERS = {
-        core:      { display: '核心', label: '核心 · 7天',  rx: 230, ry: 98,  cycle: 7,    col: '#5B34D6' },
-        important: { display: '重点', label: '重点 · 30天', rx: 430, ry: 146, cycle: 30,   col: '#8257F5' },
-        normal:    { display: '重要', label: '重要',        rx: 620, ry: 182, cycle: null, col: '#B49BF0' }
+        core:      { display: '圈一', cap: 5,  cycle: 7,    col: '#5B34D6', rBound: 150,
+                     cycleHint: '圈一 · 建议约 7 天联系一次', rows: [{ r: 82, k: 2 }, { r: 128, k: 3 }] },
+        important: { display: '圈二', cap: 15, cycle: 30,   col: '#8257F5', rBound: 278,
+                     cycleHint: '圈二 · 建议约 30 天联系一次', rows: [{ r: 180, k: 4 }, { r: 222, k: 5 }, { r: 260, k: 6 }] },
+        normal:    { display: '圈三', cap: 30, cycle: null, col: '#B49BF0', rBound: 415,
+                     cycleHint: '圈三 · 不强制联系周期', rows: [{ r: 300, k: 9 }, { r: 340, k: 10 }, { r: 380, k: 11 }] }
     };
     var LAYER_ORDER = ['core', 'important', 'normal'];
 
@@ -276,37 +284,79 @@ var Praxis = (function() {
         renderEditorEmpty();
     }
 
-    // ===== 同心弧（T-291 §11.6，严格对照 preview）=====
-    function arcPath(rx, ry) {
-        return 'M ' + CX + ' ' + (CY - ry) +
-            ' C ' + CX + ' ' + (CY - ry) + ' ' + (CX + rx) + ' ' + (CY - ry) + ' ' + (CX + rx) + ' ' + CY +
-            ' C ' + (CX + rx) + ' ' + (CY + ry) + ' ' + CX + ' ' + (CY + ry) + ' ' + CX + ' ' + CY;
+    // ===== 同心弧（T-295 §11.8，严格对照 docs/praxis-arc-prototype.html）=====
+    // 极坐标 → 直角（deg：0°=正右，A0/A1 上下张开）。正圆，单一半径。
+    function polar(r, deg) {
+        var a = deg * Math.PI / 180;
+        return { x: CX + r * Math.cos(a), y: CY + r * Math.sin(a) };
+    }
+    function f(n) { return Math.round(n * 100) / 100; }
+    // 单层外边界弧：SVG 圆弧命令 A r r（正圆，废弃椭圆 rx/ry）。
+    function arcSeg(r) {
+        var s = polar(r, A0), e = polar(r, A1);
+        return 'M ' + f(s.x) + ' ' + f(s.y) + ' A ' + r + ' ' + r + ' 0 0 1 ' + f(e.x) + ' ' + f(e.y);
+    }
+    // 分区扇形（从圆心「我」到外边界弧再回收），用于填充分区底色。
+    function wedge(r) {
+        var s = polar(r, A0), e = polar(r, A1);
+        return 'M ' + CX + ' ' + CY + ' L ' + f(s.x) + ' ' + f(s.y) +
+            ' A ' + r + ' ' + r + ' 0 0 1 ' + f(e.x) + ' ' + f(e.y) + ' Z';
+    }
+
+    // 在某层分区内为 n 个人算落点：内排先满、末排取余；同心排上均匀铺开、隔排半格错位。
+    // n 超容量时余数并入末排（更密但不叠，配合温和提示）。返回 [{r, deg}] 顺序对应传入 items。
+    function layerPositions(layer, n) {
+        var rows = layer.rows, pad = 4, lo = A0 + pad, hi = A1 - pad;
+        var counts = [], left = n;
+        for (var i = 0; i < rows.length; i++) {
+            var take = (i === rows.length - 1) ? left : Math.min(rows[i].k, left);
+            if (take < 0) take = 0;
+            counts.push(take);
+            left -= take;
+            if (left < 0) left = 0;
+        }
+        var pos = [];
+        for (var r = 0; r < rows.length; r++) {
+            var c = counts[r];
+            if (!c) continue;
+            // 每排 c 点落在 c 等分子弧的中点：两端留白、始终在 [lo,hi] 内、绝不重合；
+            // 各排 c 不同（2/3、4/5/6、9/10/11）→ 天然错位，无需额外偏移。
+            var step = (hi - lo) / c;
+            for (var j = 0; j < c; j++) {
+                pos.push({ r: rows[r].r, deg: lo + (j + 0.5) * step });
+            }
+        }
+        return pos;
     }
 
     function renderArc() {
         if (_activeBoard !== 'rel') return;
         var wrap = document.getElementById('praxis-arc-wrap');
         if (!wrap) return;
-        var parts = ['<svg class="praxis-arc-svg" viewBox="0 0 820 380" role="img" aria-label="关系同心弧">'];
-        // 填充区：大→小叠放，同色低透明，越往里(左)叠得越深 → 分区渐变（preview 做法）。
+        var parts = ['<svg class="praxis-arc-svg" viewBox="0 -14 505 514" role="img" aria-label="关系同心弧">'];
+        // 分区底色：外→内叠放，同色低透明，越往里叠得越深 → 越里越亲近。
         LAYER_ORDER.slice().reverse().forEach(function(k) {
-            var l = LAYERS[k];
-            parts.push('<path d="' + arcPath(l.rx, l.ry) + '" fill="rgba(124,77,255,.06)" stroke="none"></path>');
+            parts.push('<path d="' + wedge(LAYERS[k].rBound) + '" fill="rgba(124,77,255,.055)" stroke="none"></path>');
         });
-        // 弧线（每层不同色，越里越深）+ 层级标签（落在弧线上，约 50°）。
+        // 外边界弧（每层不同色）+ 层级标签（弧上端外侧，中性代号 + 容量）。
         LAYER_ORDER.forEach(function(k) {
             var l = LAYERS[k];
-            parts.push('<path class="praxis-arc praxis-arc-' + k + '" d="' + arcPath(l.rx, l.ry) + '" stroke="' + l.col + '"></path>');
-            var la = 50 * Math.PI / 180;
-            var lx = CX + l.rx * Math.cos(la), ly = CY - l.ry * Math.sin(la);
-            parts.push('<text class="praxis-layer-label" x="' + (lx + 5) + '" y="' + (ly - 3) + '" fill="' + l.col + '">' + esc(l.label) + '</text>');
+            parts.push('<path class="praxis-arc praxis-arc-' + k + '" d="' + arcSeg(l.rBound) + '" stroke="' + l.col + '"></path>');
+            var lp = polar(l.rBound + 13, A0);
+            parts.push('<text class="praxis-layer-label" x="' + f(lp.x) + '" y="' + f(lp.y) + '" fill="' + l.col + '" text-anchor="middle">' + esc(l.display + ' · ≤' + l.cap) + '</text>');
         });
         parts.push(nodesSvg());
         parts.push('<circle class="praxis-self" cx="' + CX + '" cy="' + CY + '" r="15"></circle>');
         parts.push('<text class="praxis-self-text" x="' + CX + '" y="' + (CY + 4) + '" text-anchor="middle">我</text>');
         parts.push('</svg>');
+        // 容量软上限：超额不挤爆，给温和提示（§11.8 ④）。
+        var counts = { core: 0, important: 0, normal: 0 };
+        _contacts.forEach(function(c) { counts[LAYERS[c.layer] ? c.layer : 'normal']++; });
+        var over = LAYER_ORDER.filter(function(k) { return counts[k] > LAYERS[k].cap; })
+            .map(function(k) { return LAYERS[k].display + '建议 ≤' + LAYERS[k].cap + ' 人，你已 ' + counts[k] + ' 人'; });
+        var hint = over.length ? '<div class="praxis-cap-hint">💡 ' + esc(over.join('；')) + '</div>' : '';
         var empty = _contacts.length ? '' : '<div class="praxis-empty-hint">还没有关系人，点「+ 新建关系人」开始经营你的人脉。</div>';
-        wrap.innerHTML = parts.join('') + empty;
+        wrap.innerHTML = hint + parts.join('') + empty;
     }
 
     function nodesSvg() {
@@ -315,39 +365,32 @@ var Praxis = (function() {
             (byLayer[c.layer] || byLayer.normal).push(c);
         });
         return LAYER_ORDER.map(function(layerKey) {
-            // 同层按最近联系排序，最近的靠右(θ≈0)、越久越靠两端。
+            var layer = LAYERS[layerKey];
+            // 同层按最近联系排序：最近的排在前 → 落到更内的排（越里越亲近）。
             var items = byLayer[layerKey].sort(function(a, b) {
                 return contactTime(b) - contactTime(a);
             });
+            var positions = layerPositions(layer, items.length);
             return items.map(function(c, idx) {
-                var pos = nodePosition(layerKey, idx);
+                var p = polar(positions[idx].r, positions[idx].deg);
+                var x = f(p.x), y = f(p.y);
                 var state = nodeState(c);
                 var selected = c.id === _selectedId ? ' selected' : '';
                 var halo = state === 'hi'
-                    ? '<circle class="praxis-node-halo" cx="' + pos.x + '" cy="' + pos.y + '" r="10"></circle>'
+                    ? '<circle class="praxis-node-halo" cx="' + x + '" cy="' + y + '" r="10"></circle>'
                     : '';
                 var risk = c.risk
-                    ? '<circle class="praxis-node-risk" cx="' + (pos.x + 8) + '" cy="' + (pos.y - 8) + '" r="4"></circle>'
+                    ? '<circle class="praxis-node-risk" cx="' + f(p.x + 7) + '" cy="' + f(p.y - 7) + '" r="4"></circle>'
                     : '';
+                // 名字随点放在圆点上方居中（原型做法），不串弧上。
                 return '<g class="praxis-node ' + state + selected + '" onclick="Praxis.selectContact(' + c.id + ')" tabindex="0">' +
                     halo +
-                    '<circle class="praxis-node-dot" cx="' + pos.x + '" cy="' + pos.y + '" r="6"></circle>' +
+                    '<text x="' + x + '" y="' + f(p.y - 9) + '" text-anchor="middle">' + esc(c.name) + '</text>' +
+                    '<circle class="praxis-node-dot" cx="' + x + '" cy="' + y + '" r="5.5"></circle>' +
                     risk +
-                    '<text x="' + pos.x + '" y="' + (pos.y + 16) + '" text-anchor="middle">' + esc(c.name) + '</text>' +
                     '</g>';
             }).join('');
         }).join('');
-    }
-
-    function nodePosition(layerKey, idx) {
-        var layer = LAYERS[layerKey];
-        var offset = idx === 0 ? 0 : Math.ceil(idx / 2) * (idx % 2 ? -1 : 1);
-        var angle = Math.max(-70, Math.min(70, offset * 18));
-        var rad = angle * Math.PI / 180;
-        return {
-            x: Math.round(CX + layer.rx * Math.cos(rad)),
-            y: Math.round(CY - layer.ry * Math.sin(rad))
-        };
     }
 
     function contactTime(contact) {
@@ -416,7 +459,7 @@ var Praxis = (function() {
 
     function layerPills(current) {
         return '<div class="pf-pills" data-field="layer">' + LAYER_ORDER.map(function(k) {
-            return '<span class="pf-pill' + (k === current ? ' on' : '') + '" data-v="' + k + '" onclick="Praxis.pickPill(this)">' + LAYERS[k].display + '</span>';
+            return '<span class="pf-pill' + (k === current ? ' on' : '') + '" data-v="' + k + '" title="' + escAttr(LAYERS[k].cycleHint) + '" onclick="Praxis.pickPill(this)">' + LAYERS[k].display + '</span>';
         }).join('') + '</div>';
     }
 
