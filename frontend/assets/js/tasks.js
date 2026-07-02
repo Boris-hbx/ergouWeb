@@ -539,6 +539,12 @@ function getTodoUpgradeBadgeHtml(item) {
     return '<button class="todo-work-badge" onclick="event.stopPropagation(); openWorkTaskFromTodo(\'' + item.id + '\')" title="打开关联工作任务">已升级</button>';
 }
 
+// T-293: 未升级四象限卡的可见升级入口（桌面 hover 浮现，克制的 ↗ 小按钮）
+function getTodoUpgradeQuickBtnHtml(item) {
+    if (!item || item.upgradedToWork) return '';
+    return '<button class="todo-upgrade-quick" onmousedown="event.stopPropagation()" onclick="event.stopPropagation(); upgradeTodoToWork(\'' + item.id + '\')" title="升级到工作任务" aria-label="升级到工作任务">↗</button>';
+}
+
 function openWorkTaskFromTodo(todoId) {
     var item = allItems.find(function(i) { return i.id === todoId; });
     if (!item || !item.workTaskId) {
@@ -607,6 +613,7 @@ function createItemHtml(item) {
 
     var reminderHtml = getReminderBadgeHtml(item);
     var upgradeBadgeHtml = getTodoUpgradeBadgeHtml(item);
+    var upgradeQuickHtml = getTodoUpgradeQuickBtnHtml(item);
     var triggeredClass = (item.next_reminder && item.next_reminder.status === 'triggered') ? ' task-item-triggered' : '';
 
     return '<div class="task-item' + collabClass + triggeredClass + '" data-id="' + item.id + '" onmousedown="startCustomDrag(event)">' +
@@ -621,6 +628,7 @@ function createItemHtml(item) {
         dueDateHtml +
         collabMeta +
         assigneeHtml +
+        upgradeQuickHtml +
         '<button class="task-delete" onmousedown="event.stopPropagation()" onclick="event.stopPropagation(); deleteTask(\'' + item.id + '\')" title="删除">&times;</button>' +
     '</div>';
 }

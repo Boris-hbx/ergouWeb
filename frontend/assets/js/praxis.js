@@ -7,14 +7,14 @@ var Praxis = (function() {
     var _healthScore = 58;
 
     var BOARDS = [
-        { key: 'strategy', icon: '🎯', name: '战略定位', score: 62 },
-        { key: 'skill', icon: '🛠️', name: '能力产品', score: 78 },
-        { key: 'ops', icon: '⏱️', name: '运营管理', score: 55 },
-        { key: 'fin', icon: '💧', name: '财务健康', score: 70 },
-        { key: 'brand', icon: '📣', name: '品牌市场', score: 40 },
-        { key: 'rel', icon: '🤝', name: '关键关系', score: 58 },
-        { key: 'cog', icon: '🔭', name: '竞争认知', score: 66 },
-        { key: 'risk', icon: '🛡️', name: '风险预案', score: 48 }
+        { key: 'strategy', icon: '🎯', name: '战略定位', score: 62, idea: '想清楚要成为什么样的人，再决定做什么事。' },
+        { key: 'skill', icon: '🛠️', name: '能力产品', score: 78, idea: '把能力打磨成可被识别、可被交付的产品。' },
+        { key: 'ops', icon: '⏱️', name: '运营管理', score: 55, idea: '用系统和习惯托住状态，别靠意志硬扛。' },
+        { key: 'fin', icon: '💧', name: '财务健康', score: 70, idea: '现金流健康是自由的底座，别让钱绑架决策。' },
+        { key: 'brand', icon: '📣', name: '品牌市场', score: 40, idea: '让对的人知道你能提供什么价值。' },
+        { key: 'rel', icon: '🤝', name: '关键关系', score: 58, idea: '核心层每周深聊、重要层每月联系；拒绝无效社交，学会说不。' },
+        { key: 'cog', icon: '🔭', name: '竞争认知', score: 66, idea: '看清自己在牌桌上的位置和手里的牌。' },
+        { key: 'risk', icon: '🛡️', name: '风险预案', score: 48, idea: '给最坏情况留后手，别让单点故障掀翻全局。' }
     ];
 
     var LAYERS = {
@@ -24,17 +24,16 @@ var Praxis = (function() {
     };
 
     function open() {
-        // 进入驾驶舱时复位到八板块视图（隐藏今日经营页，spec §5.4 入口）。
+        // 进入驾驶舱时复位到八板块视图（隐藏今日经营/记录回看子页，spec §5.4 入口）。
+        var topbar = document.getElementById('praxis-topbar');
         var cockpit = document.getElementById('praxis-cockpit');
-        var entry = document.getElementById('praxis-today-entry');
-        var reviewEntry = document.getElementById('praxis-review-entry');
         var jview = document.getElementById('praxis-journal-view');
         var rview = document.getElementById('praxis-review-view');
+        if (topbar) topbar.style.display = '';
         if (cockpit) cockpit.style.display = '';
-        if (entry) entry.style.display = '';
-        if (reviewEntry) reviewEntry.style.display = '';
         if (jview) jview.style.display = 'none';
         if (rview) rview.style.display = 'none';
+        renderHealth();
         renderBoards();
         if (!_loaded) {
             _loaded = true;
@@ -75,16 +74,21 @@ var Praxis = (function() {
         }
     }
 
+    function scoreClass(n) {
+        return n >= 75 ? 'ok' : (n >= 50 ? 'mid' : 'low');
+    }
+
+    // 八板块 tab 行：名称 + 评分环，hover 弹理念（spec §10）。
     function renderBoards() {
         var grid = document.getElementById('praxis-board-grid');
         if (!grid) return;
         grid.innerHTML = BOARDS.map(function(board) {
             var active = board.key === _activeBoard ? ' active' : '';
             var score = board.key === 'rel' ? _healthScore : board.score;
-            return '<button class="praxis-board-card' + active + '" onclick="Praxis.setBoard(\'' + board.key + '\')" title="' + esc(board.name) + '">' +
-                '<span class="praxis-board-icon">' + board.icon + '</span>' +
-                '<span class="praxis-board-name">' + esc(board.name) + '</span>' +
-                '<span class="praxis-board-score">' + score + '</span>' +
+            return '<button class="praxis-btab' + active + '" onclick="Praxis.setBoard(\'' + board.key + '\')">' +
+                '<span class="praxis-btab-name">' + esc(board.name) + '</span>' +
+                '<span class="praxis-btab-score sc-' + scoreClass(score) + '">' + score + '</span>' +
+                (board.idea ? '<span class="praxis-btab-idea">' + esc(board.idea) + '</span>' : '') +
                 '</button>';
         }).join('');
     }
@@ -95,15 +99,29 @@ var Praxis = (function() {
         render();
     }
 
+    function renderHealth() {
+        var ring = document.getElementById('praxis-health-ring');
+        if (!ring) return;
+        ring.textContent = _healthScore;
+        ring.className = 'praxis-health-ring s-' + scoreClass(_healthScore);
+    }
+
     function setHealthScore(value) {
         var n = Math.max(0, Math.min(100, parseInt(value, 10) || 0));
         _healthScore = n;
-        var input = document.getElementById('praxis-health-score');
-        if (input) input.value = n;
+        renderHealth();
         renderBoards();
     }
 
+    // 健康度手动设置（点击圆环，spec §2 手动自设）。
+    function editHealth() {
+        var v = window.prompt('设置健康度（0–100）', _healthScore);
+        if (v === null) return;
+        setHealthScore(v);
+    }
+
     function render() {
+        renderBoardHead();
         renderCount();
         renderArc();
         if (_activeBoard !== 'rel') {
@@ -117,6 +135,22 @@ var Praxis = (function() {
         } else {
             renderEditorEmpty();
         }
+    }
+
+    // 板块内容区头部随当前板块切换：标题 / 理念 / 关系人专属控件（计数·新建·图例）。
+    function renderBoardHead() {
+        var board = BOARDS.find(function(b) { return b.key === _activeBoard; }) || {};
+        var isRel = _activeBoard === 'rel';
+        var title = document.getElementById('praxis-board-title');
+        var count = document.getElementById('praxis-contact-count');
+        var add = document.getElementById('praxis-add-contact');
+        var idea = document.getElementById('praxis-board-idea');
+        var legend = document.getElementById('praxis-legend');
+        if (title) title.textContent = board.name || '';
+        if (idea) idea.textContent = board.idea || '';
+        if (count) count.style.display = isRel ? '' : 'none';
+        if (add) add.style.display = isRel ? '' : 'none';
+        if (legend) legend.style.display = isRel ? '' : 'none';
     }
 
     function renderCount() {
@@ -469,6 +503,7 @@ var Praxis = (function() {
         open: open,
         setBoard: setBoard,
         setHealthScore: setHealthScore,
+        editHealth: editHealth,
         startCreate: startCreate,
         selectContact: selectContact,
         deleteSelected: deleteSelected,
