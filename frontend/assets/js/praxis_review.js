@@ -30,7 +30,7 @@ var PraxisReview = (function() {
     }
 
     function toggleView(show) {
-        ['praxis-cockpit', 'praxis-today-entry', 'praxis-review-entry'].forEach(function(id) {
+        ['praxis-topbar', 'praxis-cockpit'].forEach(function(id) {
             var el = document.getElementById(id);
             if (el) el.style.display = show ? 'none' : '';
         });

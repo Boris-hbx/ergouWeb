@@ -1,44 +1,51 @@
-// ========== Praxis module (T-283) ==========
+// ========== Praxis module (T-283 / T-291 视角+双tab+派生只读+同心弧改版) ==========
 var Praxis = (function() {
     var _loaded = false;
     var _contacts = [];
+    var _perspectives = [];
+    var _activePerspectiveId = null;
     var _selectedId = null;
     var _activeBoard = 'rel';
+    var _sideTab = 'info';   // 右侧面板当前 tab：info(人物信息) / logs(交流信息)
     var _healthScore = 58;
 
     var BOARDS = [
-        { key: 'strategy', icon: '🎯', name: '战略定位', score: 62 },
-        { key: 'skill', icon: '🛠️', name: '能力产品', score: 78 },
-        { key: 'ops', icon: '⏱️', name: '运营管理', score: 55 },
-        { key: 'fin', icon: '💧', name: '财务健康', score: 70 },
-        { key: 'brand', icon: '📣', name: '品牌市场', score: 40 },
-        { key: 'rel', icon: '🤝', name: '关键关系', score: 58 },
-        { key: 'cog', icon: '🔭', name: '竞争认知', score: 66 },
-        { key: 'risk', icon: '🛡️', name: '风险预案', score: 48 }
+        { key: 'strategy', icon: '🎯', name: '战略定位', score: 62, idea: '想清楚要成为什么样的人，再决定做什么事。' },
+        { key: 'skill', icon: '🛠️', name: '能力产品', score: 78, idea: '把能力打磨成可被识别、可被交付的产品。' },
+        { key: 'ops', icon: '⏱️', name: '运营管理', score: 55, idea: '用系统和习惯托住状态，别靠意志硬扛。' },
+        { key: 'fin', icon: '💧', name: '财务健康', score: 70, idea: '现金流健康是自由的底座，别让钱绑架决策。' },
+        { key: 'brand', icon: '📣', name: '品牌市场', score: 40, idea: '让对的人知道你能提供什么价值。' },
+        { key: 'rel', icon: '🤝', name: '关键关系', score: 58, idea: '核心层每周深聊、重点层每月联系；拒绝无效社交，学会说不。' },
+        { key: 'cog', icon: '🔭', name: '竞争认知', score: 66, idea: '看清自己在牌桌上的位置和手里的牌。' },
+        { key: 'risk', icon: '🛡️', name: '风险预案', score: 48, idea: '给最坏情况留后手，别让单点故障掀翻全局。' }
     ];
 
+    // 同心弧几何 + 配色（严格对照 docs/praxis-relations-preview.html）。
+    // T-291 §11.6：层级显示改名 核心/重点/重要；后端 layer 键仍 core/important/normal 不变，只在此处做显示映射。
+    // 维护周期：核心 7 天 / 重点 30 天 / 重要 不强制。
+    var CX = 95, CY = 190;
     var LAYERS = {
-        core: { label: '核心圈', rx: 300, ry: 120, cycle: 7 },
-        important: { label: '重点圈', rx: 560, ry: 178, cycle: 30 },
-        normal: { label: '普通圈', rx: 810, ry: 222, cycle: null }
+        core:      { display: '核心', label: '核心 · 7天',  rx: 230, ry: 98,  cycle: 7,    col: '#5B34D6' },
+        important: { display: '重点', label: '重点 · 30天', rx: 430, ry: 146, cycle: 30,   col: '#8257F5' },
+        normal:    { display: '重要', label: '重要',        rx: 620, ry: 182, cycle: null, col: '#B49BF0' }
     };
+    var LAYER_ORDER = ['core', 'important', 'normal'];
 
     function open() {
-        // 进入驾驶舱时复位到八板块视图（隐藏今日经营页，spec §5.4 入口）。
+        // 进入驾驶舱时复位到八板块视图（隐藏今日经营/记录回看子页，spec §5.4 入口）。
+        var topbar = document.getElementById('praxis-topbar');
         var cockpit = document.getElementById('praxis-cockpit');
-        var entry = document.getElementById('praxis-today-entry');
-        var reviewEntry = document.getElementById('praxis-review-entry');
         var jview = document.getElementById('praxis-journal-view');
         var rview = document.getElementById('praxis-review-view');
+        if (topbar) topbar.style.display = '';
         if (cockpit) cockpit.style.display = '';
-        if (entry) entry.style.display = '';
-        if (reviewEntry) reviewEntry.style.display = '';
         if (jview) jview.style.display = 'none';
         if (rview) rview.style.display = 'none';
+        renderHealth();
         renderBoards();
         if (!_loaded) {
             _loaded = true;
-            loadContacts();
+            loadPerspectives();
         } else {
             render();
         }
@@ -63,11 +70,29 @@ var Praxis = (function() {
         }
     }
 
+    // ===== 视角（T-291 §11.1）=====
+    async function loadPerspectives() {
+        try {
+            var res = await API.praxisPerspectiveList();
+            if (!res || res.success === false) throw new Error((res && res.error) || '加载失败');
+            _perspectives = res.items || [];
+            if (!_activePerspectiveId || !_perspectives.some(function(p) { return p.id === _activePerspectiveId; })) {
+                _activePerspectiveId = _perspectives.length ? _perspectives[0].id : null;
+            }
+            await loadContacts();
+        } catch (err) {
+            console.error('[Praxis] load perspectives failed', err);
+            if (typeof showToast === 'function') showToast('Praxis 视角加载失败', 'error');
+        }
+    }
+
     async function loadContacts() {
         try {
-            var res = await API.praxisContactList();
+            var res = await API.praxisContactList(_activePerspectiveId);
             if (!res || res.success === false) throw new Error((res && res.error) || '加载失败');
             _contacts = res.items || [];
+            // 后端可能回落默认视角，以响应回显的 perspectiveId 为准。
+            if (res.perspectiveId) _activePerspectiveId = res.perspectiveId;
             render();
         } catch (err) {
             console.error('[Praxis] load contacts failed', err);
@@ -75,16 +100,102 @@ var Praxis = (function() {
         }
     }
 
+    function switchPerspective(id) {
+        if (id === _activePerspectiveId) return;
+        _activePerspectiveId = id;
+        _selectedId = null;
+        _sideTab = 'info';
+        loadContacts();
+    }
+
+    async function createPerspective() {
+        var name = window.prompt('新建视角名称（如 工作 / 人生建议 / 日常，1–30 字）', '');
+        if (name === null) return;
+        name = name.trim();
+        if (!name) return;
+        try {
+            var res = await API.praxisPerspectiveCreate({ name: name });
+            if (!res || res.success === false) throw new Error((res && res.error) || '创建失败');
+            await loadPerspectivesKeep(res.item ? res.item.id : null);
+            if (typeof showToast === 'function') showToast('已新建视角', 'success');
+        } catch (err) {
+            console.error('[Praxis] create perspective failed', err);
+            if (typeof showToast === 'function') showToast(err.message || '创建视角失败', 'error');
+        }
+    }
+
+    // 重新拉视角列表，并切到指定视角（新建后切到新视角）。
+    async function loadPerspectivesKeep(preferId) {
+        var res = await API.praxisPerspectiveList();
+        if (!res || res.success === false) throw new Error((res && res.error) || '加载失败');
+        _perspectives = res.items || [];
+        if (preferId && _perspectives.some(function(p) { return p.id === preferId; })) {
+            _activePerspectiveId = preferId;
+        } else if (!_perspectives.some(function(p) { return p.id === _activePerspectiveId; })) {
+            _activePerspectiveId = _perspectives.length ? _perspectives[0].id : null;
+        }
+        _selectedId = null;
+        _sideTab = 'info';
+        await loadContacts();
+    }
+
+    async function deletePerspective(id) {
+        var persp = _perspectives.find(function(p) { return p.id === id; });
+        if (!persp) return;
+        if (!window.confirm('删除视角「' + persp.name + '」？（视角内不能有关系人）')) return;
+        try {
+            var res = await API.praxisPerspectiveDelete(id);
+            // 删非空视角后端返 409：{success:false,error:"视角内还有 N 位关系人，请先清空再删除"}。
+            if (!res || res.success === false) {
+                if (typeof showToast === 'function') showToast((res && res.error) || '该视角非空，请先清空再删除', 'warning');
+                return;
+            }
+            await loadPerspectivesKeep(null);
+            if (typeof showToast === 'function') showToast('已删除视角', 'success');
+        } catch (err) {
+            console.error('[Praxis] delete perspective failed', err);
+            if (typeof showToast === 'function') showToast(err.message || '删除视角失败', 'error');
+        }
+    }
+
+    function renderPerspBar() {
+        var bar = document.getElementById('praxis-persp-bar');
+        if (!bar) return;
+        if (_activeBoard !== 'rel') {
+            bar.style.display = 'none';
+            return;
+        }
+        bar.style.display = '';
+        var canDelete = _perspectives.length > 1;
+        var chips = _perspectives.map(function(p) {
+            var active = p.id === _activePerspectiveId ? ' active' : '';
+            var del = (active && canDelete)
+                ? '<span class="pchip-x" title="删除视角" onclick="event.stopPropagation(); Praxis.deletePerspective(' + p.id + ')">×</span>'
+                : '';
+            return '<span class="pchip' + active + '" onclick="Praxis.switchPerspective(' + p.id + ')">' + esc(p.name) + del + '</span>';
+        }).join('');
+        bar.innerHTML =
+            '<span class="persp-lab">视角</span>' +
+            chips +
+            '<span class="pchip add" onclick="Praxis.createPerspective()">+ 新建视角</span>' +
+            '<button class="persp-addp" onclick="Praxis.startCreate()">+ 新建关系人</button>';
+    }
+
+    function scoreClass(n) {
+        return n >= 75 ? 'ok' : (n >= 50 ? 'mid' : 'low');
+    }
+
+    // 八板块 tab 行：名称 + 评分环，hover 弹理念（spec §10）。
     function renderBoards() {
         var grid = document.getElementById('praxis-board-grid');
         if (!grid) return;
         grid.innerHTML = BOARDS.map(function(board) {
             var active = board.key === _activeBoard ? ' active' : '';
             var score = board.key === 'rel' ? _healthScore : board.score;
-            return '<button class="praxis-board-card' + active + '" onclick="Praxis.setBoard(\'' + board.key + '\')" title="' + esc(board.name) + '">' +
-                '<span class="praxis-board-icon">' + board.icon + '</span>' +
-                '<span class="praxis-board-name">' + esc(board.name) + '</span>' +
-                '<span class="praxis-board-score">' + score + '</span>' +
+            return '<button class="praxis-btab' + active + '" onclick="Praxis.setBoard(\'' + board.key + '\')">' +
+                '<span class="praxis-btab-name">' + esc(board.name) + '</span>' +
+                '<span class="praxis-btab-score sc-' + scoreClass(score) + '">' + score + '</span>' +
+                (board.idea ? '<span class="praxis-btab-idea">' + esc(board.idea) + '</span>' : '') +
                 '</button>';
         }).join('');
     }
@@ -95,16 +206,31 @@ var Praxis = (function() {
         render();
     }
 
+    function renderHealth() {
+        var ring = document.getElementById('praxis-health-ring');
+        if (!ring) return;
+        ring.textContent = _healthScore;
+        ring.className = 'praxis-health-ring s-' + scoreClass(_healthScore);
+    }
+
     function setHealthScore(value) {
         var n = Math.max(0, Math.min(100, parseInt(value, 10) || 0));
         _healthScore = n;
-        var input = document.getElementById('praxis-health-score');
-        if (input) input.value = n;
+        renderHealth();
         renderBoards();
     }
 
+    // 健康度手动设置（点击圆环，spec §2 手动自设）。
+    function editHealth() {
+        var v = window.prompt('设置健康度（0–100）', _healthScore);
+        if (v === null) return;
+        setHealthScore(v);
+    }
+
     function render() {
+        renderBoardHead();
         renderCount();
+        renderPerspBar();
         renderArc();
         if (_activeBoard !== 'rel') {
             renderPlaceholder();
@@ -119,9 +245,23 @@ var Praxis = (function() {
         }
     }
 
+    // 板块内容区头部随当前板块切换：标题 / 理念 / 关系人专属控件（计数·图例）。
+    function renderBoardHead() {
+        var board = BOARDS.find(function(b) { return b.key === _activeBoard; }) || {};
+        var isRel = _activeBoard === 'rel';
+        var title = document.getElementById('praxis-board-title');
+        var count = document.getElementById('praxis-contact-count');
+        var idea = document.getElementById('praxis-board-idea');
+        var legend = document.getElementById('praxis-legend');
+        if (title) title.textContent = board.name || '';
+        if (idea) idea.textContent = board.idea || '';
+        if (count) count.style.display = isRel ? '' : 'none';
+        if (legend) legend.style.display = isRel ? '' : 'none';
+    }
+
     function renderCount() {
         var count = document.getElementById('praxis-contact-count');
-        if (count) count.textContent = _contacts.length + ' 人';
+        if (count) count.textContent = '本视角 ' + _contacts.length + ' 人 · 与其它视角隔离';
     }
 
     function renderPlaceholder() {
@@ -136,47 +276,46 @@ var Praxis = (function() {
         renderEditorEmpty();
     }
 
+    // ===== 同心弧（T-291 §11.6，严格对照 preview）=====
+    function arcPath(rx, ry) {
+        return 'M ' + CX + ' ' + (CY - ry) +
+            ' C ' + CX + ' ' + (CY - ry) + ' ' + (CX + rx) + ' ' + (CY - ry) + ' ' + (CX + rx) + ' ' + CY +
+            ' C ' + (CX + rx) + ' ' + (CY + ry) + ' ' + CX + ' ' + (CY + ry) + ' ' + CX + ' ' + CY;
+    }
+
     function renderArc() {
         if (_activeBoard !== 'rel') return;
         var wrap = document.getElementById('praxis-arc-wrap');
         if (!wrap) return;
-        var svg = [
-            '<svg class="praxis-arc-svg" viewBox="0 0 1000 470" role="img" aria-label="关系同心弧">',
-            '<defs><linearGradient id="praxis-arc-grad" x1="0%" y1="50%" x2="100%" y2="50%"><stop offset="0%" stop-color="#d7dbe6"/><stop offset="100%" stop-color="#7c4dff"/></linearGradient></defs>',
-            arcPath('core'), arcPath('important'), arcPath('normal'),
-            '<circle class="praxis-self" cx="120" cy="235" r="30"></circle>',
-            '<text class="praxis-self-text" x="120" y="240" text-anchor="middle">我</text>',
-            labelsSvg(),
-            nodesSvg(),
-            '</svg>'
-        ].join('');
-        var empty = _contacts.length ? '' : '<div class="praxis-empty-hint">从新建关系人开始</div>';
-        wrap.innerHTML = svg + empty;
-    }
-
-    function arcPath(layerKey) {
-        var layer = LAYERS[layerKey];
-        var sx = 120, cy = 235;
-        var d = 'M ' + sx + ' ' + cy +
-            ' C ' + sx + ' ' + (cy - layer.ry) + ' ' + (sx + layer.rx) + ' ' + (cy - layer.ry) + ' ' + (sx + layer.rx) + ' ' + cy +
-            ' C ' + (sx + layer.rx) + ' ' + (cy + layer.ry) + ' ' + sx + ' ' + (cy + layer.ry) + ' ' + sx + ' ' + cy;
-        return '<path class="praxis-arc praxis-arc-' + layerKey + '" d="' + d + '"></path>';
-    }
-
-    function labelsSvg() {
-        return [
-            '<text class="praxis-layer-label" x="402" y="127">核心圈 · 7天</text>',
-            '<text class="praxis-layer-label" x="656" y="66">重点圈 · 30天</text>',
-            '<text class="praxis-layer-label" x="888" y="24">普通圈</text>'
-        ].join('');
+        var parts = ['<svg class="praxis-arc-svg" viewBox="0 0 820 380" role="img" aria-label="关系同心弧">'];
+        // 填充区：大→小叠放，同色低透明，越往里(左)叠得越深 → 分区渐变（preview 做法）。
+        LAYER_ORDER.slice().reverse().forEach(function(k) {
+            var l = LAYERS[k];
+            parts.push('<path d="' + arcPath(l.rx, l.ry) + '" fill="rgba(124,77,255,.06)" stroke="none"></path>');
+        });
+        // 弧线（每层不同色，越里越深）+ 层级标签（落在弧线上，约 50°）。
+        LAYER_ORDER.forEach(function(k) {
+            var l = LAYERS[k];
+            parts.push('<path class="praxis-arc praxis-arc-' + k + '" d="' + arcPath(l.rx, l.ry) + '" stroke="' + l.col + '"></path>');
+            var la = 50 * Math.PI / 180;
+            var lx = CX + l.rx * Math.cos(la), ly = CY - l.ry * Math.sin(la);
+            parts.push('<text class="praxis-layer-label" x="' + (lx + 5) + '" y="' + (ly - 3) + '" fill="' + l.col + '">' + esc(l.label) + '</text>');
+        });
+        parts.push(nodesSvg());
+        parts.push('<circle class="praxis-self" cx="' + CX + '" cy="' + CY + '" r="15"></circle>');
+        parts.push('<text class="praxis-self-text" x="' + CX + '" y="' + (CY + 4) + '" text-anchor="middle">我</text>');
+        parts.push('</svg>');
+        var empty = _contacts.length ? '' : '<div class="praxis-empty-hint">还没有关系人，点「+ 新建关系人」开始经营你的人脉。</div>';
+        wrap.innerHTML = parts.join('') + empty;
     }
 
     function nodesSvg() {
         var byLayer = { core: [], important: [], normal: [] };
         _contacts.forEach(function(c) {
-            byLayer[c.layer || 'normal'].push(c);
+            (byLayer[c.layer] || byLayer.normal).push(c);
         });
-        return Object.keys(byLayer).map(function(layerKey) {
+        return LAYER_ORDER.map(function(layerKey) {
+            // 同层按最近联系排序，最近的靠右(θ≈0)、越久越靠两端。
             var items = byLayer[layerKey].sort(function(a, b) {
                 return contactTime(b) - contactTime(a);
             });
@@ -184,11 +323,17 @@ var Praxis = (function() {
                 var pos = nodePosition(layerKey, idx);
                 var state = nodeState(c);
                 var selected = c.id === _selectedId ? ' selected' : '';
-                var risk = c.risk ? '<circle class="praxis-node-risk" cx="' + (pos.x + 16) + '" cy="' + (pos.y - 16) + '" r="5"></circle>' : '';
+                var halo = state === 'hi'
+                    ? '<circle class="praxis-node-halo" cx="' + pos.x + '" cy="' + pos.y + '" r="10"></circle>'
+                    : '';
+                var risk = c.risk
+                    ? '<circle class="praxis-node-risk" cx="' + (pos.x + 8) + '" cy="' + (pos.y - 8) + '" r="4"></circle>'
+                    : '';
                 return '<g class="praxis-node ' + state + selected + '" onclick="Praxis.selectContact(' + c.id + ')" tabindex="0">' +
-                    '<circle cx="' + pos.x + '" cy="' + pos.y + '" r="18"></circle>' +
+                    halo +
+                    '<circle class="praxis-node-dot" cx="' + pos.x + '" cy="' + pos.y + '" r="6"></circle>' +
                     risk +
-                    '<text x="' + pos.x + '" y="' + (pos.y + 38) + '" text-anchor="middle">' + esc(c.name) + '</text>' +
+                    '<text x="' + pos.x + '" y="' + (pos.y + 16) + '" text-anchor="middle">' + esc(c.name) + '</text>' +
                     '</g>';
             }).join('');
         }).join('');
@@ -200,8 +345,8 @@ var Praxis = (function() {
         var angle = Math.max(-70, Math.min(70, offset * 18));
         var rad = angle * Math.PI / 180;
         return {
-            x: Math.round(120 + layer.rx * Math.cos(rad)),
-            y: Math.round(235 + layer.ry * Math.sin(rad))
+            x: Math.round(CX + layer.rx * Math.cos(rad)),
+            y: Math.round(CY - layer.ry * Math.sin(rad))
         };
     }
 
@@ -227,23 +372,40 @@ var Praxis = (function() {
         return 'light';
     }
 
+    function statusText(contact) {
+        var map = {
+            solid: { t: '● 实心 · 最近深聊', c: '#5B34D6' },
+            light: { t: '○ 空心 · 仅浅联系', c: '#7C4DFF' },
+            dim:   { t: '● 发暗 · 超维护周期', c: '#9C97A8' },
+            hi:    { t: '● 高亮 · 建议本周联系', c: '#7C4DFF' }
+        };
+        var s = map[nodeState(contact)] || map.dim;
+        var risk = contact.risk ? ' <span style="color:#D6455F">· ⚠ 有风险</span>' : '';
+        return '<b style="color:' + s.c + '">' + s.t + '</b>' + risk;
+    }
+
+    // ===== 关系人 CRUD + 右侧双 tab =====
     function startCreate() {
         _selectedId = null;
-        renderEditor({
-            id: null,
-            name: '',
-            layer: 'normal',
-            lastContactAt: '',
-            lastQuality: '',
-            risk: false,
-            note: '',
-            cycleOff: false
-        });
+        _sideTab = 'info';
+        renderEditorNew();
     }
 
     function selectContact(id) {
         _selectedId = id;
+        _sideTab = 'info';
         render();
+    }
+
+    function setSideTab(tab) {
+        _sideTab = tab;
+        var info = document.getElementById('praxis-pane-info');
+        var logs = document.getElementById('praxis-pane-logs');
+        if (info) info.style.display = tab === 'info' ? '' : 'none';
+        if (logs) logs.style.display = tab === 'logs' ? '' : 'none';
+        document.querySelectorAll('#praxis-editor .praxis-stab').forEach(function(el) {
+            el.classList.toggle('active', el.dataset.t === tab);
+        });
     }
 
     function renderEditorEmpty() {
@@ -252,168 +414,129 @@ var Praxis = (function() {
         editor.innerHTML = '<div class="praxis-editor-empty">选择节点或新建关系人</div>';
     }
 
+    function layerPills(current) {
+        return '<div class="pf-pills" data-field="layer">' + LAYER_ORDER.map(function(k) {
+            return '<span class="pf-pill' + (k === current ? ' on' : '') + '" data-v="' + k + '" onclick="Praxis.pickPill(this)">' + LAYERS[k].display + '</span>';
+        }).join('') + '</div>';
+    }
+
+    // 新建关系人：§11.3 只填 姓名/层级/备注/风险；不问最近联系（去交流信息记）。
+    function renderEditorNew() {
+        var editor = document.getElementById('praxis-editor');
+        if (!editor) return;
+        editor.innerHTML =
+            '<div class="praxis-side">' +
+            '<div class="praxis-side-title">新建关系人</div>' +
+            '<div class="praxis-info">' +
+            pfRow('姓名', '<input id="pf-name" maxlength="60" placeholder="必填">') +
+            pfRow('层级', layerPills('normal')) +
+            pfRow('标记', '<div class="pf-pills pf-marks"><span class="pf-pill" data-mark="risk" onclick="Praxis.toggleMark(this)">⚠ 有风险</span></div>') +
+            pfRow('备注', '<input id="pf-note" placeholder="可选">') +
+            '<button class="pf-save" onclick="Praxis.createPerson()">创建关系人</button>' +
+            '</div></div>';
+    }
+
+    // 选中关系人：右侧两 tab（人物信息 / 交流信息）。
     function renderEditor(contact) {
         var editor = document.getElementById('praxis-editor');
         if (!editor) return;
-        var isNew = !contact.id;
-        var html = '<form class="praxis-form" id="praxis-contact-form">' +
-            '<div class="praxis-form-head"><h3>' + (isNew ? '新建关系人' : '关系详情') + '</h3>' +
-            (isNew ? '' : '<button type="button" class="praxis-danger" onclick="Praxis.deleteSelected()">删除</button>') + '</div>' +
-            field('姓名', '<input name="name" maxlength="60" required value="' + escAttr(contact.name || '') + '">') +
-            field('圈层', '<select name="layer">' + option('core', '核心圈', contact.layer) + option('important', '重点圈', contact.layer) + option('normal', '普通圈', contact.layer) + '</select>') +
-            field('最近联系', '<input name="lastContactAt" type="date" value="' + escAttr(dateOnly(contact.lastContactAt)) + '">') +
-            field('质量', '<select name="lastQuality">' + option('', '未记录', contact.lastQuality || '') + option('shallow', '浅触达', contact.lastQuality) + option('effective', '有效', contact.lastQuality) + option('deep', '深度', contact.lastQuality) + '</select>') +
-            '<label class="praxis-check"><input name="risk" type="checkbox" ' + (contact.risk ? 'checked' : '') + '> 有风险</label>' +
-            '<label class="praxis-check"><input name="cycleOff" type="checkbox" ' + (contact.cycleOff ? 'checked' : '') + '> 暂停周期提醒</label>' +
-            field('备注', '<textarea name="note" rows="4">' + esc(contact.note || '') + '</textarea>') +
-            '<button class="eg-btn eg-btn--primary" type="submit">' + (isNew ? '创建' : '保存') + '</button>' +
-            '</form>';
-        if (!isNew) html += logsSectionHtml();
-        editor.innerHTML = html;
-        var form = document.getElementById('praxis-contact-form');
-        if (form) {
-            form.addEventListener('submit', function(ev) {
+        var recent = contact.lastContactAt
+            ? (dateOnly(contact.lastContactAt) + (contact.lastQuality ? ' · ' + qualityLabel(contact.lastQuality) : ''))
+            : '从未联系';
+        var infoPane =
+            '<div class="praxis-pane" id="praxis-pane-info"' + (_sideTab === 'info' ? '' : ' style="display:none"') + '>' +
+            '<div class="praxis-info">' +
+            pfRow('姓名', '<input id="pf-name" maxlength="60" value="' + escAttr(contact.name || '') + '">') +
+            pfRow('层级', layerPills(contact.layer || 'normal')) +
+            pfRow('标记', '<div class="pf-pills pf-marks">' +
+                '<span class="pf-pill' + (contact.risk ? ' on' : '') + '" data-mark="risk" onclick="Praxis.toggleMark(this)">⚠ 有风险</span>' +
+                '<span class="pf-pill' + (contact.cycleOff ? ' on' : '') + '" data-mark="cycleOff" onclick="Praxis.toggleMark(this)">暂停周期</span>' +
+                '</div>') +
+            pfRow('备注', '<input id="pf-note" value="' + escAttr(contact.note || '') + '">') +
+            '<div class="pf-row pf-ro"><label>最近联系</label><div class="pf-rov">' + esc(recent) + '<span class="pf-lock">🔒 只读</span></div></div>' +
+            '<div class="pf-row pf-ro"><label>当前状态</label><div class="pf-rov">' + statusText(contact) + '</div></div>' +
+            '<div class="pf-hint">「最近联系」「状态」读取自『交流信息』最新一条，此处不可改；要改去交流信息记一条。</div>' +
+            '<button class="pf-save" onclick="Praxis.savePerson(' + contact.id + ')">保存人物信息</button>' +
+            '<button class="pf-del" onclick="Praxis.deleteSelected()">删除关系人</button>' +
+            '</div></div>';
+        var logsPane =
+            '<div class="praxis-pane" id="praxis-pane-logs"' + (_sideTab === 'logs' ? '' : ' style="display:none"') + '>' +
+            logsSectionHtml() +
+            '</div>';
+        editor.innerHTML =
+            '<div class="praxis-side">' +
+            '<div class="praxis-sidetabs">' +
+            '<button class="praxis-stab' + (_sideTab === 'info' ? ' active' : '') + '" data-t="info" onclick="Praxis.setSideTab(\'info\')">👤 人物信息</button>' +
+            '<button class="praxis-stab' + (_sideTab === 'logs' ? ' active' : '') + '" data-t="logs" onclick="Praxis.setSideTab(\'logs\')">💬 交流信息</button>' +
+            '</div>' +
+            infoPane + logsPane +
+            '</div>';
+        var logForm = document.getElementById('praxis-log-form');
+        if (logForm) {
+            logForm.addEventListener('submit', function(ev) {
                 ev.preventDefault();
-                saveContact(contact.id, form);
+                saveLog(contact.id, logForm);
             });
         }
-        if (!isNew) {
-            var logForm = document.getElementById('praxis-log-form');
-            if (logForm) {
-                logForm.addEventListener('submit', function(ev) {
-                    ev.preventDefault();
-                    saveLog(contact.id, logForm);
-                });
-            }
-            loadLogs(contact.id);
-        }
+        loadLogs(contact.id);
     }
 
-    // ===== T-287:关系人交流记录 =====
-    var LOG_METHODS = ['面对面', '电话', '微信', '会议', '邮件', '其他'];
-
-    function logsSectionHtml() {
-        var methodOpts = '<option value="">方式</option>' + LOG_METHODS.map(function(m) {
-            return '<option value="' + esc(m) + '">' + esc(m) + '</option>';
-        }).join('');
-        var qualityOpts = '<option value="">质量</option>' +
-            option('shallow', '浅触达', '') + option('effective', '有效', '') + option('deep', '深度', '');
-        return '<div class="praxis-logs">' +
-            '<div class="praxis-logs-head"><h4>交流记录</h4>' +
-            '<button type="button" class="eg-btn" onclick="Praxis.toggleLogForm()">+ 记录交流</button></div>' +
-            '<div class="praxis-log-form-wrap" id="praxis-log-form-wrap" style="display:none;">' +
-            '<form class="praxis-log-form" id="praxis-log-form">' +
-            '<div class="praxis-log-form-row">' +
-            '<input name="at" type="date" value="' + todayStr() + '" required>' +
-            '<select name="method">' + methodOpts + '</select>' +
-            '<select name="quality">' + qualityOpts + '</select>' +
-            '</div>' +
-            '<textarea name="content" rows="2" placeholder="聊了什么（摘要）"></textarea>' +
-            '<textarea name="note" rows="2" placeholder="我的心得（可选）"></textarea>' +
-            '<button class="eg-btn eg-btn--primary" type="submit">保存交流</button>' +
-            '</form></div>' +
-            '<div class="praxis-logs-timeline" id="praxis-logs-timeline"><div class="praxis-logs-empty">加载中…</div></div>' +
-            '</div>';
+    function pfRow(label, control) {
+        return '<div class="pf-row"><label>' + label + '</label>' + control + '</div>';
     }
 
-    function toggleLogForm() {
-        var f = document.getElementById('praxis-log-form-wrap');
-        if (f) f.style.display = f.style.display === 'none' ? '' : 'none';
+    // 层级 pill 单选。
+    function pickPill(el) {
+        var box = el.parentElement;
+        box.querySelectorAll('.pf-pill').forEach(function(p) { p.classList.toggle('on', p === el); });
     }
 
-    async function loadLogs(contactId) {
-        var box = document.getElementById('praxis-logs-timeline');
-        if (!box) return;
-        try {
-            var res = await API.praxisContactLogList(contactId);
-            if (!res || res.success === false) throw new Error((res && res.error) || '加载失败');
-            renderLogs(res.items || []);
-        } catch (err) {
-            console.error('[Praxis] load logs failed', err);
-            box.innerHTML = '<div class="praxis-logs-empty">交流记录加载失败</div>';
-        }
+    // 标记 pill（风险/暂停周期）多选切换。
+    function toggleMark(el) {
+        el.classList.toggle('on');
     }
 
-    function qualityLabel(q) {
-        return { shallow: '浅触达', effective: '有效', deep: '深度' }[q] || '';
+    function readPersonForm() {
+        var name = (document.getElementById('pf-name') || {}).value || '';
+        var note = (document.getElementById('pf-note') || {}).value || '';
+        var layerEl = document.querySelector('#praxis-editor .pf-pills[data-field="layer"] .pf-pill.on');
+        var layer = layerEl ? layerEl.dataset.v : 'normal';
+        var risk = !!document.querySelector('#praxis-editor .pf-pill[data-mark="risk"].on');
+        var cycleOff = !!document.querySelector('#praxis-editor .pf-pill[data-mark="cycleOff"].on');
+        // §11.3：不再提交 lastContactAt / lastQuality（后端派生、只读）。
+        return { name: name.trim(), layer: layer, risk: risk, cycleOff: cycleOff, note: note };
     }
 
-    function renderLogs(logs) {
-        var box = document.getElementById('praxis-logs-timeline');
-        if (!box) return;
-        if (!logs.length) {
-            box.innerHTML = '<div class="praxis-logs-empty">还没有交流记录，点「+ 记录交流」开始。</div>';
+    async function createPerson() {
+        var data = readPersonForm();
+        if (!data.name) {
+            if (typeof showToast === 'function') showToast('填个姓名', 'info');
             return;
         }
-        box.innerHTML = logs.map(function(l) {
-            var m = l.method ? '<span class="praxis-log-method">' + esc(l.method) + '</span>' : '';
-            var q = l.quality ? '<span class="praxis-log-q q-' + esc(l.quality) + '">' + esc(qualityLabel(l.quality)) + '</span>' : '';
-            var note = l.note ? '<details class="praxis-log-note"><summary>心得</summary>' + esc(l.note) + '</details>' : '';
-            return '<div class="praxis-log-item">' +
-                '<div class="praxis-log-head"><b>' + esc(dateOnly(l.at)) + '</b>' + m + q + '</div>' +
-                (l.content ? '<p class="praxis-log-content">' + esc(l.content) + '</p>' : '') +
-                note + '</div>';
-        }).join('');
-    }
-
-    async function saveLog(contactId, form) {
-        var data = {
-            at: form.at.value || todayStr(),
-            method: form.method.value || null,
-            quality: form.quality.value || null,
-            content: form.content.value || '',
-            note: form.note.value || ''
-        };
-        if (!data.at) {
-            if (typeof showToast === 'function') showToast('选个交流时间', 'info');
-            return;
-        }
+        data.perspectiveId = _activePerspectiveId;
         try {
-            var res = await API.praxisContactLogCreate(contactId, data);
+            var res = await API.praxisContactCreate(data);
             if (!res || res.success === false) throw new Error((res && res.error) || '保存失败');
-            // 回写驱动节点状态：把本地 contact 的最近联系时间/质量同步后重渲弧。
-            if (res.contactUpdated) {
-                _contacts = _contacts.map(function(c) {
-                    return c.id === contactId
-                        ? Object.assign({}, c, { lastContactAt: data.at, lastQuality: data.quality })
-                        : c;
-                });
-            }
-            render();   // 重渲弧 + 节点状态；重开该 contact 详情会重新拉 logs
-            if (typeof showToast === 'function') showToast('已记录交流', 'success');
+            _contacts.push(res.item);
+            _selectedId = res.item.id;
+            render();
+            if (typeof showToast === 'function') showToast('已新建关系人', 'success');
         } catch (err) {
-            console.error('[Praxis] save log failed', err);
+            console.error('[Praxis] create contact failed', err);
             if (typeof showToast === 'function') showToast(err.message || '保存失败', 'error');
         }
     }
 
-    function field(label, control) {
-        return '<label class="praxis-field"><span>' + label + '</span>' + control + '</label>';
-    }
-
-    function option(value, label, selected) {
-        return '<option value="' + escAttr(value) + '"' + (value === (selected || '') ? ' selected' : '') + '>' + esc(label) + '</option>';
-    }
-
-    async function saveContact(id, form) {
-        var data = {
-            name: form.name.value,
-            layer: form.layer.value,
-            lastContactAt: form.lastContactAt.value || null,
-            lastQuality: form.lastQuality.value || null,
-            risk: form.risk.checked,
-            cycleOff: form.cycleOff.checked,
-            note: form.note.value || ''
-        };
+    async function savePerson(id) {
+        var data = readPersonForm();
+        if (!data.name) {
+            if (typeof showToast === 'function') showToast('填个姓名', 'info');
+            return;
+        }
         try {
-            var res = id ? await API.praxisContactUpdate(id, data) : await API.praxisContactCreate(data);
+            var res = await API.praxisContactUpdate(id, data);
             if (!res || res.success === false) throw new Error((res && res.error) || '保存失败');
-            if (id) {
-                _contacts = _contacts.map(function(c) { return c.id === id ? res.item : c; });
-            } else {
-                _contacts.push(res.item);
-                _selectedId = res.item.id;
-            }
+            _contacts = _contacts.map(function(c) { return c.id === id ? res.item : c; });
             render();
             if (typeof showToast === 'function') showToast('已保存', 'success');
         } catch (err) {
@@ -435,6 +558,176 @@ var Praxis = (function() {
         } catch (err) {
             console.error('[Praxis] delete contact failed', err);
             if (typeof showToast === 'function') showToast('删除失败', 'error');
+        }
+    }
+
+    // ===== 交流记录（T-287 + T-291 改删）=====
+    var LOG_METHODS = ['面对面', '电话', '微信', '会议', '邮件', '其他'];
+    var QUALITIES = [
+        { v: 'shallow', t: '浅' },
+        { v: 'effective', t: '有效' },
+        { v: 'deep', t: '深聊' }
+    ];
+
+    function qualityLabel(q) {
+        var m = { shallow: '浅', effective: '有效', deep: '深聊' };
+        return m[q] || '';
+    }
+
+    function methodOptions(selected) {
+        return '<option value="">方式</option>' + LOG_METHODS.map(function(m) {
+            return '<option value="' + esc(m) + '"' + (m === selected ? ' selected' : '') + '>' + esc(m) + '</option>';
+        }).join('');
+    }
+
+    function qualityPills(current, cls) {
+        return '<div class="pf-pills ' + (cls || '') + '" data-field="quality">' + QUALITIES.map(function(q) {
+            return '<span class="pf-pill' + (q.v === current ? ' on' : '') + '" data-v="' + q.v + '" onclick="Praxis.pickPill(this)">' + q.t + '</span>';
+        }).join('') + '</div>';
+    }
+
+    function logsSectionHtml() {
+        return '<div class="praxis-logs2">' +
+            '<div class="pl-head">💬 交流记录 <button type="button" class="pl-add" onclick="Praxis.toggleLogForm()">+ 记录交流</button></div>' +
+            '<div class="pl-form-wrap" id="praxis-log-form-wrap" style="display:none;">' +
+            '<form class="praxis-log-form" id="praxis-log-form">' +
+            '<div class="pl-form-row">' +
+            '<input name="at" type="date" value="' + todayStr() + '" required>' +
+            '<select name="method">' + methodOptions('') + '</select>' +
+            '</div>' +
+            '<div class="pf-row"><label>质量</label>' + qualityPills('', 'pl-new-quality') + '</div>' +
+            '<textarea name="content" rows="2" placeholder="聊了什么（摘要）"></textarea>' +
+            '<textarea name="note" rows="2" placeholder="我的心得（可选）"></textarea>' +
+            '<button class="pf-save" type="submit">保存交流</button>' +
+            '</form></div>' +
+            '<div class="pl-list" id="praxis-logs-timeline"><div class="pl-empty">加载中…</div></div>' +
+            '</div>';
+    }
+
+    function toggleLogForm() {
+        var f = document.getElementById('praxis-log-form-wrap');
+        if (f) f.style.display = f.style.display === 'none' ? '' : 'none';
+    }
+
+    async function loadLogs(contactId) {
+        var box = document.getElementById('praxis-logs-timeline');
+        if (!box) return;
+        try {
+            var res = await API.praxisContactLogList(contactId);
+            if (!res || res.success === false) throw new Error((res && res.error) || '加载失败');
+            renderLogs(contactId, res.items || []);
+        } catch (err) {
+            console.error('[Praxis] load logs failed', err);
+            box.innerHTML = '<div class="pl-empty">交流记录加载失败</div>';
+        }
+    }
+
+    function shortDate(v) {
+        var s = dateOnly(v);
+        var parts = s.split('-');
+        return parts.length === 3 ? (parseInt(parts[1], 10) + '/' + parts[2]) : s;
+    }
+
+    function renderLogs(contactId, logs) {
+        var box = document.getElementById('praxis-logs-timeline');
+        if (!box) return;
+        if (!logs.length) {
+            box.innerHTML = '<div class="pl-empty">还没有交流记录，点「+ 记录交流」开始。</div>';
+            return;
+        }
+        box.innerHTML = logs.map(function(l) {
+            var q = l.quality ? '<span class="pl-q q-' + esc(l.quality) + '">' + esc(qualityLabel(l.quality)) + '</span>' : '';
+            var sum = l.content || l.method || '（无摘要）';
+            return '<div class="pl-log" data-id="' + l.id + '">' +
+                '<div class="pl-row" onclick="Praxis.toggleLogRow(this)">' +
+                '<span class="pl-caret">▸</span><span class="pl-dt">' + esc(shortDate(l.at)) + '</span>' + q +
+                '<span class="pl-sum">' + esc(sum) + '</span></div>' +
+                '<div class="pl-edit">' +
+                pfRow('时间', '<input class="ple-at" type="date" value="' + escAttr(dateOnly(l.at)) + '">') +
+                pfRow('方式', '<select class="ple-method">' + methodOptions(l.method || '') + '</select>') +
+                pfRow('质量', qualityPills(l.quality || '', 'ple-quality')) +
+                '<textarea class="ple-content" rows="2" placeholder="聊了什么">' + esc(l.content || '') + '</textarea>' +
+                '<textarea class="ple-note" rows="2" placeholder="我的心得">' + esc(l.note || '') + '</textarea>' +
+                '<div class="pl-acts">' +
+                '<button class="pri" onclick="Praxis.saveLogEdit(' + contactId + ',' + l.id + ',this)">保存</button>' +
+                '<button onclick="Praxis.toggleLogRow(this.closest(\'.pl-log\').querySelector(\'.pl-row\'))">取消</button>' +
+                '<button class="del" onclick="Praxis.deleteLog(' + contactId + ',' + l.id + ')">删除</button>' +
+                '</div></div></div>';
+        }).join('');
+    }
+
+    function toggleLogRow(rowEl) {
+        var log = rowEl.closest ? rowEl.closest('.pl-log') : rowEl.parentElement;
+        if (log) log.classList.toggle('open');
+    }
+
+    async function saveLog(contactId, form) {
+        var qEl = document.querySelector('#praxis-log-form .pl-new-quality .pf-pill.on');
+        var data = {
+            at: form.at.value || todayStr(),
+            method: form.method.value || null,
+            quality: qEl ? qEl.dataset.v : null,
+            content: form.content.value || '',
+            note: form.note.value || ''
+        };
+        if (!data.at) {
+            if (typeof showToast === 'function') showToast('选个交流时间', 'info');
+            return;
+        }
+        try {
+            var res = await API.praxisContactLogCreate(contactId, data);
+            if (!res || res.success === false) throw new Error((res && res.error) || '保存失败');
+            await afterLogChange(contactId, res.contactUpdated);
+            if (typeof showToast === 'function') showToast('已记录交流', 'success');
+        } catch (err) {
+            console.error('[Praxis] save log failed', err);
+            if (typeof showToast === 'function') showToast(err.message || '保存失败', 'error');
+        }
+    }
+
+    async function saveLogEdit(contactId, logId, btn) {
+        var box = btn.closest('.pl-log');
+        if (!box) return;
+        var qEl = box.querySelector('.ple-quality .pf-pill.on');
+        var data = {
+            at: (box.querySelector('.ple-at') || {}).value || todayStr(),
+            method: (box.querySelector('.ple-method') || {}).value || null,
+            quality: qEl ? qEl.dataset.v : null,
+            content: (box.querySelector('.ple-content') || {}).value || '',
+            note: (box.querySelector('.ple-note') || {}).value || ''
+        };
+        try {
+            var res = await API.praxisContactLogUpdate(contactId, logId, data);
+            if (!res || res.success === false) throw new Error((res && res.error) || '保存失败');
+            await afterLogChange(contactId, res.contactUpdated);
+            if (typeof showToast === 'function') showToast('已保存', 'success');
+        } catch (err) {
+            console.error('[Praxis] update log failed', err);
+            if (typeof showToast === 'function') showToast(err.message || '保存失败', 'error');
+        }
+    }
+
+    async function deleteLog(contactId, logId) {
+        if (!window.confirm('删除这条交流记录？')) return;
+        try {
+            var res = await API.praxisContactLogDelete(contactId, logId);
+            if (!res || res.success === false) throw new Error((res && res.error) || '删除失败');
+            await afterLogChange(contactId, res.contactUpdated);
+            if (typeof showToast === 'function') showToast('已删除', 'success');
+        } catch (err) {
+            console.error('[Praxis] delete log failed', err);
+            if (typeof showToast === 'function') showToast(err.message || '删除失败', 'error');
+        }
+    }
+
+    // 交流增/改/删后：contactUpdated 为真则重拉本视角关系人（刷新派生「最近联系」+ 弧），
+    // 否则只重渲当前选中详情（会重新拉 logs）。均停留在交流信息 tab。
+    async function afterLogChange(contactId, contactUpdated) {
+        _sideTab = 'logs';
+        if (contactUpdated) {
+            await loadContacts();
+        } else {
+            render();
         }
     }
 
@@ -469,10 +762,25 @@ var Praxis = (function() {
         open: open,
         setBoard: setBoard,
         setHealthScore: setHealthScore,
+        editHealth: editHealth,
         startCreate: startCreate,
         selectContact: selectContact,
         deleteSelected: deleteSelected,
         refreshJournalStatus: refreshJournalStatus,
-        toggleLogForm: toggleLogForm
+        // 视角
+        switchPerspective: switchPerspective,
+        createPerspective: createPerspective,
+        deletePerspective: deletePerspective,
+        // 右侧双 tab + 人物信息
+        setSideTab: setSideTab,
+        pickPill: pickPill,
+        toggleMark: toggleMark,
+        createPerson: createPerson,
+        savePerson: savePerson,
+        // 交流记录
+        toggleLogForm: toggleLogForm,
+        toggleLogRow: toggleLogRow,
+        saveLogEdit: saveLogEdit,
+        deleteLog: deleteLog
     };
 })();

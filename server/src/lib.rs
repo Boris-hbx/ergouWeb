@@ -432,6 +432,23 @@ pub fn build_app(state: state::AppState) -> Router {
             get(routes::praxis_contact_logs::list_logs)
                 .post(routes::praxis_contact_logs::create_log),
         )
+        // Praxis 交流记录改删 (T-292 / SPEC praxis §11.4) - 改删后重算最近联系。
+        .route(
+            "/praxis/contacts/{id}/logs/{log_id}",
+            axum::routing::patch(routes::praxis_contact_logs::update_log)
+                .delete(routes::praxis_contact_logs::delete_log),
+        )
+        // Praxis 视角 (T-292 / SPEC praxis §11.1) - guarded by AdminUserId in handlers.
+        .route(
+            "/praxis/perspectives",
+            get(routes::praxis_perspectives::list_perspectives)
+                .post(routes::praxis_perspectives::create_perspective),
+        )
+        .route(
+            "/praxis/perspectives/{id}",
+            axum::routing::patch(routes::praxis_perspectives::update_perspective)
+                .delete(routes::praxis_perspectives::delete_perspective),
+        )
         // T-105 SPEC insight — 注意此处必须与 main.rs 同步(memory:duplicate-build-app)
         .route(
             "/insights",

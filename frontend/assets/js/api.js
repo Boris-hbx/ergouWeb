@@ -658,8 +658,10 @@ var API = (function() {
         stakeholderDeleteColumn: async function(key) {
             return await request('DELETE', '/work/stakeholder-columns/' + encodeURIComponent(key));
         },
-        praxisContactList: async function() {
-            return await request('GET', '/praxis/contacts');
+        // perspectiveId 可选：按视角过滤（T-291/T-292）；缺省后端回落默认视角。
+        praxisContactList: async function(perspectiveId) {
+            var q = perspectiveId ? ('?perspectiveId=' + encodeURIComponent(perspectiveId)) : '';
+            return await request('GET', '/praxis/contacts' + q);
         },
         praxisContactCreate: async function(data) {
             return await request('POST', '/praxis/contacts', data);
@@ -670,12 +672,32 @@ var API = (function() {
         praxisContactDelete: async function(id) {
             return await request('DELETE', '/praxis/contacts/' + encodeURIComponent(id));
         },
-        // ===== Praxis 关系人交流记录 v0.2 (T-287) =====
+        // ===== Praxis 视角 v0.2.2 (T-291 前端 / T-292 后端) =====
+        praxisPerspectiveList: async function() {
+            return await request('GET', '/praxis/perspectives');
+        },
+        praxisPerspectiveCreate: async function(data) {
+            return await request('POST', '/praxis/perspectives', data);
+        },
+        praxisPerspectiveUpdate: async function(id, patch) {
+            return await request('PATCH', '/praxis/perspectives/' + encodeURIComponent(id), patch);
+        },
+        // 删非空视角后端返 409（{success:false,error}），前端据此提示先清空。
+        praxisPerspectiveDelete: async function(id) {
+            return await request('DELETE', '/praxis/perspectives/' + encodeURIComponent(id));
+        },
+        // ===== Praxis 关系人交流记录 v0.2 (T-287) + 改删 v0.2.2 (T-291/T-292) =====
         praxisContactLogList: async function(contactId) {
             return await request('GET', '/praxis/contacts/' + encodeURIComponent(contactId) + '/logs');
         },
         praxisContactLogCreate: async function(contactId, data) {
             return await request('POST', '/praxis/contacts/' + encodeURIComponent(contactId) + '/logs', data);
+        },
+        praxisContactLogUpdate: async function(contactId, logId, patch) {
+            return await request('PATCH', '/praxis/contacts/' + encodeURIComponent(contactId) + '/logs/' + encodeURIComponent(logId), patch);
+        },
+        praxisContactLogDelete: async function(contactId, logId) {
+            return await request('DELETE', '/praxis/contacts/' + encodeURIComponent(contactId) + '/logs/' + encodeURIComponent(logId));
         },
 
         // ===== Praxis 今日经营记录 v0.2 (T-285) =====

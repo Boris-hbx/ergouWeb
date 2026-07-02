@@ -8,8 +8,12 @@ use serde_json::{Map, Value as JsonValue};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PraxisContact {
     pub id: i64,
+    /// 所属视角（T-292 §11.1）。老库迁移期可能为 NULL。
+    #[serde(rename = "perspectiveId", default)]
+    pub perspective_id: Option<i64>,
     pub name: String,
     pub layer: String,
+    /// 派生缓存（T-292 §11.3）：恒等于最新一条交流记录，只读，随 logs 增改删重算。
     #[serde(rename = "lastContactAt", default)]
     pub last_contact_at: Option<String>,
     #[serde(rename = "lastQuality", default)]
@@ -33,10 +37,11 @@ pub struct CreatePraxisContactRequest {
     pub name: String,
     #[serde(default = "default_layer")]
     pub layer: String,
-    #[serde(rename = "lastContactAt", default)]
-    pub last_contact_at: Option<String>,
-    #[serde(rename = "lastQuality", default)]
-    pub last_quality: Option<String>,
+    /// 新建落在哪个视角；缺省 = 用户默认视角（T-292 §11.1）。
+    #[serde(rename = "perspectiveId", default)]
+    pub perspective_id: Option<i64>,
+    // T-292 §11.3:最近联系改为派生缓存,新建不再接收 lastContactAt/lastQuality
+    // 入参(老客户端传了也被 serde 忽略);想标记"上次何时聊过"→ 建交流记录。
     #[serde(default)]
     pub risk: bool,
     #[serde(default)]
@@ -65,6 +70,7 @@ mod tests {
     fn contact_uses_camel_case_json_fields() {
         let contact = PraxisContact {
             id: 1,
+            perspective_id: Some(2),
             name: "Boris".into(),
             layer: "core".into(),
             last_contact_at: Some("2026-06-29".into()),
@@ -77,10 +83,12 @@ mod tests {
             updated_at: String::new(),
         };
         let j = serde_json::to_string(&contact).unwrap();
+        assert!(j.contains("perspectiveId"));
         assert!(j.contains("lastContactAt"));
         assert!(j.contains("lastQuality"));
         assert!(j.contains("cycleOff"));
         assert!(j.contains("sortOrder"));
+        assert!(!j.contains("perspective_id"));
         assert!(!j.contains("last_contact_at"));
         assert!(!j.contains("cycle_off"));
     }
