@@ -28,3 +28,4 @@ pub mod factory;
 pub mod praxis_contact;
 pub mod praxis_contact_log;
 pub mod praxis_journal;
+pub mod praxis_perspective;

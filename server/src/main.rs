@@ -401,6 +401,23 @@ pub fn build_app(state: AppState) -> Router {
             get(routes::praxis_contact_logs::list_logs)
                 .post(routes::praxis_contact_logs::create_log),
         )
+        // Praxis 交流记录改删 (T-292 / SPEC praxis §11.4) - 改删后重算最近联系。
+        .route(
+            "/praxis/contacts/{id}/logs/{log_id}",
+            axum::routing::patch(routes::praxis_contact_logs::update_log)
+                .delete(routes::praxis_contact_logs::delete_log),
+        )
+        // Praxis 视角 (T-292 / SPEC praxis §11.1) - guarded by AdminUserId in handlers.
+        .route(
+            "/praxis/perspectives",
+            get(routes::praxis_perspectives::list_perspectives)
+                .post(routes::praxis_perspectives::create_perspective),
+        )
+        .route(
+            "/praxis/perspectives/{id}",
+            axum::routing::patch(routes::praxis_perspectives::update_perspective)
+                .delete(routes::praxis_perspectives::delete_perspective),
+        )
         // Insight module (T-105 / SPEC insight) — Hybrid 架构:Web 后端只做收件箱/抓取/存储,
         // 报告生成在 Claude Code(Boris 本机)写回,公开 /r/{token} 不在 /api 下,见 build_app 末尾。
         .route(

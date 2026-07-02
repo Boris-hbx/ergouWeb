@@ -3,6 +3,7 @@
 //! See SPEC: `C:\Project\ergouPM\specs\praxis\spec.md` §7
 
 use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value as JsonValue};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PraxisContactLog {
@@ -34,6 +35,13 @@ pub struct CreateContactLogRequest {
     pub content: String,
     #[serde(default)]
     pub note: String,
+}
+
+/// PATCH /contacts/{id}/logs/{logId}(T-292 §11.4),部分更新 at/method/quality/content/note。
+#[derive(Debug, Deserialize, Default)]
+pub struct UpdateContactLogRequest {
+    #[serde(flatten)]
+    pub fields: Map<String, JsonValue>,
 }
 
 #[cfg(test)]
