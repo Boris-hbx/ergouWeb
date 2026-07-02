@@ -552,6 +552,78 @@ body:has(.sidebar.collapsed) { --sidebar-width: 0px; }
 .praxis-log-note { margin-top: 4px; font-size: 0.8rem; color: #64748b; }
 .praxis-log-note summary { cursor: pointer; color: var(--primary-color); }
 
+/* ============ v0.2.1 驾驶舱布局重构 (T-290) ============ */
+/* ① 顶部工具条一行(← 工作 与控件齐平)。基准=praxis-relations-preview.html(收紧版) */
+.praxis-topbar {
+  display: flex; align-items: center; gap: 10px;
+  background: #fff; border: 1px solid #ebedf2; border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(31, 29, 43, .04); padding: 7px 13px; margin-bottom: 11px;
+}
+.praxis-tb-crumb {
+  color: #6d28d9; font-size: 12.5px; font-weight: 600; cursor: pointer;
+  background: none; border: none; padding: 0 10px 0 0; border-right: 1px solid #ebedf2;
+}
+.praxis-tb-brand { display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 14px; padding-right: 10px; border-right: 1px solid #ebedf2; }
+.praxis-tb-logo { width: 22px; height: 22px; border-radius: 6px; background: linear-gradient(135deg, #9B6BFF, #6B3DF5); display: grid; place-items: center; font-size: 12px; }
+.praxis-tb-en { color: #6d28d9; }
+.praxis-tb-act {
+  display: flex; align-items: center; gap: 6px; border: 1px solid #e0e3ea; border-radius: 8px;
+  padding: 5px 10px; cursor: pointer; background: #fff; font-size: 12.5px; font-weight: 600;
+  transition: border-color .15s, background .15s;
+}
+.praxis-tb-act:hover { border-color: #b6a4ee; background: #faf8ff; }
+.praxis-tb-ic { font-size: 13px; }
+.praxis-tb-name { color: #1f2433; }
+.praxis-tb-act .praxis-today-status { font-size: 10px; border-radius: 9px; padding: 1px 6px; margin-left: 2px; font-weight: 600; }
+.praxis-tb-spacer { flex: 1; }
+.praxis-tb-health { display: flex; align-items: center; gap: 7px; font-size: 12px; color: #94a3b8; }
+.praxis-tb-health .lab { font-size: 12px; color: #94a3b8; }
+.praxis-health-ring {
+  width: 34px; height: 34px; border-radius: 50%; border: 2.5px solid; display: grid; place-items: center;
+  font-weight: 700; font-size: 13px; cursor: pointer; background: #fff; padding: 0;
+}
+.praxis-health-ring.s-ok { color: #16a34a; border-color: #16a34a; background: #f0fdf4; }
+.praxis-health-ring.s-mid { color: #ca8a04; border-color: #eab308; background: #fefce8; }
+.praxis-health-ring.s-low { color: #dc2626; border-color: #dc2626; background: #fef2f2; }
+
+/* ② 八板块 tab 行（名称 + 评分环，hover 弹理念） */
+.praxis-board-tabs { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; margin-bottom: 12px; }
+.praxis-btab {
+  display: flex; align-items: center; justify-content: center; gap: 6px; position: relative;
+  background: #fff; border: 1px solid #ebedf2; border-radius: 8px; padding: 8px 6px;
+  cursor: pointer; font-size: 12.5px; font-weight: 600; color: #334155;
+  transition: border-color .15s, background .15s;
+}
+.praxis-btab:hover { border-color: #b6a4ee; }
+.praxis-btab.active { border-color: #7c4dff; background: #faf8ff; box-shadow: 0 3px 10px rgba(124, 77, 255, .14); }
+.praxis-btab-score { font-size: 11px; font-weight: 700; padding: 0 5px; border-radius: 8px; }
+.praxis-btab-score.sc-ok { color: #16a34a; background: #f0fdf4; }
+.praxis-btab-score.sc-mid { color: #ca8a04; background: #fefce8; }
+.praxis-btab-score.sc-low { color: #dc2626; background: #fef2f2; }
+.praxis-btab-idea {
+  position: absolute; left: 0; right: 0; top: calc(100% + 7px); z-index: 20;
+  background: #2A2733; color: #F4F2FA; font-size: 12px; line-height: 1.55; font-weight: 400; text-align: left;
+  border-radius: 8px; padding: 9px 11px; box-shadow: 0 8px 24px rgba(31, 29, 43, .22);
+  opacity: 0; visibility: hidden; transform: translateY(-4px); transition: .14s; pointer-events: none;
+}
+.praxis-btab:hover .praxis-btab-idea { opacity: 1; visibility: visible; transform: none; }
+
+/* ③ 板块内容区占满剩余高度 + 板块理念 + 图例 */
+.praxis-relation-layout { min-height: calc(100vh - 240px); align-items: stretch; }
+.praxis-map-panel { display: flex; flex-direction: column; }
+.praxis-board-idea { color: #475569; font-size: 12.5px; border-left: 2px solid #e6e1f3; padding-left: 10px; margin: 6px 0 4px; }
+.praxis-arc-wrap { flex: 1; display: flex; align-items: center; justify-content: center; }
+.praxis-arc-svg { height: auto; max-height: calc(100vh - 340px); }
+.praxis-legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 11.5px; color: #475569; padding-top: 10px; border-top: 1px solid #eef0f4; }
+.praxis-legend .pl-it { display: flex; align-items: center; gap: 6px; }
+.praxis-legend .pl-sw { width: 13px; height: 13px; border-radius: 50%; position: relative; }
+.praxis-legend .sw-solid { background: #7c4dff; border: 1.5px solid #7c4dff; }
+.praxis-legend .sw-light { background: #fff; border: 1.5px solid #7c4dff; }
+.praxis-legend .sw-dim { background: #D7D3E0; border: 1.5px solid #C9C4D6; }
+.praxis-legend .sw-hi { background: #fff; border: 1.5px solid #7c4dff; box-shadow: 0 0 0 3px #f1ebff; }
+.praxis-legend .sw-risk { background: #7c4dff; border: 1.5px solid #7c4dff; }
+.praxis-legend .sw-risk::after { content: ''; position: absolute; top: -2px; right: -3px; width: 6px; height: 6px; border-radius: 50%; background: #dc2626; border: 1px solid #fff; }
+
 /* ============ 工具栏 ============ */
 .wt-back-btn {
   background: none; border: none; color: var(--primary-color);
