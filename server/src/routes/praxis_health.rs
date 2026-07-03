@@ -21,7 +21,7 @@ use tracing::{error, warn};
 use crate::auth::AdminUserId;
 use crate::models::praxis_health::{
     CreateDimRequest, HealthDim, HealthMark, HealthMetric, MarkRequest, MetricRequest,
-    UpdateDimRequest, KINDS, RINGS, SEED_DIMS, SECTORS,
+    UpdateDimRequest, KINDS, RINGS, SECTORS, SEED_DIMS,
 };
 use crate::services::llm::LlmClient;
 use crate::state::AppState;
@@ -361,10 +361,15 @@ fn create_metric_impl(
            (user_id, dim_id, measured_at, value, text_value, unit, source, note, created_at)
          VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)",
         params![
-            user_id, req.dim_id, date, req.value,
+            user_id,
+            req.dim_id,
+            date,
+            req.value,
             req.text_value.clone().unwrap_or_default(),
-            req.unit.clone().unwrap_or_default(), source,
-            req.note.clone().unwrap_or_default(), now
+            req.unit.clone().unwrap_or_default(),
+            source,
+            req.note.clone().unwrap_or_default(),
+            now
         ],
     )
     .map_err(|e| format!("insert metric: {e}"))?;
@@ -450,12 +455,23 @@ fn streak_for(db: &Connection, user_id: &str, dim_id: i64) -> i64 {
 }
 
 /// 该维本周 AI 分（scores 表），没有则 None。
-fn latest_score(db: &Connection, user_id: &str, week: &str, dim_id: i64) -> Option<(Option<i64>, String, String)> {
+fn latest_score(
+    db: &Connection,
+    user_id: &str,
+    week: &str,
+    dim_id: i64,
+) -> Option<(Option<i64>, String, String)> {
     db.query_row(
         "SELECT score, trend, explain FROM praxis_health_scores
          WHERE user_id=?1 AND week=?2 AND dim_id=?3",
         params![user_id, week, dim_id],
-        |r| Ok((r.get::<_, Option<i64>>(0)?, r.get::<_, String>(1)?, r.get::<_, String>(2)?)),
+        |r| {
+            Ok((
+                r.get::<_, Option<i64>>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, String>(2)?,
+            ))
+        },
     )
     .optional()
     .ok()
@@ -549,7 +565,12 @@ fn build_score_input(db: &Connection, user_id: &str, dims: &[HealthDim]) -> Stri
             .optional().ok().flatten().flatten();
         let mut ev = format!(
             "- {} [{}·{}·{}]：近14天打卡 {} 次、连续 {} 天",
-            d.name, sector_cn(&d.sector), ring_cn(&d.ring), kind_cn(&d.kind), marks, streak
+            d.name,
+            sector_cn(&d.sector),
+            ring_cn(&d.ring),
+            kind_cn(&d.kind),
+            marks,
+            streak
         );
         if let Some(m) = last_metric {
             ev.push_str(&format!("；最近实测 {m}"));
@@ -626,11 +647,16 @@ fn parse_obj(text: &str) -> Option<JsonValue> {
 fn signal_to_dimkey(sig: &str) -> Option<&'static str> {
     if sig.contains("掉发") || sig.contains("脱发") {
         Some("hairloss")
-    } else if sig.contains("消化") || sig.contains("肠胃") || sig.contains("胃")
-        || sig.contains("便秘") || sig.contains("腹泻") || sig.contains("拉肚")
+    } else if sig.contains("消化")
+        || sig.contains("肠胃")
+        || sig.contains("胃")
+        || sig.contains("便秘")
+        || sig.contains("腹泻")
+        || sig.contains("拉肚")
     {
         Some("digestion")
-    } else if sig.contains("精力") || sig.contains("疲") || sig.contains("累") || sig.contains("乏") {
+    } else if sig.contains("精力") || sig.contains("疲") || sig.contains("累") || sig.contains("乏")
+    {
         Some("energy")
     } else {
         None
@@ -704,7 +730,15 @@ fn derive_from_journals(db: &Connection, user_id: &str) -> Result<i64, String> {
         // sleep: good/fair/poor → 睡眠（poor 记 done=0 表示有留痕但质量差）
         if let (Some(id), Some(sl)) = (key_id("sleep"), h.get("sleep").and_then(|v| v.as_str())) {
             let done = if sl == "poor" { 0 } else { 1 };
-            if derive_mark_if_absent(db, user_id, id, &date, None, done, &format!("今日经营派生:{sl}")) {
+            if derive_mark_if_absent(
+                db,
+                user_id,
+                id,
+                &date,
+                None,
+                done,
+                &format!("今日经营派生:{sl}"),
+            ) {
                 written += 1;
             }
         }
@@ -714,9 +748,19 @@ fn derive_from_journals(db: &Connection, user_id: &str) -> Result<i64, String> {
                 let Some(text) = sig.as_str().filter(|s| !s.trim().is_empty()) else {
                     continue;
                 };
-                let Some(k) = signal_to_dimkey(text) else { continue };
+                let Some(k) = signal_to_dimkey(text) else {
+                    continue;
+                };
                 if let Some(id) = key_id(k) {
-                    if derive_mark_if_absent(db, user_id, id, &date, None, 1, &format!("今日经营派生:{text}")) {
+                    if derive_mark_if_absent(
+                        db,
+                        user_id,
+                        id,
+                        &date,
+                        None,
+                        1,
+                        &format!("今日经营派生:{text}"),
+                    ) {
                         written += 1;
                     }
                 }
@@ -773,11 +817,17 @@ pub async fn create_dim(
 ) -> (StatusCode, Json<JsonValue>) {
     let db = state.db.lock();
     match create_dim_impl(&db, &admin.0, &req) {
-        Ok(item) => (StatusCode::OK, Json(json!({ "success": true, "item": item }))),
+        Ok(item) => (
+            StatusCode::OK,
+            Json(json!({ "success": true, "item": item })),
+        ),
         Err(e) if is_user_err(&e) => bad(&e),
         Err(e) => {
             error!(target: "praxis_health", "create_dim: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "success": false, "error": "内部错误" })))
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "success": false, "error": "内部错误" })),
+            )
         }
     }
 }
@@ -790,12 +840,21 @@ pub async fn update_dim(
 ) -> (StatusCode, Json<JsonValue>) {
     let db = state.db.lock();
     match update_dim_impl(&db, &admin.0, id, &patch) {
-        Ok(Some(item)) => (StatusCode::OK, Json(json!({ "success": true, "item": item }))),
-        Ok(None) => (StatusCode::NOT_FOUND, Json(json!({ "success": false, "error": "未找到维度" }))),
+        Ok(Some(item)) => (
+            StatusCode::OK,
+            Json(json!({ "success": true, "item": item })),
+        ),
+        Ok(None) => (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "success": false, "error": "未找到维度" })),
+        ),
         Err(e) if is_user_err(&e) => bad(&e),
         Err(e) => {
             error!(target: "praxis_health", "update_dim: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "success": false, "error": "内部错误" })))
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "success": false, "error": "内部错误" })),
+            )
         }
     }
 }
@@ -824,10 +883,16 @@ pub async fn list_marks(
 ) -> (StatusCode, Json<JsonValue>) {
     let db = state.db.lock();
     match list_marks_impl(&db, &admin.0, q.from.as_deref(), q.to.as_deref()) {
-        Ok(items) => (StatusCode::OK, Json(json!({ "success": true, "items": items }))),
+        Ok(items) => (
+            StatusCode::OK,
+            Json(json!({ "success": true, "items": items })),
+        ),
         Err(e) => {
             error!(target: "praxis_health", "list_marks: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "success": false, "error": "内部错误" })))
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "success": false, "error": "内部错误" })),
+            )
         }
     }
 }
@@ -839,11 +904,17 @@ pub async fn upsert_mark(
 ) -> (StatusCode, Json<JsonValue>) {
     let db = state.db.lock();
     match upsert_mark_impl(&db, &admin.0, &req) {
-        Ok(item) => (StatusCode::OK, Json(json!({ "success": true, "item": item }))),
+        Ok(item) => (
+            StatusCode::OK,
+            Json(json!({ "success": true, "item": item })),
+        ),
         Err(e) if is_user_err(&e) => bad(&e),
         Err(e) => {
             error!(target: "praxis_health", "upsert_mark: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "success": false, "error": "内部错误" })))
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "success": false, "error": "内部错误" })),
+            )
         }
     }
 }
@@ -855,10 +926,16 @@ pub async fn list_metrics(
 ) -> (StatusCode, Json<JsonValue>) {
     let db = state.db.lock();
     match list_metrics_impl(&db, &admin.0, q.dim_id) {
-        Ok(items) => (StatusCode::OK, Json(json!({ "success": true, "items": items }))),
+        Ok(items) => (
+            StatusCode::OK,
+            Json(json!({ "success": true, "items": items })),
+        ),
         Err(e) => {
             error!(target: "praxis_health", "list_metrics: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "success": false, "error": "内部错误" })))
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "success": false, "error": "内部错误" })),
+            )
         }
     }
 }
@@ -870,11 +947,17 @@ pub async fn create_metric(
 ) -> (StatusCode, Json<JsonValue>) {
     let db = state.db.lock();
     match create_metric_impl(&db, &admin.0, &req) {
-        Ok(item) => (StatusCode::OK, Json(json!({ "success": true, "item": item }))),
+        Ok(item) => (
+            StatusCode::OK,
+            Json(json!({ "success": true, "item": item })),
+        ),
         Err(e) if is_user_err(&e) => bad(&e),
         Err(e) => {
             error!(target: "praxis_health", "create_metric: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "success": false, "error": "内部错误" })))
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "success": false, "error": "内部错误" })),
+            )
         }
     }
 }
@@ -890,7 +973,10 @@ pub async fn delete_metric(
         "UPDATE praxis_health_metrics SET deleted=1 WHERE id=?1 AND user_id=?2 AND deleted=0",
         params![id, &admin.0],
     ) {
-        Ok(0) => (StatusCode::NOT_FOUND, Json(json!({ "success": false, "error": "未找到记录" }))),
+        Ok(0) => (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "success": false, "error": "未找到记录" })),
+        ),
         Ok(_) => {
             let _ = now;
             (StatusCode::OK, Json(json!({ "success": true })))
@@ -907,10 +993,16 @@ pub async fn get_board(
     let db = state.db.lock();
     let week = q.week.filter(|s| !s.is_empty()).unwrap_or_else(this_week);
     match build_board(&db, &admin.0, &week) {
-        Ok(board) => (StatusCode::OK, Json(json!({ "success": true, "board": board }))),
+        Ok(board) => (
+            StatusCode::OK,
+            Json(json!({ "success": true, "board": board })),
+        ),
         Err(e) => {
             error!(target: "praxis_health", "get_board: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "success": false, "error": "内部错误" })))
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "success": false, "error": "内部错误" })),
+            )
         }
     }
 }
@@ -921,10 +1013,16 @@ pub async fn derive_signals(
 ) -> (StatusCode, Json<JsonValue>) {
     let db = state.db.lock();
     match derive_from_journals(&db, &admin.0) {
-        Ok(n) => (StatusCode::OK, Json(json!({ "success": true, "derived": n }))),
+        Ok(n) => (
+            StatusCode::OK,
+            Json(json!({ "success": true, "derived": n })),
+        ),
         Err(e) => {
             error!(target: "praxis_health", "derive: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "success": false, "error": "内部错误" })))
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "success": false, "error": "内部错误" })),
+            )
         }
     }
 }
@@ -941,7 +1039,10 @@ pub async fn score_health(
             Ok(d) => d,
             Err(e) => {
                 error!(target: "praxis_health", "score list dims: {}", e);
-                return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "success": false, "error": "内部错误" })));
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({ "success": false, "error": "内部错误" })),
+                );
             }
         };
         let input = build_score_input(&db, &admin.0, &dims);
@@ -960,18 +1061,29 @@ pub async fn score_health(
     };
 
     // 3. 调用（不持锁 await）。
-    let reply = match client.simple_generate(SCORE_SYSTEM_PROMPT, &prompt_input, 1500).await {
+    let reply = match client
+        .simple_generate(SCORE_SYSTEM_PROMPT, &prompt_input, 1500)
+        .await
+    {
         Ok(t) => t,
         Err(e) => {
             warn!(target: "praxis_health", "score llm error: {}", e);
-            return (StatusCode::BAD_GATEWAY, Json(json!({ "success": false, "error": e, "retryable": true })));
+            return (
+                StatusCode::BAD_GATEWAY,
+                Json(json!({ "success": false, "error": e, "retryable": true })),
+            );
         }
     };
     let parsed = match parse_obj(&reply) {
         Some(v) => v,
         None => {
             warn!(target: "praxis_health", "score parse fail");
-            return (StatusCode::UNPROCESSABLE_ENTITY, Json(json!({ "success": false, "error": "AI 返回格式异常，可重试", "retryable": true })));
+            return (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                Json(
+                    json!({ "success": false, "error": "AI 返回格式异常，可重试", "retryable": true }),
+                ),
+            );
         }
     };
 
@@ -979,20 +1091,32 @@ pub async fn score_health(
     let week = this_week();
     let now = now_rfc3339();
     let empty = vec![];
-    let ai_dims = parsed.get("dims").and_then(|v| v.as_array()).unwrap_or(&empty);
+    let ai_dims = parsed
+        .get("dims")
+        .and_then(|v| v.as_array())
+        .unwrap_or(&empty);
     let mut weighted_sum = 0.0f64;
     let mut weight_total = 0.0f64;
     {
         let db = state.db.lock();
         for d in &dims {
-            let Some(entry) = ai_dims.iter().find(|e| {
-                e.get("dimKey").and_then(|k| k.as_str()) == Some(d.dim_key.as_str())
-            }) else {
+            let Some(entry) = ai_dims
+                .iter()
+                .find(|e| e.get("dimKey").and_then(|k| k.as_str()) == Some(d.dim_key.as_str()))
+            else {
                 continue;
             };
             let score = entry.get("score").and_then(|v| v.as_i64());
-            let trend = entry.get("trend").and_then(|v| v.as_str()).unwrap_or("").to_string();
-            let explain = entry.get("explain").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let trend = entry
+                .get("trend")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let explain = entry
+                .get("explain")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
             if let Err(e) = db.execute(
                 "INSERT INTO praxis_health_scores (user_id, week, dim_id, score, trend, explain, computed_at)
                  VALUES (?1,?2,?3,?4,?5,?6,?7)
@@ -1028,7 +1152,11 @@ pub async fn score_health(
         } else {
             None
         };
-        let summary = parsed.get("summary").and_then(|v| v.as_str()).unwrap_or("").to_string();
+        let summary = parsed
+            .get("summary")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
         if let Err(e) = db.execute(
             "INSERT INTO praxis_health_scores (user_id, week, dim_id, score, trend, explain, computed_at)
              VALUES (?1,?2,0,?3,'',?4,?5)
@@ -1042,10 +1170,16 @@ pub async fn score_health(
     // 5. 回 board。
     let db = state.db.lock();
     match build_board(&db, &admin.0, &week) {
-        Ok(board) => (StatusCode::OK, Json(json!({ "success": true, "board": board }))),
+        Ok(board) => (
+            StatusCode::OK,
+            Json(json!({ "success": true, "board": board })),
+        ),
         Err(e) => {
             error!(target: "praxis_health", "score board: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "success": false, "error": "内部错误" })))
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "success": false, "error": "内部错误" })),
+            )
         }
     }
 }
