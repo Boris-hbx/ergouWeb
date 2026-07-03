@@ -471,7 +471,10 @@ pub fn build_app(state: state::AppState) -> Router {
             "/praxis/health/metrics/{id}",
             axum::routing::delete(routes::praxis_health::delete_metric),
         )
-        .route("/praxis/health/board", get(routes::praxis_health::get_board))
+        .route(
+            "/praxis/health/board",
+            get(routes::praxis_health::get_board),
+        )
         .route(
             "/praxis/health/derive",
             post(routes::praxis_health::derive_signals),
