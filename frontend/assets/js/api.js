@@ -724,6 +724,49 @@ var API = (function() {
             return await request('POST', '/praxis/journal/' + encodeURIComponent(id) + '/analyze');
         },
 
+        // ===== Praxis 健康板块 v0.3 (T-296) =====
+        praxisHealthDimList: async function() {
+            return await request('GET', '/praxis/health/dims');
+        },
+        praxisHealthDimCreate: async function(data) {
+            return await request('POST', '/praxis/health/dims', data);
+        },
+        praxisHealthDimUpdate: async function(id, patch) {
+            return await request('PATCH', '/praxis/health/dims/' + encodeURIComponent(id), patch);
+        },
+        praxisHealthDimDelete: async function(id) {
+            return await request('DELETE', '/praxis/health/dims/' + encodeURIComponent(id));
+        },
+        praxisHealthMarkList: async function(from, to) {
+            var q = '';
+            if (from) q += (q ? '&' : '?') + 'from=' + encodeURIComponent(from);
+            if (to) q += (q ? '&' : '?') + 'to=' + encodeURIComponent(to);
+            return await request('GET', '/praxis/health/marks' + q);
+        },
+        praxisHealthMarkUpsert: async function(data) {
+            return await request('POST', '/praxis/health/marks', data);
+        },
+        praxisHealthMetricList: async function(dimId) {
+            var q = dimId ? ('?dimId=' + encodeURIComponent(dimId)) : '';
+            return await request('GET', '/praxis/health/metrics' + q);
+        },
+        praxisHealthMetricCreate: async function(data) {
+            return await request('POST', '/praxis/health/metrics', data);
+        },
+        praxisHealthMetricDelete: async function(id) {
+            return await request('DELETE', '/praxis/health/metrics/' + encodeURIComponent(id));
+        },
+        praxisHealthBoard: async function(week) {
+            var q = week ? ('?week=' + encodeURIComponent(week)) : '';
+            return await request('GET', '/praxis/health/board' + q);
+        },
+        praxisHealthDerive: async function() {
+            return await request('POST', '/praxis/health/derive');
+        },
+        praxisHealthScore: async function() {
+            return await request('POST', '/praxis/health/score');
+        },
+
         // ===== Insight Tasks v0.3 (T-122 后端 / T-123 前端) =====
         // 单层 insight_task。claim / create-report 由 Claude Code 调,前端不用。
         // v0.2 的 insight/source/annotation/publish API 已废弃(后端保留只读 30 天)。

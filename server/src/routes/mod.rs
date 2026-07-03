@@ -42,5 +42,6 @@ pub mod insight_factory;
 pub mod events;
 pub mod praxis_contact_logs;
 pub mod praxis_contacts;
+pub mod praxis_health;
 pub mod praxis_journal;
 pub mod praxis_perspectives;

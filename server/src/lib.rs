@@ -449,6 +449,37 @@ pub fn build_app(state: state::AppState) -> Router {
             axum::routing::patch(routes::praxis_perspectives::update_perspective)
                 .delete(routes::praxis_perspectives::delete_perspective),
         )
+        // Praxis 健康板块 (T-296 / SPEC praxis §12) - guarded by AdminUserId in handlers.
+        .route(
+            "/praxis/health/dims",
+            get(routes::praxis_health::list_dims).post(routes::praxis_health::create_dim),
+        )
+        .route(
+            "/praxis/health/dims/{id}",
+            axum::routing::patch(routes::praxis_health::update_dim)
+                .delete(routes::praxis_health::delete_dim),
+        )
+        .route(
+            "/praxis/health/marks",
+            get(routes::praxis_health::list_marks).post(routes::praxis_health::upsert_mark),
+        )
+        .route(
+            "/praxis/health/metrics",
+            get(routes::praxis_health::list_metrics).post(routes::praxis_health::create_metric),
+        )
+        .route(
+            "/praxis/health/metrics/{id}",
+            axum::routing::delete(routes::praxis_health::delete_metric),
+        )
+        .route("/praxis/health/board", get(routes::praxis_health::get_board))
+        .route(
+            "/praxis/health/derive",
+            post(routes::praxis_health::derive_signals),
+        )
+        .route(
+            "/praxis/health/score",
+            post(routes::praxis_health::score_health),
+        )
         // T-105 SPEC insight — 注意此处必须与 main.rs 同步(memory:duplicate-build-app)
         .route(
             "/insights",
