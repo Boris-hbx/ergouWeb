@@ -93,10 +93,11 @@ fn row_to_dim(row: &rusqlite::Row) -> rusqlite::Result<HealthDim> {
 }
 
 /// 首次访问时把系统种子维度写入该用户（对齐靶盘原型 17 维）。幂等。
+/// T-297⑥：计数**含软删行** —— 用户曾种过再删光，不再重播种（只种"从未有过"的用户）。
 fn ensure_seeded(db: &Connection, user_id: &str) -> Result<(), String> {
     let cnt: i64 = db
         .query_row(
-            "SELECT COUNT(*) FROM praxis_health_dims WHERE user_id = ?1 AND deleted = 0",
+            "SELECT COUNT(*) FROM praxis_health_dims WHERE user_id = ?1",
             params![user_id],
             |r| r.get(0),
         )
@@ -553,6 +554,20 @@ fn build_score_input(db: &Connection, user_id: &str, dims: &[HealthDim]) -> Stri
         if let Some(m) = last_metric {
             ev.push_str(&format!("；最近实测 {m}"));
         }
+        // 信号维度带上最近一条留痕的内容，AI 才能据此判断（T-297①，否则只见次数）。
+        if d.kind == "signal" {
+            let last_note: Option<String> = db
+                .query_row(
+                    "SELECT note FROM praxis_health_marks WHERE user_id=?1 AND dim_id=?2 AND note != ''
+                     ORDER BY mark_date DESC LIMIT 1",
+                    params![user_id, d.id],
+                    |r| r.get::<_, Option<String>>(0),
+                )
+                .optional().ok().flatten().flatten();
+            if let Some(n) = last_note {
+                ev.push_str(&format!("；最近信号「{n}」"));
+            }
+        }
         if !d.target_floor.is_empty() {
             ev.push_str(&format!("；基线 {}", d.target_floor));
         }
@@ -607,11 +622,48 @@ fn parse_obj(text: &str) -> Option<JsonValue> {
 
 // ===================== journal 派生信号 (M4) =====================
 
-/// 从已分析 journal 的 `structured.health` 派生身体信号 → 写入 signal 维度打卡。
-/// 复用 `praxis_journal.structured`（其 analyze 提示已产出可空的 health 块）。
-/// 键映射：energy→精力(1-5) / sleep→睡眠 / moved→运动 / discomfort→消化或掉发命中。
+/// 自由文本身体信号 → 信号维度 key（T-297①）。仅命中已存在的信号维度。
+fn signal_to_dimkey(sig: &str) -> Option<&'static str> {
+    if sig.contains("掉发") || sig.contains("脱发") {
+        Some("hairloss")
+    } else if sig.contains("消化") || sig.contains("肠胃") || sig.contains("胃")
+        || sig.contains("便秘") || sig.contains("腹泻") || sig.contains("拉肚")
+    {
+        Some("digestion")
+    } else if sig.contains("精力") || sig.contains("疲") || sig.contains("累") || sig.contains("乏") {
+        Some("energy")
+    } else {
+        None
+    }
+}
+
+/// 只在该 (维度,日期) 尚无任何打卡时插入派生值（T-297⑥：不覆盖手动/已有值）。
+/// 返回是否真的写入了一行。
+fn derive_mark_if_absent(
+    db: &Connection,
+    user_id: &str,
+    dim_id: i64,
+    date: &str,
+    value: Option<f64>,
+    done: i64,
+    note: &str,
+) -> bool {
+    let now = now_rfc3339();
+    db.execute(
+        "INSERT INTO praxis_health_marks (user_id, dim_id, mark_date, value, done, note, created_at, updated_at)
+         VALUES (?1,?2,?3,?4,?5,?6,?7,?7)
+         ON CONFLICT(user_id, dim_id, mark_date) DO NOTHING",
+        params![user_id, dim_id, date, value, done, note, now],
+    )
+    .unwrap_or(0)
+        > 0
+}
+
+/// 从已分析 journal 的 `structured.health` 派生身体信号 → 写入信号维度打卡。
+/// 复用 `praxis_journal.structured`（analyze 提示产出可空 health 块）。
+/// 映射：energy→精力(1-5) / sleep→睡眠 / moved→运动 / **signals[]→掉发/消化/精力等信号维度(T-297①)**。
+/// 不覆盖已有打卡（T-297⑥），只补空缺。
 fn derive_from_journals(db: &Connection, user_id: &str) -> Result<i64, String> {
-    // signal/habit 维度按 dim_key 建索引，用于回填。
     let dims = list_dims_impl(db, user_id)?;
     let key_id = |k: &str| dims.iter().find(|d| d.dim_key == k).map(|d| d.id);
 
@@ -637,36 +689,38 @@ fn derive_from_journals(db: &Connection, user_id: &str) -> Result<i64, String> {
         };
         // energy: 1-5
         if let (Some(id), Some(e)) = (key_id("energy"), h.get("energy").and_then(|v| v.as_i64())) {
-            if (1..=5).contains(&e) {
-                let _ = db.execute(
-                    "INSERT INTO praxis_health_marks (user_id, dim_id, mark_date, value, done, note, created_at, updated_at)
-                     VALUES (?1,?2,?3,?4,1,'今日经营派生',?5,?5)
-                     ON CONFLICT(user_id, dim_id, mark_date) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at",
-                    params![user_id, id, date, e as f64, now_rfc3339()],
-                );
+            if (1..=5).contains(&e)
+                && derive_mark_if_absent(db, user_id, id, &date, Some(e as f64), 1, "今日经营派生")
+            {
                 written += 1;
             }
         }
         // moved: bool → 运动打卡
         if let (Some(id), Some(true)) = (key_id("move"), h.get("moved").and_then(|v| v.as_bool())) {
-            let _ = db.execute(
-                "INSERT INTO praxis_health_marks (user_id, dim_id, mark_date, value, done, note, created_at, updated_at)
-                 VALUES (?1,?2,?3,NULL,1,'今日经营派生',?4,?4)
-                 ON CONFLICT(user_id, dim_id, mark_date) DO UPDATE SET done=1, updated_at=excluded.updated_at",
-                params![user_id, id, date, now_rfc3339()],
-            );
-            written += 1;
+            if derive_mark_if_absent(db, user_id, id, &date, None, 1, "今日经营派生") {
+                written += 1;
+            }
         }
-        // sleep: good/fair/poor → 睡眠信号（good=1 有效打卡；poor 记 note 不计 done）
+        // sleep: good/fair/poor → 睡眠（poor 记 done=0 表示有留痕但质量差）
         if let (Some(id), Some(sl)) = (key_id("sleep"), h.get("sleep").and_then(|v| v.as_str())) {
             let done = if sl == "poor" { 0 } else { 1 };
-            let _ = db.execute(
-                "INSERT INTO praxis_health_marks (user_id, dim_id, mark_date, value, done, note, created_at, updated_at)
-                 VALUES (?1,?2,?3,NULL,?4,?5,?6,?6)
-                 ON CONFLICT(user_id, dim_id, mark_date) DO UPDATE SET done=excluded.done, note=excluded.note, updated_at=excluded.updated_at",
-                params![user_id, id, date, done, format!("今日经营派生:{sl}"), now_rfc3339()],
-            );
-            written += 1;
+            if derive_mark_if_absent(db, user_id, id, &date, None, done, &format!("今日经营派生:{sl}")) {
+                written += 1;
+            }
+        }
+        // signals[]：自由文本身体信号 → 对应信号维度留痕（T-297①：修信号维度恒待测）。
+        if let Some(sigs) = h.get("signals").and_then(|v| v.as_array()) {
+            for sig in sigs {
+                let Some(text) = sig.as_str().filter(|s| !s.trim().is_empty()) else {
+                    continue;
+                };
+                let Some(k) = signal_to_dimkey(text) else { continue };
+                if let Some(id) = key_id(k) {
+                    if derive_mark_if_absent(db, user_id, id, &date, None, 1, &format!("今日经营派生:{text}")) {
+                        written += 1;
+                    }
+                }
+            }
         }
     }
     Ok(written)
@@ -951,6 +1005,21 @@ pub async fn score_health(
                 let w = ring_weight(&d.ring);
                 weighted_sum += s as f64 * w;
                 weight_total += w;
+                // T-297③ 动态优先级：仅系统种子维度、每次至多挪一层——
+                // 做绿(≥80)的核心维移出到常规；恶化(<40)的常规维移进核心。用户自定义维度不动。
+                if d.seeded {
+                    let new_ring = match (d.ring.as_str(), s) {
+                        ("core", s) if s >= 80 => Some("mid"),
+                        ("mid", s) if s < 40 => Some("core"),
+                        _ => None,
+                    };
+                    if let Some(nr) = new_ring {
+                        let _ = db.execute(
+                            "UPDATE praxis_health_dims SET ring=?1, updated_at=?2 WHERE id=?3 AND user_id=?4 AND deleted=0",
+                            params![nr, now, d.id, &admin.0],
+                        );
+                    }
+                }
             }
         }
         // 总分：加权平均（四舍五入），explain 用 AI summary。
@@ -1159,5 +1228,70 @@ mod tests {
     fn iso_week_format() {
         assert_eq!(iso_week_of("2026-07-02"), "2026-W27");
         assert_eq!(ring_weight("core"), 3.0);
+    }
+
+    #[test]
+    fn signal_keyword_mapping() {
+        assert_eq!(signal_to_dimkey("最近掉发严重"), Some("hairloss"));
+        assert_eq!(signal_to_dimkey("消化不良"), Some("digestion"));
+        assert_eq!(signal_to_dimkey("很累精力差"), Some("energy"));
+        assert_eq!(signal_to_dimkey("心情不错"), None);
+    }
+
+    // T-297⑥：删光维度后再访问不重播种（种过的用户不再种）。
+    #[tokio::test]
+    async fn health_no_reseed_after_delete_all() {
+        let state = test_state();
+        let (_aid, token) = create_admin_user(&state, "ph-reseed", "Pa55word1");
+        let app = crate::build_app(state);
+
+        // 首访种 17 维
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/api/praxis/health/dims")
+                    .header("Cookie", auth_cookie(&token))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let ids: Vec<i64> = body_json(resp).await["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|d| d["id"].as_i64().unwrap())
+            .collect();
+        assert_eq!(ids.len(), 17);
+
+        // 删光
+        for id in &ids {
+            let _ = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .method("DELETE")
+                        .uri(format!("/api/praxis/health/dims/{id}"))
+                        .header("Cookie", auth_cookie(&token))
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+        }
+
+        // 再访问：不应重新种子（保持空）
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/praxis/health/dims")
+                    .header("Cookie", auth_cookie(&token))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(body_json(resp).await["items"].as_array().unwrap().len(), 0);
     }
 }

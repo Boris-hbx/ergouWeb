@@ -8,6 +8,9 @@ var PraxisHealth = (function() {
     var _weekOffset = 0;    // 0=本周
     var _selId = null;      // 选中维度 id
     var _metrics = [];      // 选中维度的指标记录
+    var _marks = [];        // 选中(习惯/信号)维度近 21 天打卡(趋势时间线, T-297②)
+    var _addMode = false;   // 新增维度表单态 (T-297④)
+    var _detailFor = null;  // 已加载明细的维度 id(防重拉守卫, T-297②)
     var _busy = false;
     var _loaded = false;
 
@@ -43,10 +46,11 @@ var PraxisHealth = (function() {
         var a = ang * Math.PI / 180;
         return { x: CX + r * Math.cos(a), y: CY - r * Math.sin(a) };
     }
-    function todayStr() {
-        var d = new Date(), p = function(n) { return n < 10 ? '0' + n : '' + n; };
+    function fmtDate(d) {
+        var p = function(n) { return n < 10 ? '0' + n : '' + n; };
         return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
     }
+    function todayStr() { return fmtDate(new Date()); }
     // ISO-8601 周键（周一为周首，含首个周四的周为第 1 周）——与后端 chrono 一致。
     function isoWeek(d) {
         var date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
@@ -126,10 +130,14 @@ var PraxisHealth = (function() {
             return;
         }
         var dims = (_board && _board.dims) || [];
+        // T-297⑤：把真实总分回填八板块「健康」tab 评分环。
+        var total = (_board && _board.total) || {};
+        if (window.Praxis && Praxis.setHealthBoardScore) Praxis.setHealthBoardScore(total.score);
+        var side = _addMode ? addFormHtml() : (_selId ? editorHtml() : sidebarHtml(dims));
         stage.innerHTML =
             '<div class="ph-board">' + boardSvg(dims) + '</div>' +
-            '<div class="ph-side">' + (_selId ? editorHtml() : sidebarHtml(dims)) + '</div>';
-        if (_selId) loadMetricsIfNeeded();
+            '<div class="ph-side">' + side + '</div>';
+        if (_selId && !_addMode) loadDetailIfNeeded();
     }
 
     // ===== 靶盘 SVG =====
@@ -240,19 +248,26 @@ var PraxisHealth = (function() {
               '<div class="ph-ed-head"><h4>' + esc(d.name) + '</h4>' + scoreLine + '</div>' +
               '<div class="ph-ed-meta">' + (RINGS[d.ring] ? RINGS[d.ring].label : '') + ' · ' + esc(SECTORS[d.sector] ? SECTORS[d.sector].label : '') + ' · ' + esc(KIND_LABEL[d.kind] || d.kind) + '</div>';
         if (d.explain) html += '<div class="ph-why">💡 ' + esc(d.explain) + '</div>';
-        if (d.targetFloor) html += '<div class="ph-target-line">基线：' + esc(d.targetFloor) + '</div>';
+        // T-297②：三类目标都显示（基线 floor / 个人目标 goal），不再只显 floor。
+        if (d.targetFloor) html += '<div class="ph-target-line"><b>基线</b>（守）：' + esc(d.targetFloor) + '</div>';
+        if (d.targetGoal) html += '<div class="ph-target-line"><b>个人目标</b>（攻）：' + esc(d.targetGoal) + '</div>';
+
+        // T-297②：趋势时间线（习惯/信号=近 21 天打卡点条；指标=历次实测折线）。
+        html += timelineHtml(d);
 
         if (d.kind === 'metric') {
             html += metricFormHtml(d);
         } else {
             html += habitFormHtml(d);
         }
-        // 维度设置（改圈层/类别/删除）
+        // 维度设置（改圈层/类别/单位/目标/删除）
         html +=
             '<details class="ph-dim-settings"><summary>维度设置</summary>' +
               '<div class="ph-set-row"><label>优先级</label>' + ringPills(d) + '</div>' +
               '<div class="ph-set-row"><label>类别</label>' + sectorPills(d) + '</div>' +
               '<div class="ph-set-row"><label>单位</label><input id="ph-set-unit" value="' + esc(d.unit || '') + '" placeholder="如 分钟/升/cm"></div>' +
+              '<div class="ph-set-row"><label>基线</label><input id="ph-set-floor" value="' + esc(d.targetFloor || '') + '" placeholder="健康基线(守)"></div>' +
+              '<div class="ph-set-row"><label>目标</label><input id="ph-set-goal" value="' + esc(d.targetGoal || '') + '" placeholder="个人目标(攻)"></div>' +
               '<div class="ph-set-acts"><button class="ph-btn" onclick="PraxisHealth.saveDim()">保存维度</button>' +
               '<button class="ph-btn danger" onclick="PraxisHealth.deleteDim()">删除维度</button></div>' +
             '</details>';
@@ -294,6 +309,47 @@ var PraxisHealth = (function() {
             '</div>';
     }
 
+    // T-297②：趋势时间线。习惯/信号→近 21 天打卡点条；指标→历次实测值序列。
+    function timelineHtml(d) {
+        if (d.kind === 'metric') {
+            if (!_metrics.length) return '';
+            var seq = _metrics.slice().reverse().map(function(m) {   // _metrics 为 desc，转升序
+                var v = m.textValue || (m.value == null ? '·' : m.value);
+                return '<span class="ph-tl-mv">' + esc((m.measuredAt || '').slice(5)) + ' <b>' + esc(v) + '</b></span>';
+            }).join('<span class="ph-tl-arrow">→</span>');
+            return '<div class="ph-timeline"><div class="ph-tl-h">趋势（历次实测）</div><div class="ph-tl-metrics">' + seq + '</div></div>';
+        }
+        var byDate = {};
+        _marks.forEach(function(m) { byDate[m.markDate] = m; });
+        var cells = '', base = new Date();
+        for (var i = 20; i >= 0; i--) {
+            var dt = new Date(); dt.setDate(base.getDate() - i);
+            var ds = fmtDate(dt), m = byDate[ds];
+            var cls = !m ? 'none' : (m.done ? 'done' : 'miss');
+            var tip = ds + (m ? ((m.done ? ' ✓' : ' 记录') + (m.value != null ? ' ' + m.value : '') + (m.note ? ' ' + m.note : '')) : ' 未打卡');
+            cells += '<span class="ph-tl-cell ' + cls + '" title="' + esc(tip) + '"></span>';
+        }
+        return '<div class="ph-timeline"><div class="ph-tl-h">近 21 天</div><div class="ph-tl-strip">' + cells + '</div></div>';
+    }
+
+    // T-297④：新增维度表单（替代两次 prompt；sector/ring/kind 用下拉）。
+    function addFormHtml() {
+        var secOpt = Object.keys(SECTORS).map(function(k) { return '<option value="' + k + '">' + SECTORS[k].label + '</option>'; }).join('');
+        var ringOpt = RING_ORDER.map(function(k) { return '<option value="' + k + '"' + (k === 'mid' ? ' selected' : '') + '>' + RINGS[k].label + '</option>'; }).join('');
+        var kindOpt = Object.keys(KIND_LABEL).map(function(k) { return '<option value="' + k + '">' + KIND_LABEL[k] + '</option>'; }).join('');
+        return '<div class="ph-editor">' +
+            '<button class="ph-back" onclick="PraxisHealth.cancelAdd()">← 返回看板</button>' +
+            '<div class="ph-ed-head"><h4>新增追踪维度</h4></div>' +
+            '<div class="ph-set-row"><label>名称</label><input id="ph-add-name" maxlength="40" placeholder="如 冥想 / 泡沫轴放松"></div>' +
+            '<div class="ph-set-row"><label>类别</label><select id="ph-add-sector">' + secOpt + '</select></div>' +
+            '<div class="ph-set-row"><label>优先级</label><select id="ph-add-ring">' + ringOpt + '</select></div>' +
+            '<div class="ph-set-row"><label>采集</label><select id="ph-add-kind">' + kindOpt + '</select></div>' +
+            '<div class="ph-set-row"><label>单位</label><input id="ph-add-unit" placeholder="可选，如 分钟"></div>' +
+            '<div class="ph-set-acts"><button class="ph-btn pri" id="ph-add-save" onclick="PraxisHealth.createDim()">创建维度</button>' +
+            '<button class="ph-btn" onclick="PraxisHealth.cancelAdd()">取消</button></div>' +
+            '</div>';
+    }
+
     function ringPills(d) {
         return '<div class="ph-pills" data-field="ring">' + RING_ORDER.map(function(k) {
             return '<span class="ph-pill' + (k === d.ring ? ' on' : '') + '" data-v="' + k + '" onclick="PraxisHealth.pick(this)">' + RINGS[k].label + '</span>';
@@ -313,6 +369,7 @@ var PraxisHealth = (function() {
     function setSub(s) {
         _sub = s;
         _selId = null;
+        _addMode = false;
         document.querySelectorAll('#praxis-health-view .ph-subtab').forEach(function(el) {
             el.classList.toggle('on', el.dataset.s === s);
         });
@@ -326,40 +383,69 @@ var PraxisHealth = (function() {
     }
     function selectDim(id) {
         _selId = id;
+        _addMode = false;
         _metrics = [];
+        _marks = [];
+        _detailFor = null;   // 触发该维度明细(指标/打卡)重新拉取
         paint();
     }
     function back() {
         _selId = null;
+        _addMode = false;
         paint();
     }
-    function loadMetricsIfNeeded() {
+    // T-297②：加载选中维度明细。metric→实测；habit/signal→近 21 天打卡（供时间线）。
+    // `_detailFor` 占位守卫：避免 paint()→拉取→paint() 的无限重拉循环（T-296 遗留）。
+    function loadDetailIfNeeded() {
+        if (_detailFor === _selId) return;
         var d = findDim(_selId);
-        if (!d || d.kind !== 'metric') return;
-        API.praxisHealthMetricList(d.id).then(function(res) {
-            if (res && res.success !== false) {
-                _metrics = res.items || [];
-                // 仅当仍停留在该维度时重绘
-                if (_selId === d.id) paint();
-            }
-        }).catch(function(err) { console.error('[PraxisHealth] metrics', err); });
+        if (!d) return;
+        _detailFor = _selId;   // 乐观占位，阻断重复请求与重绘循环
+        var done = function() { if (_selId === d.id) paint(); };
+        if (d.kind === 'metric') {
+            API.praxisHealthMetricList(d.id).then(function(res) {
+                if (res && res.success !== false) _metrics = res.items || [];
+                done();
+            }).catch(function(err) { console.error('[PraxisHealth] metrics', err); _detailFor = null; });
+        } else {
+            var fromD = new Date();
+            fromD.setDate(fromD.getDate() - 20);
+            API.praxisHealthMarkList(fmtDate(fromD), todayStr()).then(function(res) {
+                if (res && res.success !== false) {
+                    _marks = (res.items || []).filter(function(m) { return m.dimId === d.id; });
+                }
+                done();
+            }).catch(function(err) { console.error('[PraxisHealth] marks', err); _detailFor = null; });
+        }
     }
 
+    // T-297④：所有写操作加 _busy 防重复提交。
     async function checkIn(id) {
+        if (_busy) return;
+        _busy = true;
+        var btn = document.querySelector('#praxis-health-view .ph-checkin .ph-btn.pri');
+        if (btn) btn.disabled = true;
         var valEl = document.getElementById('ph-ci-val');
         var v = valEl && valEl.value !== '' ? parseFloat(valEl.value) : null;
         try {
             var res = await API.praxisHealthMarkUpsert({ dimId: id, done: true, value: v });
             if (!res || res.success === false) throw new Error((res && res.error) || '打卡失败');
             if (typeof showToast === 'function') showToast('已打卡', 'success');
+            _detailFor = null;   // 让时间线随新打卡刷新
             await load();
         } catch (err) {
             console.error('[PraxisHealth] checkIn', err);
             if (typeof showToast === 'function') showToast(err.message || '打卡失败', 'error');
+        } finally {
+            _busy = false;
         }
     }
 
     async function recordMetric(id) {
+        if (_busy) return;
+        _busy = true;
+        var btn = document.querySelector('#praxis-health-view .ph-metricbox .ph-btn.pri');
+        if (btn) btn.disabled = true;
         var date = (document.getElementById('ph-m-date') || {}).value || todayStr();
         var valStr = (document.getElementById('ph-m-val') || {}).value;
         var unit = (document.getElementById('ph-m-unit') || {}).value || '';
@@ -372,34 +458,46 @@ var PraxisHealth = (function() {
             var res = await API.praxisHealthMetricCreate(data);
             if (!res || res.success === false) throw new Error((res && res.error) || '记录失败');
             if (typeof showToast === 'function') showToast('已记录实测', 'success');
-            loadMetricsIfNeeded();
+            _detailFor = null;
+            paint();
         } catch (err) {
             console.error('[PraxisHealth] recordMetric', err);
             if (typeof showToast === 'function') showToast(err.message || '记录失败', 'error');
+        } finally {
+            _busy = false;
         }
     }
 
     async function deleteMetric(id) {
+        if (_busy) return;
         if (!window.confirm('删除这条实测记录？')) return;
+        _busy = true;
         try {
             var res = await API.praxisHealthMetricDelete(id);
             if (!res || res.success === false) throw new Error((res && res.error) || '删除失败');
-            loadMetricsIfNeeded();
+            _detailFor = null;
+            paint();
         } catch (err) {
             console.error('[PraxisHealth] deleteMetric', err);
             if (typeof showToast === 'function') showToast('删除失败', 'error');
+        } finally {
+            _busy = false;
         }
     }
 
     async function saveDim() {
+        if (_busy) return;
         var d = findDim(_selId);
         if (!d) return;
+        _busy = true;
         var ringEl = document.querySelector('#praxis-health-view .ph-pills[data-field="ring"] .ph-pill.on');
         var secEl = document.querySelector('#praxis-health-view .ph-pills[data-field="sector"] .ph-pill.on');
         var patch = {
             ring: ringEl ? ringEl.dataset.v : d.ring,
             sector: secEl ? secEl.dataset.v : d.sector,
-            unit: (document.getElementById('ph-set-unit') || {}).value || ''
+            unit: (document.getElementById('ph-set-unit') || {}).value || '',
+            targetFloor: (document.getElementById('ph-set-floor') || {}).value || '',
+            targetGoal: (document.getElementById('ph-set-goal') || {}).value || ''
         };
         try {
             var res = await API.praxisHealthDimUpdate(d.id, patch);
@@ -409,6 +507,8 @@ var PraxisHealth = (function() {
         } catch (err) {
             console.error('[PraxisHealth] saveDim', err);
             if (typeof showToast === 'function') showToast(err.message || '保存失败', 'error');
+        } finally {
+            _busy = false;
         }
     }
 
@@ -428,21 +528,44 @@ var PraxisHealth = (function() {
         }
     }
 
-    async function addDim() {
-        var name = window.prompt('新维度名称（如 冥想 / 泡沫轴放松，1–40 字）', '');
-        if (name === null) return;
-        name = name.trim();
-        if (!name) return;
-        var sector = window.prompt('归到哪个类别？move(动) / eat(吃) / rest(睡·恢复) / sign(体征·信号)', 'move');
-        if (sector === null) return;
+    // T-297④：打开新增维度表单（不再用 prompt）。
+    function addDim() {
+        _addMode = true;
+        _selId = null;
+        paint();
+    }
+    function cancelAdd() {
+        _addMode = false;
+        paint();
+    }
+    async function createDim() {
+        if (_busy) return;
+        var name = ((document.getElementById('ph-add-name') || {}).value || '').trim();
+        if (!name) {
+            if (typeof showToast === 'function') showToast('填个维度名称', 'info');
+            return;
+        }
+        _busy = true;
+        var btn = document.getElementById('ph-add-save');
+        if (btn) btn.disabled = true;
+        var data = {
+            name: name,
+            sector: (document.getElementById('ph-add-sector') || {}).value || 'move',
+            ring: (document.getElementById('ph-add-ring') || {}).value || 'mid',
+            kind: (document.getElementById('ph-add-kind') || {}).value || 'habit',
+            unit: (document.getElementById('ph-add-unit') || {}).value || ''
+        };
         try {
-            var res = await API.praxisHealthDimCreate({ name: name, sector: (sector || 'move').trim(), ring: 'mid', kind: 'habit' });
+            var res = await API.praxisHealthDimCreate(data);
             if (!res || res.success === false) throw new Error((res && res.error) || '创建失败');
             if (typeof showToast === 'function') showToast('已新增维度', 'success');
+            _addMode = false;
             await load();
         } catch (err) {
-            console.error('[PraxisHealth] addDim', err);
+            console.error('[PraxisHealth] createDim', err);
             if (typeof showToast === 'function') showToast(err.message || '创建失败', 'error');
+        } finally {
+            _busy = false;
         }
     }
 
@@ -499,6 +622,8 @@ var PraxisHealth = (function() {
         saveDim: saveDim,
         deleteDim: deleteDim,
         addDim: addDim,
+        createDim: createDim,
+        cancelAdd: cancelAdd,
         runScore: runScore,
         runDerive: runDerive
     };
