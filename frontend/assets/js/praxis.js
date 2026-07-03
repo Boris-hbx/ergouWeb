@@ -214,6 +214,15 @@ var Praxis = (function() {
         render();
     }
 
+    // T-297⑤：健康板块 AI 打分后回填「健康」tab 的评分环（原硬编码 58）。
+    function setHealthBoardScore(n) {
+        if (n == null) return;
+        var b = BOARDS.find(function(x) { return x.key === 'health'; });
+        if (!b) return;
+        b.score = n;
+        renderBoards();
+    }
+
     function renderHealth() {
         var ring = document.getElementById('praxis-health-ring');
         if (!ring) return;
@@ -816,6 +825,7 @@ var Praxis = (function() {
         open: open,
         setBoard: setBoard,
         setHealthScore: setHealthScore,
+        setHealthBoardScore: setHealthBoardScore,
         editHealth: editHealth,
         startCreate: startCreate,
         selectContact: selectContact,
