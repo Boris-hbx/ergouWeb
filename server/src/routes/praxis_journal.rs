@@ -36,14 +36,21 @@ JSON 结构（字段固定，可空但必须存在）：
   "boards": ["命中的经营板块 key，取值仅限 strategy/skill/ops/fin/brand/rel/cog/risk"],
   "value": "今天的主基调，仅取一个：build(主动建设)|respond(被动响应)|firefight(救火)|maintain(维护)|rest(休整)",
   "risks": ["风险信号，可空数组"],
-  "tomorrow": "一个明日调整，小而具体、可执行"
+  "tomorrow": "一个明日调整，小而具体、可执行",
+  "health": {
+    "energy": 1到5的整数或 null（今天主观精力）,
+    "sleep": "good|fair|poor 或 null（睡眠质量）",
+    "moved": true/false/null（今天是否有运动/活动身体）,
+    "signals": ["身体信号，如 掉发/消化不适/久坐/头痛，可空数组"]
+  }
 }
 
 要求：
 - 基于用户记录本身，不空泛、不编造未提及的事实。
 - 区分事实/判断/建议：events 是事实，summary 是判断，tomorrow 是建议。
 - 输出短、克制、有信息量。
-- boards/value 用上面给定的英文 key，其余字段用中文。"#;
+- boards/value 用上面给定的英文 key，其余字段用中文。
+- health 仅在记录**提到**身体/精力/睡眠/运动/健康信号时填；完全没提就整块给 null，绝不编造。"#;
 
 fn now_rfc3339() -> String {
     Utc::now().to_rfc3339()

@@ -1140,6 +1140,75 @@ fn create_tables(conn: &Connection) {
         );
         CREATE INDEX IF NOT EXISTS idx_praxis_logs_contact ON praxis_contact_logs(contact_id, at DESC);
 
+        -- Praxis 健康·维度目录 (T-296 / SPEC praxis §12 · 设计底本 §3/§6)
+        -- 用户可自定义的追踪维度：位置=优先级(ring)×类别(sector)，采集方式=kind。
+        CREATE TABLE IF NOT EXISTS praxis_health_dims (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            dim_key TEXT NOT NULL,
+            name TEXT NOT NULL,
+            sector TEXT NOT NULL DEFAULT 'move',   -- move/eat/rest/sign
+            ring TEXT NOT NULL DEFAULT 'mid',       -- core/mid/watch (优先级)
+            kind TEXT NOT NULL DEFAULT 'habit',     -- habit(每日打卡)/metric(周期自测)/signal(派生·自评)
+            unit TEXT NOT NULL DEFAULT '',
+            target_floor TEXT NOT NULL DEFAULT '',  -- 健康基线(守)
+            target_goal TEXT NOT NULL DEFAULT '',   -- 个人目标(攻)
+            cadence TEXT NOT NULL DEFAULT 'daily',  -- daily/weekly/quarterly/adhoc
+            seeded INTEGER NOT NULL DEFAULT 0,      -- 1=系统种子(可改可删)
+            sort_order REAL NOT NULL DEFAULT 0,
+            archived INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            deleted INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE INDEX IF NOT EXISTS idx_praxis_hdim_user ON praxis_health_dims(user_id, deleted);
+
+        -- Praxis 健康·每日习惯打卡 (T-296)：每维每日一条(upsert)。
+        CREATE TABLE IF NOT EXISTS praxis_health_marks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            dim_id INTEGER NOT NULL,
+            mark_date TEXT NOT NULL,
+            value REAL,
+            done INTEGER NOT NULL DEFAULT 1,
+            note TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_praxis_hmark_dim_date
+            ON praxis_health_marks(user_id, dim_id, mark_date);
+
+        -- Praxis 健康·周期能力指标 & 体征/体检录入 (T-296)。
+        CREATE TABLE IF NOT EXISTS praxis_health_metrics (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            dim_id INTEGER NOT NULL,
+            measured_at TEXT NOT NULL,
+            value REAL,
+            text_value TEXT NOT NULL DEFAULT '',
+            unit TEXT NOT NULL DEFAULT '',
+            source TEXT NOT NULL DEFAULT 'self',   -- self/exam/device
+            note TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL,
+            deleted INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE INDEX IF NOT EXISTS idx_praxis_hmetric_dim
+            ON praxis_health_metrics(user_id, dim_id, measured_at DESC);
+
+        -- Praxis 健康·AI 打分快照 (T-296)：dim_id=0 表示板块总分；按周留档 + 覆盖最新。
+        CREATE TABLE IF NOT EXISTS praxis_health_scores (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            week TEXT NOT NULL,
+            dim_id INTEGER NOT NULL DEFAULT 0,
+            score INTEGER,
+            trend TEXT NOT NULL DEFAULT '',
+            explain TEXT NOT NULL DEFAULT '',
+            computed_at TEXT NOT NULL
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_praxis_hscore
+            ON praxis_health_scores(user_id, week, dim_id);
+
         -- Stakeholder columns (per-user schema config for stakeholders)
         CREATE TABLE IF NOT EXISTS stakeholder_columns (
             user_id   TEXT    NOT NULL REFERENCES users(id),

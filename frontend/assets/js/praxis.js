@@ -13,7 +13,7 @@ var Praxis = (function() {
         { key: 'strategy', icon: '🎯', name: '战略定位', score: 62, idea: '想清楚要成为什么样的人，再决定做什么事。' },
         { key: 'skill', icon: '🛠️', name: '能力产品', score: 78, idea: '把能力打磨成可被识别、可被交付的产品。' },
         { key: 'ops', icon: '⏱️', name: '运营管理', score: 55, idea: '用系统和习惯托住状态，别靠意志硬扛。' },
-        { key: 'fin', icon: '💧', name: '财务健康', score: 70, idea: '现金流健康是自由的底座，别让钱绑架决策。' },
+        { key: 'health', icon: '🩺', name: '健康', score: 58, idea: '身体是经营自己的基础资本；先行指标(动/吃/睡)决定滞后的体能与体征。' },
         { key: 'brand', icon: '📣', name: '品牌市场', score: 40, idea: '让对的人知道你能提供什么价值。' },
         { key: 'rel', icon: '🤝', name: '关键关系', score: 58, idea: '核心层每周深聊、重点层每月联系；拒绝无效社交，学会说不。' },
         { key: 'cog', icon: '🔭', name: '竞争认知', score: 66, idea: '看清自己在牌桌上的位置和手里的牌。' },
@@ -237,8 +237,19 @@ var Praxis = (function() {
 
     function render() {
         renderBoardHead();
-        renderCount();
         renderPerspBar();
+        var relLayout = document.getElementById('praxis-relation-layout');
+        var healthView = document.getElementById('praxis-health-view');
+        // 健康板块(T-296)：独立靶盘视图，交给 PraxisHealth 模块渲染。
+        if (_activeBoard === 'health') {
+            if (relLayout) relLayout.style.display = 'none';
+            if (healthView) healthView.style.display = '';
+            if (window.PraxisHealth) PraxisHealth.render();
+            return;
+        }
+        if (relLayout) relLayout.style.display = '';
+        if (healthView) healthView.style.display = 'none';
+        renderCount();
         renderArc();
         if (_activeBoard !== 'rel') {
             renderPlaceholder();
