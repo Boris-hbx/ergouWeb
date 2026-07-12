@@ -109,7 +109,7 @@ var PraxisHealth = (function() {
                 '<button onclick="PraxisHealth.shiftWeek(1)" title="下一周">›</button>' +
               '</div>' +
               '<div class="ph-actions">' +
-                '<button class="ph-btn" id="ph-derive" onclick="PraxisHealth.runDerive()" title="从今日经营记录抽取身体信号回填">↺ 从今日经营派生</button>' +
+                '<button class="ph-btn" id="ph-derive" onclick="PraxisHealth.runDerive()" title="从每日复盘记录抽取身体信号回填">↺ 从每日复盘派生</button>' +
                 '<button class="ph-btn pri" id="ph-score" onclick="PraxisHealth.runScore()" title="让 AI 教练打分(可解释)">✦ AI 打分</button>' +
                 '<button class="ph-btn" onclick="PraxisHealth.addDim()" title="自定义追踪维度">+ 维度</button>' +
               '</div>' +
@@ -283,7 +283,7 @@ var PraxisHealth = (function() {
               '<input id="ph-ci-val" type="number" step="any" placeholder="数值' + unit + '(可选)">' +
               '<button class="ph-btn pri" onclick="PraxisHealth.checkIn(' + d.id + ')">今天已做 ✓</button>' +
             '</div>' +
-            '<div class="ph-ci-hint">打一次卡即记入连续天数与覆盖度；也可写进「今日经营」让 AI 抓。</div>' +
+            '<div class="ph-ci-hint">打一次卡即记入连续天数与覆盖度；也可写进「每日复盘」让 AI 抓。</div>' +
             '</div>';
     }
 
@@ -598,14 +598,14 @@ var PraxisHealth = (function() {
         try {
             var res = await API.praxisHealthDerive();
             if (!res || res.success === false) throw new Error((res && res.error) || '派生失败');
-            if (typeof showToast === 'function') showToast('已从今日经营派生 ' + (res.derived || 0) + ' 条身体信号', 'success');
+            if (typeof showToast === 'function') showToast('已从每日复盘派生 ' + (res.derived || 0) + ' 条身体信号', 'success');
             await load();
         } catch (err) {
             console.error('[PraxisHealth] runDerive', err);
             if (typeof showToast === 'function') showToast(err.message || '派生失败', 'error');
         } finally {
             _busy = false;
-            if (btn) { btn.disabled = false; btn.textContent = '↺ 从今日经营派生'; }
+            if (btn) { btn.disabled = false; btn.textContent = '↺ 从每日复盘派生'; }
         }
     }
 
