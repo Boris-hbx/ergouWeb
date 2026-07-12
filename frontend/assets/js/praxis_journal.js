@@ -79,7 +79,7 @@ var PraxisJournal = (function() {
             _entry = (res.items && res.items[0]) || null;
         } catch (err) {
             console.error('[PraxisJournal] load day failed', err);
-            if (typeof showToast === 'function') showToast('今日经营加载失败', 'error');
+            if (typeof showToast === 'function') showToast('每日复盘加载失败', 'error');
         }
         var raw = document.getElementById('pj-raw');
         if (raw) raw.value = _entry ? (_entry.rawText || '') : '';
@@ -208,7 +208,7 @@ var PraxisJournal = (function() {
             if (_entry.structured && typeof _entry.structured === 'object') {
                 renderAi(_entry.structured);
             }
-            if (typeof showToast === 'function') showToast('已生成今日经营卡', 'success');
+            if (typeof showToast === 'function') showToast('已生成每日复盘卡', 'success');
         } catch (err) {
             console.error('[PraxisJournal] analyze failed', err);
             // 原文已保存，分析失败可重试，不阻塞（spec §5.3）。
@@ -231,7 +231,7 @@ var PraxisJournal = (function() {
         var events = Array.isArray(s.events) ? s.events.slice(0, 3) : [];
         var risks = Array.isArray(s.risks) ? s.risks : [];
         var html = '<div class="pj-card pj-fade">';
-        html += '<div class="pj-card-head"><span class="pj-card-title">今日经营卡</span>' +
+        html += '<div class="pj-card-head"><span class="pj-card-title">每日复盘卡</span>' +
             '<span class="pj-card-date">' + esc(_entry ? _entry.entryDate : _date) + '</span></div>';
         if (s.value && VALUE_LABELS[s.value]) {
             html += '<div class="pj-card-type pj-type-' + esc(s.value) + '">' + esc(VALUE_LABELS[s.value]) + '</div>';
